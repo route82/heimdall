@@ -113,6 +113,8 @@ const esc = s => (s??'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;
 const hms = s => { s=+s||0; return `${Math.floor(s/3600)}:${String(Math.floor(s%3600/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; };
 const STATUS = {draft:'전사만', review:'검토 중', reported:'경영진 보고됨', archived:'보관'};
 const ROLE = {member:'구성원', manager:'부서 관리자', exec:'경영진', admin:'관리자'};
+const ROLE_HELP = {member:'본인이 참석한 회의만', manager:'전체 회의 · 경영진 보고',
+  exec:'보고된 회의 · 사람 관리', admin:'전부 · 사람 관리'};
 let me=null, view='list', cur=null, editing=false;
 
 function toast(html,ms=3600){const t=document.createElement('div');t.className='toast';t.innerHTML=html;
@@ -235,7 +237,7 @@ function profilePage(row, msg=''){
 // ─────────────────────────── 뼈대
 function shell(){
   const tabs = [['list','회의'],['search','검색'],['actions','액션아이템'],['brief','브리핑']];
-  if(me.role==='admin') tabs.push(['members','구성원']);
+  if(['admin','exec'].includes(me.role)) tabs.push(['members','구성원']);
   $('#app').innerHTML = `
    <div class="top"><div class="brand"><svg class="bolt" viewBox="0 0 400 100" fill="currentColor" aria-hidden="true"><polygon points="0,37.5 236,0 236,50 400,50 400,62.5 164,100 164,50 0,50"/></svg>HEIMDALL</div>
      ${tabs.map(([k,l])=>`<button class="nav" data-v="${k}">${l}</button>`).join('')}
@@ -534,8 +536,8 @@ async function renderMembers(){
           <option value="">소속 회사</option>${COMPANIES.map(c=>`<option>${c}</option>`).join('')}
         </select>
         <input id="iv-dept" placeholder="부서" style="flex:1;min-width:120px">
-        <select id="iv-role" style="min-width:130px">
-          ${Object.entries(ROLE).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}
+        <select id="iv-role" style="min-width:190px">
+          ${Object.entries(ROLE).map(([k,v])=>`<option value="${k}">${v} — ${ROLE_HELP[k]}</option>`).join('')}
         </select>
         <button class="btn p" id="iv-add">추가</button>
       </div>
@@ -599,7 +601,7 @@ async function renderMembers(){
 
 // 승인 대기 알림 배지
 async function checkPending(){
-  if(me.role!=='admin') return;
+  if(!['admin','exec'].includes(me.role)) return;
   const {data}=await SB.rpc('hd_pending');
   if(data&&data.length){
     const b=document.querySelector('.nav[data-v=members]');
