@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HEIMDALL</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#1B1F26">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="HEIMDALL">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 400 400%22%3E%3Crect width=%22400%22 height=%22400%22 rx=%2280%22 fill=%22%231B1F26%22/%3E%3Cpolygon points=%2230,187 266,150 266,200 370,200 370,212 194,250 194,200 30,200%22 fill=%22%23fff%22/%3E%3C/svg%3E">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#F5F6F8;color:#1B1F26;line-height:1.7;
+ font-family:-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit}
+.top{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid #E6EAF0;
+ display:flex;align-items:center;gap:6px;padding:0 22px}
+.brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:17px;
+ letter-spacing:.03em;margin-right:14px;padding:15px 0}
+.bolt{height:.62em;width:auto;display:block;flex:none}
+.login .mark{display:flex;align-items:center;gap:11px;margin-bottom:18px}
+.login .mark .bolt{height:26px}
+.login .mark span{font-weight:800;font-size:23px;letter-spacing:.03em}
+.login h2{margin:0 0 6px;font-size:21px}
+.nav{appearance:none;border:0;background:none;font-size:14.5px;font-weight:600;color:#8A93A1;
+ padding:16px 13px;cursor:pointer;border-bottom:2.5px solid transparent}
+.nav[aria-current=true]{color:#0B65D8;border-bottom-color:#0B65D8}
+.me{margin-left:auto;font-size:13px;color:#8A93A1;display:flex;align-items:center;gap:10px}
+.role{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:#EEF2F7;color:#4A5464}
+.wrap{max-width:1000px;margin:0 auto;padding:26px 22px 90px}
+.page{display:none}.page.on{display:block}
+h1{font-size:23px;margin:0 0 4px;letter-spacing:-.01em}
+.sub{color:#8A93A1;font-size:13.5px;margin-bottom:22px}
+.card{display:block;background:#fff;border:1px solid #E6EAF0;border-radius:12px;padding:16px 20px;
+ margin-bottom:10px;cursor:pointer;transition:.12s}
+.card:hover{border-color:#0B65D8;box-shadow:0 3px 14px rgba(11,101,216,.08)}
+.ct{font-size:16.5px;font-weight:700;margin-bottom:4px}
+.cm{font-size:13px;color:#8A93A1;display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.tag{font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px}
+.t-draft{background:#EEF1F5;color:#5B6472}.t-review{background:#FFF3D6;color:#8A6100}
+.t-reported{background:#E3F5E9;color:#1B6B36}.t-archived{background:#EDE9F5;color:#5A3699}
+.btn{appearance:none;border:1px solid #DDE2E9;background:#fff;border-radius:9px;padding:9px 16px;
+ font-size:14px;font-weight:600;cursor:pointer;color:#3A424F}
+.btn.p{background:#0B65D8;border-color:#0B65D8;color:#fff}
+.btn.g{background:#12833F;border-color:#12833F;color:#fff}
+.btn:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+input,select,textarea{font-family:inherit;font-size:14.5px;padding:10px 13px;border:1px solid #DDE2E9;
+ border-radius:9px;background:#fff}
+input:focus,textarea:focus,select:focus{outline:none;border-color:#0B65D8}
+.full{width:100%}
+.box{background:#fff;border:1px solid #E6EAF0;border-radius:12px;padding:22px 24px;margin-bottom:14px}
+.tabs{display:flex;gap:3px;border-bottom:1px solid #E6EAF0;margin:18px 0 20px}
+.tab{appearance:none;border:0;background:none;font-size:15px;font-weight:600;color:#8A93A1;
+ padding:11px 15px;cursor:pointer;border-bottom:2.5px solid transparent}
+.tab[aria-selected=true]{color:#0B65D8;border-bottom-color:#0B65D8}
+.pane{display:none}.pane.on{display:block}
+.seg{display:grid;grid-template-columns:70px 1fr;gap:14px;padding:7px 0}
+.seg:hover{background:#FAFBFD}
+.ts{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:#98A0AC;padding-top:3px}
+.spk{display:inline-block;font-size:12px;font-weight:700;padding:2px 9px;border-radius:20px;margin-bottom:3px}
+.s0{background:#E4EEFC;color:#144E9C}.s1{background:#E7F4E8;color:#1F6B33}
+.s2{background:#FBEBE2;color:#9B4A15}.s3{background:#F0E9FA;color:#5A3699}
+.s4{background:#FCE9EF;color:#95214A}.s5{background:#E6F2F4;color:#14615F}
+.seg p{margin:0}
+[contenteditable=true]{outline:1px dashed #C7D3E4;border-radius:6px;padding:3px 7px;background:#FCFDFF}
+[contenteditable=true]:focus{outline:2px solid #0B65D8;background:#fff}
+.hl{border-left:3px solid #0B65D8;padding:2px 0 2px 18px;margin-bottom:24px}
+.hl .ts{margin-bottom:4px}
+.hl h3{font-size:17.5px;margin:0 0 8px;line-height:1.5}
+.hl ul{margin:0;padding-left:18px;color:#3A424F}.hl li{margin:5px 0;font-size:15px}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:10px 0}
+th,td{border:1px solid #E6EAF0;padding:9px 11px;text-align:left;vertical-align:top}
+th{background:#F5F7FA;font-weight:600}
+.md h1{font-size:21px}.md h2{font-size:17.5px;margin:26px 0 10px;padding-bottom:7px;border-bottom:1px solid #EEF1F5}
+.md ul{padding-left:19px}
+.act{display:grid;grid-template-columns:26px 1fr auto;gap:12px;align-items:start;
+ padding:12px 0;border-top:1px solid #F0F2F5}
+.act input[type=checkbox]{width:19px;height:19px;margin-top:3px}
+.act .meta{font-size:12.5px;color:#98A0AC;margin-top:2px}
+.act.done .task{text-decoration:line-through;color:#A8B0BA}
+.hit{background:#fff;border:1px solid #E6EAF0;border-radius:10px;padding:13px 16px;margin-bottom:8px;cursor:pointer}
+.hit:hover{border-color:#0B65D8}
+.hit .h{font-size:12.5px;color:#8A93A1;margin-bottom:3px}
+mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
+.empty{padding:52px;text-align:center;color:#98A0AC;background:#fff;border:1px dashed #DDE2E9;border-radius:12px}
+.login{max-width:400px;margin:14vh auto;background:#fff;border:1px solid #E6EAF0;border-radius:14px;padding:34px}
+.login h2{margin:0 0 6px;font-size:21px}.login p{margin:0 0 20px;color:#8A93A1;font-size:14px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:26px;background:#1B1F26;color:#fff;
+ padding:13px 20px;border-radius:10px;font-size:14px;z-index:80;box-shadow:0 6px 22px rgba(0,0,0,.25)}
+.bar{position:fixed;right:22px;bottom:22px;display:flex;gap:9px;z-index:50}
+.bar .btn{box-shadow:0 4px 16px rgba(0,0,0,.16);padding:12px 20px;border-radius:24px}
+.hist{margin-top:26px;font-size:12.5px;color:#98A0AC}
+.hist div{padding:4px 0;border-top:1px solid #F2F4F7}
+.install{appearance:none;border:1px solid #DDE2E9;background:#fff;border-radius:8px;
+ padding:5px 11px;font-size:12.5px;font-weight:600;color:#0B65D8;cursor:pointer}
+.upd{position:fixed;left:50%;transform:translateX(-50%);bottom:26px;background:#0B65D8;color:#fff;
+ padding:11px 18px;border-radius:10px;font-size:14px;z-index:90;cursor:pointer;
+ box-shadow:0 6px 22px rgba(11,101,216,.35)}
+@media(max-width:640px){.wrap{padding:18px 14px 90px}.seg{grid-template-columns:58px 1fr;gap:9px}}
+</style></head><body>
+
+<div id="app"><div class="login"><div class="mark"><svg class="bolt" viewBox="0 0 400 100" fill="currentColor" aria-hidden="true"><polygon points="0,37.5 236,0 236,50 400,50 400,62.5 164,100 164,50 0,50"/></svg><span>HEIMDALL</span></div>
+<p>불러오는 중…</p></div></div>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+const SB = createClient('https://dwoiobqucmikbtikfjwk.supabase.co', 'sb_publishable_K6BW26u2jRkTBDwuMqaaFA_3HkfnOc9');
+const $ = (s,r=document)=>r.querySelector(s);
+const esc = s => (s??'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const hms = s => { s=+s||0; return `${Math.floor(s/3600)}:${String(Math.floor(s%3600/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; };
+const STATUS = {draft:'전사만', review:'검토 중', reported:'경영진 보고됨', archived:'보관'};
+const ROLE = {member:'구성원', manager:'부서 관리자', exec:'경영진', admin:'관리자'};
+let me=null, view='list', cur=null, editing=false;
+
+function toast(html,ms=3600){const t=document.createElement('div');t.className='toast';t.innerHTML=html;
+  document.body.appendChild(t);setTimeout(()=>t.remove(),ms);}
+
+// ─────────────────────────── 로그인 · 가입
+const COMPANIES = ['더올마이티','루트82','슈퍼홀릭','라피스인터내셔널'];
+const AUTH_MSG = {
+  'Invalid login credentials':'이메일 또는 비밀번호가 맞지 않습니다.',
+  'User already registered':'이미 가입된 이메일입니다. 로그인해주세요.',
+  'Password should be at least 6 characters.':'비밀번호는 6자 이상이어야 합니다.',
+  'Email not confirmed':'메일 확인이 필요한 설정입니다. 관리자에게 문의해주세요.',
+};
+const authErr = m => AUTH_MSG[m] || m;
+
+function loginPage(mode='in', msg=''){
+  const isUp = mode==='up';
+  $('#app').innerHTML = `<div class="login">
+    <div class="mark"><svg class="bolt" viewBox="0 0 400 100" fill="currentColor" aria-hidden="true"><polygon points="0,37.5 236,0 236,50 400,50 400,62.5 164,100 164,50 0,50"/></svg><span>HEIMDALL</span></div>
+    <div class="tabs" style="margin:4px 0 20px">
+      <button class="tab" data-m="in" ${!isUp?'aria-selected="true"':''}>로그인</button>
+      <button class="tab" data-m="up" ${isUp?'aria-selected="true"':''}>가입</button>
+    </div>
+    <input class="full" id="em" type="email" placeholder="회사 이메일" style="margin-bottom:10px">
+    <input class="full" id="pw" type="password" placeholder="비밀번호 (6자 이상)" style="margin-bottom:10px">
+    ${isUp?`
+      <input class="full" id="nm" placeholder="이름 (예: 김현우)" style="margin-bottom:10px">
+      <select class="full" id="co" style="margin-bottom:10px">
+        <option value="">소속 회사 선택</option>
+        ${COMPANIES.map(c=>`<option>${c}</option>`).join('')}
+      </select>
+      <input class="full" id="dp" placeholder="부서 (예: 글로벌커머스팀)" style="margin-bottom:10px">`:''}
+    <button class="btn p full" id="go">${isUp?'가입하고 시작하기':'로그인'}</button>
+    ${!isUp?'<button class="btn full" id="reset" style="margin-top:9px;border:0;color:#8A93A1;font-size:13px">비밀번호를 잊으셨나요?</button>':''}
+    <p style="margin-top:14px;font-size:13px;color:${msg.startsWith('!')?'#C0392B':'#98A0AC'}">${esc(msg.replace(/^!/,''))}</p>
+    ${isUp?'<p style="font-size:12.5px;color:#98A0AC;margin:0">가입 신청 후 관리자 승인이 있어야 이용하실 수 있습니다.</p>':''}
+  </div>`;
+
+  document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>loginPage(t.dataset.m));
+
+  const email=()=>$('#em').value.trim(), pw=()=>$('#pw').value;
+  $('#go').onclick = async () => {
+    if(!email()||!pw()) return loginPage(mode,'!이메일과 비밀번호를 입력해주세요.');
+    $('#go').disabled=true; $('#go').textContent='잠시만요…';
+    if(isUp){
+      const nm=$('#nm').value.trim(), co=$('#co').value, dp=$('#dp').value.trim();
+      if(!nm||!co) { return loginPage('up','!이름과 소속 회사는 반드시 입력해주세요.'); }
+      const {data,error} = await SB.auth.signUp({email:email(), password:pw(),
+        options:{data:{name:nm, company:co, dept:dp}}});
+      if(error) return loginPage('up','!'+authErr(error.message));
+      if(!data.session)
+        return loginPage('in','가입되었습니다. 메일 확인이 필요한 설정이라면 메일함을 확인해주세요.');
+      // 트리거가 못 채운 경우를 대비해 한 번 더 저장합니다
+      await SB.from('hd_member').update({name:nm, company:co, dept:dp}).eq('id',data.user.id);
+      boot();
+    } else {
+      const {error} = await SB.auth.signInWithPassword({email:email(), password:pw()});
+      if(error) return loginPage('in','!'+authErr(error.message));
+      boot();
+    }
+  };
+  $('#em')?.addEventListener('keydown',e=>{if(e.key==='Enter')$('#pw').focus();});
+  $('#pw')?.addEventListener('keydown',e=>{if(e.key==='Enter'&&!isUp)$('#go').click();});
+  const rs=$('#reset');
+  if(rs) rs.onclick = async () => {
+    if(!email()) return loginPage('in','!이메일을 먼저 입력해주세요.');
+    const {error} = await SB.auth.resetPasswordForEmail(email(), {redirectTo:location.href});
+    loginPage('in', error? '!'+authErr(error.message) : '재설정 메일을 보냈습니다.');
+  };
+}
+
+// 승인 대기 화면
+const ADMIN_MAILS = ['seokinho@gmail.com','Kdamian2025@gmail.com',
+  'zeus@thealmighty.co.kr','khw@jhhds.co.kr','route82biz@gmail.com'];
+function pendingPage(row){
+  $('#app').innerHTML = `<div class="login">
+    <div class="mark"><svg class="bolt" viewBox="0 0 400 100" fill="currentColor" aria-hidden="true"><polygon points="0,37.5 236,0 236,50 400,50 400,62.5 164,100 164,50 0,50"/></svg><span>HEIMDALL</span></div>
+    <h2>가입 승인 대기</h2>
+    <p><b>${esc(row.name)}</b> 님, 가입 신청이 접수되었습니다.<br>
+       관리자가 승인해야 회의를 보실 수 있습니다.</p>
+    <div class="box" style="margin:0 0 16px;padding:14px 16px;font-size:13.5px;color:#5B6472">
+      ${esc(row.company||'')} ${esc(row.dept||'')}<br>${esc(row.email)}
+    </div>
+    <p style="font-size:13px;color:#8A93A1;margin-bottom:16px">
+      승인 권한이 있는 분<br>${ADMIN_MAILS.map(m=>esc(m)).join('<br>')}
+    </p>
+    <button class="btn p full" id="again">승인됐는지 확인</button>
+    <button class="btn full" id="out3" style="margin-top:8px;border:0;color:#8A93A1;font-size:13px">로그아웃</button>
+  </div>`;
+  $('#again').onclick=()=>boot();
+  $('#out3').onclick=async()=>{await SB.auth.signOut(); loginPage();};
+}
+
+// 가입 정보가 비어 있으면 채우게 합니다 (예전 계정 대응)
+function profilePage(row, msg=''){
+  $('#app').innerHTML = `<div class="login">
+    <div class="mark"><svg class="bolt" viewBox="0 0 400 100" fill="currentColor" aria-hidden="true"><polygon points="0,37.5 236,0 236,50 400,50 400,62.5 164,100 164,50 0,50"/></svg><span>HEIMDALL</span></div>
+    <h2>프로필 확인</h2>
+    <p>직함은 넣지 마세요. 이름만 적으시면 됩니다.</p>
+    <input class="full" id="nm" placeholder="이름 (예: 김현우)" value="${esc(row.name||'')}" style="margin-bottom:10px">
+    <select class="full" id="co" style="margin-bottom:10px">
+      <option value="">소속 회사 선택</option>
+      ${COMPANIES.map(c=>`<option ${row.company===c?'selected':''}>${c}</option>`).join('')}
+    </select>
+    <input class="full" id="dp" placeholder="부서" value="${esc(row.dept||'')}" style="margin-bottom:12px">
+    <button class="btn p full" id="save">저장하고 시작하기</button>
+    <p style="margin-top:12px;font-size:13px;color:#C0392B">${esc(msg)}</p>
+    <button class="btn full" id="out2" style="margin-top:6px;border:0;color:#8A93A1;font-size:13px">다른 계정으로 로그인</button>
+  </div>`;
+  $('#save').onclick = async () => {
+    const nm=$('#nm').value.trim(), co=$('#co').value, dp=$('#dp').value.trim();
+    if(!nm||!co) return profilePage(row,'이름과 소속 회사는 반드시 입력해주세요.');
+    const {error} = await SB.from('hd_member').update({name:nm, company:co, dept:dp}).eq('id',row.id);
+    if(error) return profilePage(row, error.message);
+    boot();
+  };
+  $('#out2').onclick = async()=>{await SB.auth.signOut(); loginPage();};
+}
+
+// ─────────────────────────── 뼈대
+function shell(){
+  const tabs = [['list','회의'],['search','검색'],['actions','액션아이템'],['brief','브리핑']];
+  if(me.role==='admin') tabs.push(['members','구성원']);
+  $('#app').innerHTML = `
+   <div class="top"><div class="brand"><svg class="bolt" viewBox="0 0 400 100" fill="currentColor" aria-hidden="true"><polygon points="0,37.5 236,0 236,50 400,50 400,62.5 164,100 164,50 0,50"/></svg>HEIMDALL</div>
+     ${tabs.map(([k,l])=>`<button class="nav" data-v="${k}">${l}</button>`).join('')}
+     <div class="me"><span>${esc(me.company||'')} ${esc(me.name)}</span><span class="role">${ROLE[me.role]||me.role}</span>
+       <button class="install" id="inst" style="display:none">앱으로 설치</button>
+       <button class="btn" id="out" style="padding:5px 11px;font-size:12.5px">로그아웃</button></div>
+   </div>
+   <div class="wrap">
+     <div class="page" id="p-list"></div><div class="page" id="p-search"></div>
+     <div class="page" id="p-actions"></div><div class="page" id="p-brief"></div>
+     <div class="page" id="p-members"></div>
+     <div class="page" id="p-meeting"></div>
+   </div>`;
+  document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>go(b.dataset.v));
+  $('#out').onclick = async()=>{await SB.auth.signOut();location.reload();};
+  wireInstall();
+}
+
+function go(v){
+  view=v; cur=null;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.nav').forEach(b=>b.setAttribute('aria-current', b.dataset.v===v));
+  const el=$('#p-'+v); if(el) el.classList.add('on');
+  ({list:renderList, search:renderSearch, actions:renderActions, brief:renderBrief,
+    members:renderMembers}[v]||(()=>{}))();
+}
+
+// ─────────────────────────── 회의 목록
+async function renderList(){
+  const el=$('#p-list'); el.innerHTML='<div class="sub">불러오는 중…</div>';
+  const {data,error} = await SB.from('hd_meeting')
+    .select('id,title,held_on,status,duration_sec,dept,summary_md').order('held_on',{ascending:false}).limit(200);
+  if(error) return el.innerHTML=`<div class="empty">${esc(error.message)}</div>`;
+  el.innerHTML = `<h1>회의</h1><div class="sub">${data.length}건 · ${ROLE[me.role]} 권한으로 보이는 것만 표시됩니다</div>`
+   + (data.length? data.map(m=>`<div class="card" data-id="${m.id}">
+        <div class="ct">${esc(m.title)}</div>
+        <div class="cm"><span class="tag t-${m.status}">${STATUS[m.status]}</span>
+          <span>${m.held_on}</span>${m.duration_sec?`<span>${hms(m.duration_sec)}</span>`:''}
+          ${m.summary_md?'':'<span>요약 없음</span>'}</div></div>`).join('')
+     : '<div class="empty">아직 올라온 회의가 없습니다.<br><br>대표님 맥에서 <b>./heimdall push</b> 를 실행하세요.</div>');
+  el.querySelectorAll('.card').forEach(c=>c.onclick=()=>openMeeting(c.dataset.id));
+}
+
+// ─────────────────────────── 회의 상세
+async function openMeeting(id){
+  editing=false;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  const el=$('#p-meeting'); el.classList.add('on'); el.innerHTML='<div class="sub">불러오는 중…</div>';
+  const [m,segs,hls,acts,edits,att] = await Promise.all([
+    SB.from('hd_meeting').select('*').eq('id',id).single(),
+    SB.from('hd_segment').select('*').eq('meeting_id',id).order('idx'),
+    SB.from('hd_highlight').select('*').eq('meeting_id',id).order('idx'),
+    SB.from('hd_action').select('*').eq('meeting_id',id).order('idx'),
+    SB.from('hd_edit').select('*').eq('meeting_id',id).order('at',{ascending:false}).limit(30),
+    SB.from('hd_attendee').select('name').eq('meeting_id',id),
+  ]);
+  if(m.error) return el.innerHTML=`<div class="empty">${esc(m.error.message)}</div>`;
+  cur = {m:m.data, segs:segs.data||[], hls:hls.data||[], acts:acts.data||[],
+         edits:edits.data||[], att:(att.data||[]).map(a=>a.name)};
+  drawMeeting();
+}
+
+function drawMeeting(){
+  const {m,segs,hls,acts,edits,att} = cur;
+  const names=[...new Set(segs.map(s=>s.speaker).filter(Boolean))];
+  const si=n=>'s'+(names.indexOf(n)%6);
+  const canReport = ['manager','admin'].includes(me.role);
+  const el=$('#p-meeting');
+  el.innerHTML = `
+  <div class="row" style="margin-bottom:12px"><button class="btn" id="back">← 목록</button>
+    <span class="tag t-${m.status}">${STATUS[m.status]}</span>
+    ${m.reported_at?`<span class="sub" style="margin:0">보고 ${m.reported_at.slice(0,10)}</span>`:''}</div>
+  <h1>${esc(m.title)}</h1>
+  <div class="sub">${m.held_on} · ${hms(m.duration_sec)} · ${att.length?esc(att.join(', ')):'참석자 미기재'}</div>
+  <div class="tabs">
+    <button class="tab" aria-selected="true">하이라이트</button>
+    <button class="tab">전사</button><button class="tab">요약</button>
+    <button class="tab">액션아이템 ${acts.length?`(${acts.filter(a=>a.state==='open').length})`:''}</button>
+  </div>
+  <div class="pane on">${hls.length? hls.map((h,i)=>`<div class="hl" data-i="${i}">
+      <div class="ts">${hms(h.start_sec)}</div><h3>${esc(h.headline)}</h3>
+      ${(h.points||[]).length?`<ul>${h.points.map(p=>`<li>${esc(p)}</li>`).join('')}</ul>`:''}</div>`).join('')
+    : '<div class="empty">하이라이트가 없습니다.</div>'}</div>
+  <div class="pane"><input class="full" id="q2" placeholder="이 회의에서 찾기" style="margin-bottom:14px">
+    <div id="segs">${segs.map(s=>`<div class="seg"><div class="ts">${hms(s.start_sec)}</div>
+      <div>${s.speaker?`<span class="spk ${si(s.speaker)}">${esc(s.speaker)}</span><br>`:''}
+      <p data-i="${s.idx}">${esc(s.text)}</p></div></div>`).join('')}</div></div>
+  <div class="pane"><div class="md" id="smview">${mdHtml(m.summary_md||'')}</div>
+    <textarea id="smedit" class="full" style="display:none;min-height:520px;font-family:ui-monospace,Menlo,monospace;font-size:13.5px"></textarea></div>
+  <div class="pane">${acts.length? acts.map(a=>`<div class="act ${a.state!=='open'?'done':''}" data-id="${a.id}">
+      <input type="checkbox" ${a.state==='done'?'checked':''}>
+      <div><div class="task">${esc(a.task)}</div>
+        <div class="meta">${esc(a.owner_name||'담당 미정')}${a.due?' · '+esc(a.due):''}
+        ${a.done_at?' · 완료 '+a.done_at.slice(0,10):''}</div></div>
+      <span class="tag ${a.state==='done'?'t-reported':'t-review'}">${a.state==='done'?'완료':'진행'}</span>
+    </div>`).join('') : '<div class="empty">액션아이템이 없습니다.</div>'}</div>
+  ${edits.length?`<div class="hist"><b>편집 이력</b>${edits.map(e=>
+     `<div>${e.at.slice(0,16).replace('T',' ')} · ${esc(e.editor)} · ${e.kind}</div>`).join('')}</div>`:''}
+  <div class="bar">
+    ${canReport && m.status!=='reported' ? '<button class="btn g" id="rep">경영진 보고</button>':''}
+    ${canReport && m.status==='reported' ? '<button class="btn" id="unrep">보고 취소</button>':''}
+    <button class="btn" id="cancel" style="display:none">취소</button>
+    <button class="btn p" id="edit">편집</button></div>`;
+
+  const tabs=[...el.querySelectorAll('.tab')], panes=[...el.querySelectorAll('.pane')];
+  tabs.forEach((t,i)=>t.onclick=()=>{tabs.forEach(x=>x.setAttribute('aria-selected','false'));
+    panes.forEach(p=>p.classList.remove('on'));t.setAttribute('aria-selected','true');panes[i].classList.add('on');});
+  $('#back').onclick=()=>go('list');
+
+  const q=$('#q2'); q.oninput=()=>{const v=q.value.trim().toLowerCase();
+    el.querySelectorAll('#segs .seg').forEach(s=>{const p=s.querySelector('p');
+      s.style.display = !v || p.textContent.toLowerCase().includes(v) ? '' : 'none';});};
+
+  el.querySelectorAll('.act input').forEach(cb=>cb.onchange=async()=>{
+    const id=cb.closest('.act').dataset.id;
+    const st=cb.checked?'done':'open';
+    const {error}=await SB.from('hd_action').update({state:st, done_at:cb.checked?new Date().toISOString():null}).eq('id',id);
+    if(error){toast('변경 실패: '+esc(error.message));cb.checked=!cb.checked;return;}
+    cb.closest('.act').classList.toggle('done',cb.checked);
+    toast(cb.checked?'완료 처리했습니다':'다시 진행으로 되돌렸습니다',1800);
+  });
+
+  const rep=$('#rep'), unrep=$('#unrep');
+  if(rep) rep.onclick=async()=>{
+    if(!confirm('이 회의록을 경영진께 보고합니다. 보고 후에는 부서 관리자만 수정할 수 있습니다.')) return;
+    const {error}=await SB.rpc('hd_report',{mid:m.id});
+    if(error) return toast('실패: '+esc(error.message));
+    toast('경영진 보고 완료');openMeeting(m.id);};
+  if(unrep) unrep.onclick=async()=>{
+    const {error}=await SB.rpc('hd_unreport',{mid:m.id});
+    if(error) return toast('실패: '+esc(error.message));
+    toast('보고를 취소했습니다');openMeeting(m.id);};
+
+  $('#edit').onclick=()=>editing?saveMeeting():startEdit();
+  $('#cancel').onclick=()=>openMeeting(m.id);
+}
+
+function startEdit(){
+  const el=$('#p-meeting');
+  const nm = s => (s||'').replace(/\s/g,'');
+  const same = (a,b) => nm(a).length>1 && nm(b).length>1 && (nm(a).includes(nm(b)) || nm(b).includes(nm(a)));
+  const allowed = ['manager','admin'].includes(me.role) || cur.att.some(a=>same(a, me.name));
+  if(!allowed) return toast('이 회의 참석자만 수정할 수 있습니다.<br>참석자: '+esc(cur.att.join(', ')||'미기재'),5000);
+  if(cur.m.status==='reported' && !['manager','admin'].includes(me.role))
+    return toast('경영진께 보고된 회의는 부서 관리자만 수정할 수 있습니다.',5000);
+  editing=true;
+  el.querySelectorAll('#segs p, .hl h3, .hl li').forEach(e=>{e.contentEditable='true';e.spellcheck=false;});
+  $('#smview').style.display='none';
+  const ta=$('#smedit'); ta.style.display='block'; ta.value=cur.m.summary_md||'';
+  $('#edit').textContent='저장'; $('#cancel').style.display='';
+  toast('편집 중입니다. 글자를 눌러 바로 고치세요.');
+}
+
+async function saveMeeting(){
+  const el=$('#p-meeting'), btn=$('#edit');
+  btn.disabled=true; btn.textContent='저장 중…';
+  const id=cur.m.id, msg=[];
+
+  const changed=[];
+  el.querySelectorAll('#segs p').forEach(p=>{
+    const i=+p.dataset.i, t=p.innerText.trim(), o=cur.segs.find(s=>s.idx===i);
+    if(o && t!==o.text) changed.push({old:o.text,neu:t,row:o});
+  });
+  for(const c of changed) await SB.from('hd_segment').update({text:c.neu}).eq('id',c.row.id);
+  if(changed.length){
+    msg.push(`전사 ${changed.length}곳 수정`);
+    const rules = learn(changed);
+    if(rules.length){
+      await SB.from('hd_rule').upsert(rules.map(r=>({wrong:r.a,right_:r.b,reason:r.why,
+        approved:r.ok,by_name:me.name})),{onConflict:'wrong'});
+      const ok=rules.filter(r=>r.ok);
+      if(ok.length) msg.push('교정 규칙 <b>'+ok.map(r=>r.a+'→'+r.b).join(', ')+'</b> 등록');
+    }
+  }
+
+  const hls=[...el.querySelectorAll('.hl')];
+  for(const h of hls){
+    const i=+h.dataset.i, o=cur.hls[i]; if(!o) continue;
+    const head=h.querySelector('h3').innerText.trim();
+    const pts=[...h.querySelectorAll('li')].map(li=>li.innerText.trim()).filter(Boolean);
+    if(head!==o.headline || JSON.stringify(pts)!==JSON.stringify(o.points))
+      await SB.from('hd_highlight').update({headline:head,points:pts}).eq('id',o.id);
+  }
+  const sm=$('#smedit').value;
+  if(sm!==(cur.m.summary_md||'')){
+    await SB.from('hd_meeting').update({summary_md:sm}).eq('id',id);
+    msg.push('요약 수정');
+  }
+  await SB.from('hd_edit').insert({meeting_id:id, editor:me.name, kind:'web',
+    detail:{문장:changed.length}});
+  toast(msg.join('<br>')||'변경 사항이 없습니다', 3000);
+  setTimeout(()=>openMeeting(id), 900);
+}
+
+// 낱말 하나가 낱말 하나로 바뀐 것만 규칙 후보로 봅니다 (맥 쪽 rules.py 와 같은 기준)
+const COMMON=new Set('그거 그건 그게 지금 아직 오늘 내일 어제 이후 이전 대상 상태 상황 내용 부분 경우 정도 문제 방법 생각 사람 시간 다음 이번 나중 우리 저희'.split(' '));
+function learn(changed){
+  const out=[];
+  for(const c of changed){
+    const A=c.old.match(/[가-힣]+|[A-Za-z][A-Za-z0-9]*/g)||[], B=c.neu.match(/[가-힣]+|[A-Za-z][A-Za-z0-9]*/g)||[];
+    if(A.length!==B.length) continue;
+    for(let i=0;i<A.length;i++){
+      if(A[i]===B[i]) continue;
+      const a=A[i], b=B[i];
+      const ok = a.length>=3 && !COMMON.has(a) && !COMMON.has(b) && a.length<=12;
+      out.push({a,b,ok,why: ok?'웹 편집에서 학습':'검토 필요 (짧거나 흔한 낱말)'});
+    }
+  }
+  return out;
+}
+
+// ─────────────────────────── 검색
+function renderSearch(){
+  $('#p-search').innerHTML = `<h1>검색</h1>
+   <div class="sub">전체 회의의 발언에서 찾습니다. 볼 수 있는 회의만 검색됩니다.</div>
+   <div class="row" style="margin-bottom:18px">
+     <input class="full" id="q" placeholder="예: 리드타임, 에스토니아, 이홍림" style="flex:1">
+     <button class="btn p" id="sgo">찾기</button></div><div id="res"></div>`;
+  const run=async()=>{
+    const q=$('#q').value.trim(); if(!q) return;
+    $('#res').innerHTML='<div class="sub">찾는 중…</div>';
+    const {data,error}=await SB.rpc('hd_search',{q, lim:80});
+    if(error) return $('#res').innerHTML=`<div class="empty">${esc(error.message)}</div>`;
+    if(!data.length) return $('#res').innerHTML='<div class="empty">결과가 없습니다.</div>';
+    const re=new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');
+    $('#res').innerHTML=`<div class="sub">${data.length}건</div>`+data.map(r=>
+      `<div class="hit" data-id="${r.meeting_id}"><div class="h">${esc(r.title)} · ${r.held_on} · ${hms(r.start_sec)}${r.speaker?' · '+esc(r.speaker):''}</div>
+       <div>${esc(r.body).replace(re,'<mark>$1</mark>')}</div></div>`).join('');
+    $('#res').querySelectorAll('.hit').forEach(h=>h.onclick=()=>openMeeting(h.dataset.id));
+  };
+  $('#sgo').onclick=run; $('#q').onkeydown=e=>{if(e.key==='Enter')run();};
+  $('#q').focus();
+}
+
+// ─────────────────────────── 액션아이템
+async function renderActions(){
+  const el=$('#p-actions'); el.innerHTML='<div class="sub">불러오는 중…</div>';
+  const {data,error}=await SB.from('hd_action_board').select('*').order('held_on',{ascending:false});
+  if(error) return el.innerHTML=`<div class="empty">${esc(error.message)}</div>`;
+  const open=data.filter(a=>a.state==='open'), done=data.filter(a=>a.state!=='open');
+  const card=a=>`<div class="act ${a.state!=='open'?'done':''}" data-id="${a.id}">
+     <input type="checkbox" ${a.state==='done'?'checked':''}>
+     <div><div class="task">${esc(a.task)}</div>
+       <div class="meta">${esc(a.owner_name||'담당 미정')}${a.due?' · '+esc(a.due):''} · ${esc(a.meeting_title)} (${a.held_on})</div></div>
+     <span class="tag ${a.state==='done'?'t-reported':'t-review'}">${a.state==='done'?'완료':'진행'}</span></div>`;
+  el.innerHTML=`<h1>액션아이템</h1><div class="sub">진행 ${open.length}건 · 완료 ${done.length}건</div>
+    <div class="box">${open.length?open.map(card).join(''):'<div style="color:#98A0AC">진행 중인 항목이 없습니다.</div>'}</div>
+    ${done.length?`<h1 style="font-size:17px;margin-top:26px">완료</h1><div class="box">${done.map(card).join('')}</div>`:''}`;
+  el.querySelectorAll('.act input').forEach(cb=>cb.onchange=async()=>{
+    const id=cb.closest('.act').dataset.id;
+    const {error}=await SB.from('hd_action').update({state:cb.checked?'done':'open',
+      done_at:cb.checked?new Date().toISOString():null}).eq('id',id);
+    if(error){toast('변경 실패: '+esc(error.message));cb.checked=!cb.checked;return;}
+    renderActions();});
+}
+
+// ─────────────────────────── 브리핑
+async function renderBrief(){
+  const el=$('#p-brief'); el.innerHTML='<div class="sub">불러오는 중…</div>';
+  const {data}=await SB.from('hd_brief').select('*').order('on_date',{ascending:false}).limit(14);
+  el.innerHTML=`<h1>일일 브리핑</h1><div class="sub">전날 회의를 한 장으로 정리합니다</div>`
+   + ((data&&data.length)? data.map(b=>`<div class="box"><div class="sub" style="margin:0 0 10px">${b.on_date}</div>
+       <div class="md">${mdHtml(b.body_md)}</div></div>`).join('')
+     : '<div class="empty">아직 브리핑이 없습니다.<br><br>대표님 맥에서 <b>./heimdall brief</b> 를 실행하면 만들어집니다.</div>');
+}
+
+// ─────────────────────────── 구성원 (관리자)
+async function renderMembers(){
+  const el=$('#p-members'); el.innerHTML='<div class="sub">불러오는 중…</div>';
+  const {data,error}=await SB.from('hd_member').select('*').order('created_at');
+  if(error) return el.innerHTML=`<div class="empty">${esc(error.message)}</div>`;
+  const wait=data.filter(m=>!m.approved), ok=data.filter(m=>m.approved);
+  const sel=(m)=>`<select data-id="${m.id}" class="rsel">
+     ${Object.entries(ROLE).map(([k,v])=>`<option value="${k}" ${m.role===k?'selected':''}>${v}</option>`).join('')}
+   </select>`;
+  el.innerHTML=`<h1>구성원</h1>
+    <div class="sub">승인 대기 ${wait.length}명 · 사용 중 ${ok.length}명</div>
+    ${wait.length?`<div class="box"><h1 style="font-size:16px;margin-bottom:12px">승인 대기</h1>
+      ${wait.map(m=>`<div class="act" data-id="${m.id}" style="grid-template-columns:1fr auto">
+        <div><div class="task">${esc(m.name||'(이름 없음)')}</div>
+          <div class="meta">${esc(m.email)} · ${esc(m.company||'회사 미기재')} ${esc(m.dept||'')}
+            · 신청 ${m.created_at.slice(0,10)}</div></div>
+        <div class="row">${sel(m)}
+          <button class="btn g ap" data-id="${m.id}">승인</button>
+          <button class="btn rj" data-id="${m.id}">거절</button></div></div>`).join('')}
+      </div>`:'<div class="box" style="color:#98A0AC">승인을 기다리는 신청이 없습니다.</div>'}
+    <h1 style="font-size:16px;margin-top:26px">사용 중</h1>
+    <div class="box">${ok.map(m=>`<div class="act" data-id="${m.id}" style="grid-template-columns:1fr auto">
+        <div><div class="task">${esc(m.name)}${m.id===me.id?' (나)':''}</div>
+          <div class="meta">${esc(m.email)} · ${esc(m.company||'')} ${esc(m.dept||'')}</div></div>
+        <div class="row">${sel(m)}<button class="btn sv" data-id="${m.id}">저장</button></div></div>`).join('')}</div>`;
+
+  const roleOf=id=>el.querySelector(`.rsel[data-id="${id}"]`).value;
+  el.querySelectorAll('.ap').forEach(b=>b.onclick=async()=>{
+    b.disabled=true;
+    const {error}=await SB.rpc('hd_approve',{uid:b.dataset.id, new_role:roleOf(b.dataset.id)});
+    if(error){toast('승인 실패: '+esc(error.message));b.disabled=false;return;}
+    toast('승인했습니다'); renderMembers();});
+  el.querySelectorAll('.rj').forEach(b=>b.onclick=async()=>{
+    if(!confirm('이 신청을 거절하고 계정을 삭제합니다. 되돌릴 수 없습니다.')) return;
+    const {error}=await SB.rpc('hd_reject',{uid:b.dataset.id});
+    if(error) return toast('거절 실패: '+esc(error.message));
+    toast('거절했습니다'); renderMembers();});
+  el.querySelectorAll('.sv').forEach(b=>b.onclick=async()=>{
+    const {error}=await SB.rpc('hd_set_role',{uid:b.dataset.id, new_role:roleOf(b.dataset.id)});
+    toast(error?'변경 실패: '+esc(error.message):'역할을 바꿨습니다');});
+}
+
+// 승인 대기 알림 배지
+async function checkPending(){
+  if(me.role!=='admin') return;
+  const {data}=await SB.rpc('hd_pending');
+  if(data&&data.length){
+    const b=document.querySelector('.nav[data-v=members]');
+    if(b) b.innerHTML=`구성원 <span class="tag t-review" style="margin-left:4px">${data.length}</span>`;
+    toast(`가입 승인 대기 <b>${data.length}건</b> 있습니다. 상단 「구성원」 에서 처리하세요.`, 6000);
+  }
+}
+
+// ─────────────────────────── 마크다운
+function mdHtml(md){
+  const out=[]; let tbl=false, list=false;
+  const closeL=()=>{if(list){out.push('</ul>');list=false;}};
+  for(const raw of (md||'').split('\n')){
+    const s=raw.trimEnd();
+    if(s.startsWith('|')){
+      closeL();
+      const c=s.replace(/^\||\|$/g,'').split('|').map(x=>x.trim());
+      if([...c.join('')].every(ch=>'-: '.includes(ch))) continue;
+      if(!tbl){out.push('<table>','<tr>'+c.map(x=>`<th>${esc(x)}</th>`).join('')+'</tr>');tbl=true;}
+      else out.push('<tr>'+c.map(x=>`<td>${esc(x)}</td>`).join('')+'</tr>');
+      continue;}
+    if(tbl){out.push('</table>');tbl=false;}
+    if(s.startsWith('### ')){closeL();out.push(`<h3>${esc(s.slice(4))}</h3>`);}
+    else if(s.startsWith('## ')){closeL();out.push(`<h2>${esc(s.slice(3))}</h2>`);}
+    else if(s.startsWith('# ')){closeL();out.push(`<h1>${esc(s.slice(2))}</h1>`);}
+    else if(/^\s*[-*] /.test(s)){if(!list){out.push('<ul>');list=true;}out.push(`<li>${esc(s.trim().slice(2))}</li>`);}
+    else if(/^\s*\d+\. /.test(s)){if(!list){out.push('<ul>');list=true;}out.push(`<li>${esc(s.replace(/^\s*\d+\. /,''))}</li>`);}
+    else if(s){closeL();out.push(`<p>${esc(s)}</p>`);}
+  }
+  closeL(); if(tbl) out.push('</table>');
+  return out.join('\n').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+}
+
+// ─────────────────────────── 앱 설치 · 업데이트
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault(); deferredPrompt = e; wireInstall();
+});
+function wireInstall(){
+  const b = $('#inst'); if(!b) return;
+  const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  if(standalone || !deferredPrompt) return;
+  b.style.display='';
+  b.onclick = async () => {
+    b.disabled = true;
+    deferredPrompt.prompt();
+    const {outcome} = await deferredPrompt.userChoice;
+    deferredPrompt = null; b.style.display='none';
+    if(outcome==='accepted') toast('설치했습니다. 이제 앱 아이콘으로 바로 여실 수 있습니다.');
+  };
+}
+window.addEventListener('appinstalled', ()=>{ const b=$('#inst'); if(b) b.style.display='none'; });
+
+if('serviceWorker' in navigator){
+  addEventListener('load', async () => {
+    try{
+      const reg = await navigator.serviceWorker.register('./sw.js');
+      reg.addEventListener('updatefound', () => {
+        const w = reg.installing;
+        w && w.addEventListener('statechange', () => {
+          if(w.state==='installed' && navigator.serviceWorker.controller){
+            const u=document.createElement('div'); u.className='upd';
+            u.textContent='새 버전이 있습니다. 눌러서 새로고침';
+            u.onclick=()=>{w.postMessage({type:'SKIP_WAITING'});location.reload();};
+            document.body.appendChild(u);
+          }
+        });
+      });
+    }catch(e){ /* 로컬 파일로 열면 등록되지 않습니다. 정상입니다. */ }
+  });
+}
+
+// ─────────────────────────── 시작
+async function boot(){
+  const {data:{session}} = await SB.auth.getSession();
+  if(!session) return loginPage();
+  let {data,error} = await SB.from('hd_member').select('*').eq('id',session.user.id).single();
+  if(error||!data){
+    // 트리거가 아직 안 돌았거나 실패한 경우 직접 만들어 봅니다
+    const meta = session.user.user_metadata||{};
+    const ins = await SB.from('hd_member').insert({id:session.user.id, email:session.user.email,
+      name:meta.name||'', company:meta.company||'', dept:meta.dept||''}).select().single();
+    if(ins.error){
+      $('#app').innerHTML=`<div class="login"><h2>등록에 실패했습니다</h2>
+        <p>${esc(session.user.email)}<br><br>${esc(ins.error.message)}</p>
+        <button class="btn p full" onclick="location.reload()">다시 시도</button></div>`;
+      return;}
+    data = ins.data;
+  }
+  if(!data.name || !data.company) return profilePage(data);
+  if(!data.approved) return pendingPage(data);
+  me=data; shell(); go('list'); checkPending();
+}
+SB.auth.onAuthStateChange((e)=>{ if(e==='SIGNED_IN'||e==='SIGNED_OUT') boot(); });
+boot();
+</script></body></html>

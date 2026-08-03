@@ -1,0 +1,18 @@
+{
+  "name": "HEIMDALL — 회의 기록",
+  "short_name": "HEIMDALL",
+  "description": "THE ALMIGHTY GROUP 회의 전사·하이라이트·요약·액션아이템",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F5F6F8",
+  "theme_color": "#1B1F26",
+  "categories": ["productivity", "business"],
+  "icons": [
+    { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "./icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
