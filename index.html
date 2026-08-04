@@ -107,6 +107,20 @@ mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
 .bar .btn{box-shadow:0 4px 16px rgba(0,0,0,.16);padding:12px 20px;border-radius:24px}
 .hist{margin-top:26px;font-size:12.5px;color:#98A0AC}
 .hist div{padding:4px 0;border-top:1px solid #F2F4F7}
+.chatwrap{display:flex;gap:18px;align-items:flex-start}
+.rooms{width:230px;flex:none;background:#fff;border:1px solid #E6EAF0;border-radius:12px;
+ padding:10px;position:sticky;top:86px;max-height:72vh;overflow-y:auto}
+.rooms .newbtn{width:100%;margin-bottom:8px}
+.room{display:flex;align-items:center;gap:6px;padding:9px 10px;border-radius:8px;cursor:pointer;
+ font-size:13.5px;color:#3A424F}
+.room:hover{background:#F5F7FA}
+.room.on{background:#EAF2FE;color:#0B65D8;font-weight:600}
+.room .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.room .ic{appearance:none;border:0;background:none;cursor:pointer;font-size:13px;
+ color:#B6BEC9;padding:2px 3px;flex:none}
+.room .ic:hover{color:#0B65D8}
+.room .ic.pin.on{color:#E0A800}
+.chatmain{flex:1;min-width:0}
 .chat{display:flex;flex-direction:column;gap:14px;margin-bottom:20px}
 .msg{max-width:88%;padding:13px 16px;border-radius:14px;font-size:15px;line-height:1.72}
 .msg.q{align-self:flex-end;background:#0B65D8;color:#fff;border-bottom-right-radius:5px}
@@ -206,6 +220,12 @@ mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
   .opts{gap:14px;font-size:13px}
   .toast{bottom:74px;font-size:13.5px;padding:12px 16px}
   .hit{padding:12px 14px}
+  .chatwrap{flex-direction:column;gap:10px}
+  .rooms{width:100%;position:static;max-height:none;display:flex;gap:6px;overflow-x:auto;
+   padding:8px;scrollbar-width:none}
+  .rooms::-webkit-scrollbar{display:none}
+  .rooms .newbtn{width:auto;margin:0;flex:none;padding:8px 12px;font-size:13px}
+  .room{flex:none;max-width:180px;border:1px solid #E6EAF0}
   .msg{max-width:94%;font-size:14.5px;padding:12px 14px}
   .ask{padding:8px 0 4px}
   .ask textarea{font-size:16px}
@@ -405,15 +425,20 @@ function go(v){
 // ─────────────────────────── 회의 목록
 async function renderList(){
   const el=$('#p-list'); el.innerHTML='<div class="sub">불러오는 중…</div>';
-  const [mres, pres] = await Promise.all([
-    SB.from('hd_meeting')
+  const showArch = sessionStorage.getItem('hd_show_arch')==='1';
+  let q = SB.from('hd_meeting')
       .select('id,title,held_on,status,duration_sec,company,dept,summary_md,project_id')
-      .order('held_on',{ascending:false}).limit(200),
+      .order('held_on',{ascending:false}).limit(200);
+  if(!showArch) q = q.neq('status','archived');
+  const [mres, pres] = await Promise.all([q,
     SB.from('hd_project').select('id,name,color')]);
   const {data,error} = mres;
   if(error) return el.innerHTML=`<div class="empty">${esc(error.message)}</div>`;
   const PJ = Object.fromEntries((pres.data||[]).map(p=>[p.id,p]));
-  el.innerHTML = `<h1>회의</h1><div class="sub">${data.length}건 · ${ROLE[me.role]} 권한으로 보이는 것만 표시됩니다</div>`
+  const canArch = ['admin','exec'].includes(me.role);
+  el.innerHTML = `<h1>회의</h1><div class="sub">${data.length}건 · ${ROLE[me.role]} 권한으로 보이는 것만 표시됩니다
+    ${canArch?`<label style="margin-left:12px;cursor:pointer"><input type="checkbox" id="sharch"
+      ${showArch?'checked':''} style="width:14px;height:14px;vertical-align:-2px"> 보관된 회의 보기</label>`:''}</div>`
    + (data.length? data.map(m=>`<div class="card" data-id="${m.id}">
         <div class="ct">${esc(m.title)}</div>
         <div class="cm"><span class="tag t-${m.status}">${STATUS[m.status]}</span>
@@ -423,6 +448,8 @@ async function renderList(){
           ${m.summary_md?'':'<span>요약 없음</span>'}</div></div>`).join('')
      : '<div class="empty">아직 올라온 회의가 없습니다.<br><br>대표님 맥에서 <b>./heimdall push</b> 를 실행하세요.</div>');
   el.querySelectorAll('.card').forEach(c=>c.onclick=()=>openMeeting(c.dataset.id));
+  const sa=$('#sharch');
+  if(sa) sa.onchange=()=>{sessionStorage.setItem('hd_show_arch', sa.checked?'1':'0'); renderList();};
 }
 
 // ─────────────────────────── 회의 상세
@@ -486,6 +513,9 @@ function drawMeeting(){
   ${edits.length?`<div class="hist"><b>편집 이력</b>${edits.map(e=>
      `<div>${e.at.slice(0,16).replace('T',' ')} · ${esc(e.editor)} · ${e.kind}</div>`).join('')}</div>`:''}
   <div class="bar">
+    ${['admin','exec'].includes(me.role) ? (m.status==='archived'
+       ? '<button class="btn" id="arch">보관 해제</button>'
+       : '<button class="btn" id="arch">보관</button>') : ''}
     ${canReport && m.status!=='reported' ? '<button class="btn g" id="rep">경영진 보고</button>':''}
     ${canReport && m.status==='reported' ? '<button class="btn" id="unrep">보고 취소</button>':''}
     <button class="btn" id="cancel" style="display:none">취소</button>
@@ -508,6 +538,16 @@ function drawMeeting(){
     cb.closest('.act').classList.toggle('done',cb.checked);
     toast(cb.checked?'완료 처리했습니다':'다시 진행으로 되돌렸습니다',1800);
   });
+
+  const arch=$('#arch');
+  if(arch) arch.onclick=async()=>{
+    const undo = m.status==='archived';
+    if(!undo && !confirm('이 회의를 보관합니다.\n목록에서 사라지지만 서버에는 남고, 「보관된 회의 보기」로 다시 볼 수 있습니다.')) return;
+    const {error}=await SB.rpc('hd_archive',{mid:m.id, undo});
+    if(error) return toast('실패: '+esc(error.message));
+    toast(undo?'보관을 해제했습니다':'보관했습니다');
+    undo?openMeeting(m.id):go('list');
+  };
 
   const rep=$('#rep'), unrep=$('#unrep');
   if(rep) rep.onclick=async()=>{
@@ -791,43 +831,81 @@ async function checkPending(){
   }
 }
 
-// ─────────────────────────── 물어보기 (챗봇)
+// ─────────────────────────── 물어보기 (챗봇 · 대화방)
 const SUGGEST = ['어제 무슨 회의를 했나요?', '이번 주 회의 핵심만 간략하게 정리해주세요',
   '아직 안 끝난 할 일을 담당자별로 알려주세요', '경영진이 결정해야 할 것이 있나요?'];
-let chatBusy=false;
+let chatBusy=false, rooms=[], curRoom=null;
 
 async function renderChat(){
   const el=$('#p-chat');
   el.innerHTML=`<h1>물어보기</h1>
-    <div class="sub">회의 기록을 근거로 답합니다. 볼 수 있는 회의만 씁니다.</div>
-    <div class="chips">${SUGGEST.map(q=>`<button class="chip sg">${esc(q)}</button>`).join('')}</div>
-    <div class="chat" id="chatlog"></div>
-    <div class="ask">
-      <textarea id="qq" placeholder="예: 어제 더올마이티 회의 핵심만 간략하게 보고해주세요"></textarea>
-      <button class="btn p" id="send">보내기</button>
+    <div class="sub">회의 기록을 근거로 답합니다. 대화는 방마다 이어집니다.</div>
+    <div class="chatwrap">
+      <div class="rooms" id="rooms"></div>
+      <div class="chatmain">
+        <div class="chips" id="chatchips">${SUGGEST.map(q=>`<button class="chip sg">${esc(q)}</button>`).join('')}</div>
+        <div class="chat" id="chatlog"></div>
+        <div class="ask">
+          <textarea id="qq" placeholder="예: 어제 더올마이티 회의 핵심만 간략하게 보고해주세요"></textarea>
+          <button class="btn p" id="send">보내기</button>
+        </div>
+      </div>
     </div>`;
   el.querySelectorAll('.sg').forEach(b=>b.onclick=()=>{$('#qq').value=b.textContent;$('#qq').focus();});
   $('#send').onclick=ask;
   $('#qq').onkeydown=e=>{if(e.key==='Enter'&&(e.metaKey||e.ctrlKey))ask();};
-  const {data}=await SB.from('hd_chat').select('*').order('created_at').limit(30);
-  (data||[]).forEach(drawMsg);
-  scrollChat();
-  // 아직 답을 기다리는 질문이 있으면 이어서 확인합니다
-  (data||[]).filter(c=>c.status==='queued'||c.status==='working').forEach(c=>watch(c.id));
+  await loadRooms();
 }
 
-// 답이 올 때까지 지켜봅니다 (최대 3분)
-async function watch(id){
-  for(let i=0;i<90;i++){
-    await new Promise(r=>setTimeout(r,2000));
-    const {data:c}=await SB.from('hd_chat').select('*').eq('id',id).single();
-    if(!c) return;
-    drawMsg(c);
-    if(c.status==='done'||c.status==='failed') return;
-  }
-  const a=$('#chatlog')?.querySelector(`[data-a="${id}"]`);
-  if(a && a.classList.contains('wait'))
-    a.textContent='답이 오지 않습니다. 사무실 처리 컴퓨터가 켜져 있는지 확인해주세요.';
+async function loadRooms(){
+  const {data}=await SB.from('hd_chat_room').select('*')
+    .order('pinned',{ascending:false}).order('updated_at',{ascending:false}).limit(60);
+  rooms=data||[];
+  if(curRoom && !rooms.some(r=>r.id===curRoom)) curRoom=null;
+  if(!curRoom && rooms.length) curRoom=rooms[0].id;
+  drawRooms();
+  await loadMsgs();
+}
+
+function drawRooms(){
+  const box=$('#rooms'); if(!box) return;
+  box.innerHTML=`<button class="btn newbtn" id="newroom">+ 새 대화</button>`+
+    (rooms.length? rooms.map(r=>`<div class="room ${r.id===curRoom?'on':''}" data-id="${r.id}">
+      <span class="nm">${r.pinned?'★ ':''}${esc(r.title)}</span>
+      <button class="ic pin ${r.pinned?'on':''}" data-id="${r.id}" title="${r.pinned?'고정 해제':'위에 고정'}">${r.pinned?'★':'☆'}</button>
+      <button class="ic del" data-id="${r.id}" title="삭제">×</button>
+    </div>`).join('')
+    :'<div style="padding:12px;font-size:12.5px;color:#98A0AC">질문을 보내면 대화가 여기에 쌓입니다</div>');
+
+  $('#newroom').onclick=()=>{curRoom=null; drawRooms(); $('#chatlog').innerHTML=''; $('#qq').focus();};
+  box.querySelectorAll('.room').forEach(r=>r.onclick=e=>{
+    if(e.target.closest('.ic')) return;
+    curRoom=r.dataset.id; drawRooms(); loadMsgs();});
+  box.querySelectorAll('.pin').forEach(b=>b.onclick=async e=>{
+    e.stopPropagation();
+    const r=rooms.find(x=>x.id===b.dataset.id);
+    const {error}=await SB.from('hd_chat_room').update({pinned:!r.pinned}).eq('id',r.id);
+    if(error) return toast('실패: '+esc(error.message));
+    loadRooms();});
+  box.querySelectorAll('.del').forEach(b=>b.onclick=async e=>{
+    e.stopPropagation();
+    const r=rooms.find(x=>x.id===b.dataset.id);
+    if(!confirm(`「${r.title}」 대화를 삭제합니다.\n안의 질문·답변이 모두 지워지며 되돌릴 수 없습니다.`)) return;
+    const {error}=await SB.from('hd_chat_room').delete().eq('id',r.id);
+    if(error) return toast('삭제 실패: '+esc(error.message));
+    if(curRoom===r.id) curRoom=null;
+    toast('삭제했습니다'); loadRooms();});
+}
+
+async function loadMsgs(){
+  const log=$('#chatlog'); if(!log) return;
+  log.innerHTML='';
+  if(!curRoom) return;
+  const {data}=await SB.from('hd_chat').select('*').eq('room_id',curRoom)
+    .order('created_at').limit(50);
+  (data||[]).forEach(drawMsg);
+  scrollChat();
+  (data||[]).filter(c=>c.status==='queued'||c.status==='working').forEach(c=>watch(c.id));
 }
 
 function drawMsg(c){
@@ -851,19 +929,48 @@ function drawMsg(c){
   }
 }
 
-function scrollChat(){ const l=$('#chatlog'); if(l) window.scrollTo(0,document.body.scrollHeight); }
+function scrollChat(){ window.scrollTo(0,document.body.scrollHeight); }
+
+async function watch(id){
+  for(let i=0;i<90;i++){
+    await new Promise(r=>setTimeout(r,2000));
+    const {data:c}=await SB.from('hd_chat').select('*').eq('id',id).single();
+    if(!c) return;
+    drawMsg(c);
+    if(c.status==='done'||c.status==='failed') return;
+  }
+  const a=$('#chatlog')?.querySelector(`[data-a="${id}"]`);
+  if(a && a.classList.contains('wait'))
+    a.textContent='답이 오지 않습니다. 사무실 처리 컴퓨터가 켜져 있는지 확인해주세요.';
+}
 
 async function ask(){
   if(chatBusy) return;
   const t=$('#qq'); const q=t.value.trim(); if(!q) return;
   chatBusy=true; t.value=''; $('#send').disabled=true;
-  const {data,error}=await SB.from('hd_chat')
-    .insert({asker_id:me.id, asker_name:me.name, question:q}).select().single();
-  if(error){ chatBusy=false; $('#send').disabled=false; return toast('보내지 못했습니다: '+esc(error.message)); }
-  drawMsg(data); scrollChat();
-  chatBusy=false; $('#send').disabled=false;
-  await watch(data.id);
-  scrollChat();
+
+  try{
+    if(!curRoom){
+      const title=q.length>28? q.slice(0,28)+'…' : q;
+      const {data:r,error:e1}=await SB.from('hd_chat_room')
+        .insert({owner_id:me.id, title}).select().single();
+      if(e1) throw e1;
+      curRoom=r.id;
+    }
+    const {data,error}=await SB.from('hd_chat')
+      .insert({asker_id:me.id, asker_name:me.name, question:q, room_id:curRoom})
+      .select().single();
+    if(error) throw error;
+    await SB.from('hd_chat_room').update({updated_at:new Date().toISOString()}).eq('id',curRoom);
+    await loadRooms();
+    drawMsg(data); scrollChat();
+    chatBusy=false; $('#send').disabled=false;
+    await watch(data.id);
+    scrollChat();
+  }catch(e){
+    chatBusy=false; $('#send').disabled=false;
+    toast('보내지 못했습니다: '+esc(e.message||e));
+  }
 }
 
 // ─────────────────────────── 프로젝트 고르는 창
