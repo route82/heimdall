@@ -1,6 +1,6 @@
 {
- "version": "1.2",
- "url": "./client.py",
- "sha256": "eacbecec042a44119fdbbdcbad9b7e06813ba8c61716c545657d11add559224f",
+ "version": "1.3",
+ "url": "https://route82.github.io/heimdall/client.py",
+ "sha256": "04553d446d587635020c65087a0ab8e0171af9b1a625ea428cd2c982b154d62d",
  "notes": ""
 }

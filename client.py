@@ -10,7 +10,7 @@ import hashlib, json, os, re, shutil, subprocess, sys, threading, time, datetime
 import urllib.error, urllib.parse, urllib.request, webbrowser
 
 # 이 숫자를 올리면 이미 깔린 녹음기들이 「업데이트 있음」 을 표시합니다
-VERSION = "1.2"
+VERSION = "1.3"
 
 HOME = os.path.dirname(os.path.abspath(__file__))
 CONF_DIR = os.path.join(os.path.expanduser("~"), ".heimdall")
@@ -410,7 +410,8 @@ class Client(rumps.App):
         로그인 전·승인 대기 중에는 눌러서 웹으로 갈 수 있게 해둡니다."""
         me = self.auth.me()
         if not me:
-            self.m_state.title = "로그인이 필요합니다 — 눌러서 가입하기"
+            self.m_state.title = ("로그인이 필요합니다 — 눌러서 가입하기" if WEB_URL
+                                  else "설치가 덜 되었습니다 — 관리자에게 문의")
             self.m_state.set_callback(self.open_web)
             self.m_who.title = "로그인…"
         elif not me.get("approved"):
@@ -539,11 +540,13 @@ class Client(rumps.App):
             self.parts = r.text.strip(); self._save("participants", self.parts)
 
     def open_web(self, _=None):
-        url = WEB_URL or SB_URL
-        if not url:
-            rumps.alert("주소가 설정되지 않았습니다", "관리자에게 문의해주세요.")
+        # 서버 주소(SB_URL)로는 절대 보내지 않습니다. 사람이 볼 화면이 아닙니다.
+        if not WEB_URL:
+            rumps.alert("웹 주소가 설정되어 있지 않습니다",
+                        "관리자에게 설치 파일을 다시 받아달라고 요청해주세요.\n"
+                        "자동 업데이트도 이 주소가 있어야 동작합니다.")
             return
-        webbrowser.open(url)
+        webbrowser.open(WEB_URL)
 
     def check_jobs(self, _):
         def run():
