@@ -508,13 +508,13 @@ function drawMeeting(){
     (data||[]).forEach(p=>{
       const o=document.createElement('option'); o.value=p.id; o.textContent=p.name;
       if(m.project_id===p.id) o.selected=true; sel.appendChild(o);});
-    const canSet=['admin','manager'].includes(me.role);
-    sel.disabled=!canSet;
-    if(canSet) sel.onchange=async()=>{
-      const {error}=await SB.from('hd_meeting')
-        .update({project_id:sel.value||null}).eq('id',m.id);
-      toast(error?'바꾸지 못했습니다: '+esc(error.message)
-                 :(sel.value?'프로젝트에 넣었습니다':'분류에서 뺐습니다'), 2000);
+    sel.onchange=async()=>{
+      const {data,error}=await SB.from('hd_meeting')
+        .update({project_id:sel.value||null}).eq('id',m.id).select('id');
+      if(error) return toast('바꾸지 못했습니다: '+esc(error.message));
+      if(!(data||[]).length)
+        return toast('이 회의 참석자만 프로젝트를 바꾸실 수 있습니다.', 5000);
+      toast(sel.value?'프로젝트에 넣었습니다':'분류에서 뺐습니다', 2000);
     };
   })();
 }
@@ -879,12 +879,15 @@ function showProject(pid, projects, meetings){
   const box=$('#pjlist');
   const p=projects.find(x=>x.id===pid);
   const list=meetings.filter(m=>(m.project_id||'')===(pid||''));
-  const canSet=['admin','manager'].includes(me.role);
+  // 옮길 수 있는지는 서버(RLS)가 판단합니다.
+  // 관리자·부서 관리자는 본인 소속 회의 전부, 그 외에는 본인이 참석한 회의만 옮겨집니다.
+  const canSet=true;
   const opts=(cur)=>`<option value="">분류 안 됨</option>`+
     projects.map(x=>`<option value="${x.id}" ${cur===x.id?'selected':''}>${esc(x.name)}</option>`).join('');
 
   box.innerHTML=`<h1 style="font-size:18px">${p?esc(p.name):'분류 안 됨'}</h1>
-    <div class="sub">회의 ${list.length}건${canSet?' · 오른쪽에서 프로젝트를 고르면 바로 옮겨집니다':''}</div>
+    <div class="sub">회의 ${list.length}건 · 오른쪽에서 프로젝트를 고르면 바로 옮겨집니다
+      ${['admin','manager'].includes(me.role)?'':'<br>참석하신 회의만 옮기실 수 있습니다'}</div>
     ${canSet&&list.length?`<div class="box" style="padding:14px 16px;margin-bottom:12px">
       <div class="row">
         <label style="display:flex;align-items:center;gap:8px;font-size:14px">
@@ -913,10 +916,17 @@ function showProject(pid, projects, meetings){
 
   const move=async(ids, to)=>{
     if(!ids.length) return toast('옮길 회의를 골라주세요');
-    const {error}=await SB.from('hd_meeting').update({project_id:to||null}).in('id',ids);
+    const {data,error}=await SB.from('hd_meeting')
+      .update({project_id:to||null}).in('id',ids).select('id');
     if(error) return toast('옮기지 못했습니다: '+esc(error.message));
+    const moved=(data||[]).length;
     const name=to?(projects.find(x=>x.id===to)||{}).name:'분류 안 됨';
-    toast(`${ids.length}건을 <b>${esc(name)}</b> 으로 옮겼습니다`);
+    if(moved===0)
+      return toast('옮기지 못했습니다.<br>참석하신 회의만 옮기실 수 있습니다.', 5000);
+    if(moved<ids.length)
+      toast(`${moved}건만 옮겼습니다. 나머지는 참석하지 않으신 회의입니다.`, 5000);
+    else
+      toast(`${moved}건을 <b>${esc(name)}</b> 으로 옮겼습니다`);
     renderProjects();
   };
 
