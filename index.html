@@ -734,7 +734,10 @@ async function renderMembers(){
     <h1 style="font-size:16px;margin-top:26px">사용 중</h1>
     <div class="box">${ok.map(m=>`<div class="act" data-id="${m.id}" style="grid-template-columns:1fr auto">
         <div><div class="task">${esc(m.name)}${m.id===me.id?' (나)':''}</div>
-          <div class="meta">${esc(m.email)} · ${esc(m.company||'')} ${esc(m.dept||'')}</div></div>
+          <div class="meta">${esc(m.email)} · ${esc(m.company||'')} ${esc(m.dept||'')}</div>
+          <label class="meta" style="display:flex;align-items:center;gap:7px;margin-top:6px;cursor:pointer">
+            <input type="checkbox" class="alld" data-id="${m.id}" ${m.all_dept?'checked':''}
+              style="width:16px;height:16px;margin:0"> 회사 전체 회의 열람 (부서 무관)</label></div>
         <div class="row">${sel(m)}<button class="btn sv" data-id="${m.id}">저장</button></div></div>`).join('')}</div>`;
 
   $('#iv-add').onclick=async()=>{
@@ -766,6 +769,12 @@ async function renderMembers(){
     const {error}=await SB.rpc('hd_reject',{uid:b.dataset.id});
     if(error) return toast('거절 실패: '+esc(error.message));
     toast('거절했습니다'); renderMembers();});
+  el.querySelectorAll('.alld').forEach(c=>c.onchange=async()=>{
+    const {error}=await SB.from('hd_member')
+      .update({all_dept:c.checked}).eq('id',c.dataset.id);
+    if(error){toast('바꾸지 못했습니다: '+esc(error.message)); c.checked=!c.checked; return;}
+    toast(c.checked?'회사 전체 회의를 볼 수 있게 했습니다':'본인 부서 회의만 보게 했습니다', 2500);});
+
   el.querySelectorAll('.sv').forEach(b=>b.onclick=async()=>{
     const {error}=await SB.rpc('hd_set_role',{uid:b.dataset.id, new_role:roleOf(b.dataset.id)});
     toast(error?'변경 실패: '+esc(error.message):'역할을 바꿨습니다');});

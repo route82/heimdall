@@ -10,7 +10,7 @@ import hashlib, json, os, re, shutil, subprocess, sys, threading, time, datetime
 import urllib.error, urllib.parse, urllib.request, webbrowser
 
 # 이 숫자를 올리면 이미 깔린 녹음기들이 「업데이트 있음」 을 표시합니다
-VERSION = "1.3"
+VERSION = "1.5"
 
 HOME = os.path.dirname(os.path.abspath(__file__))
 CONF_DIR = os.path.join(os.path.expanduser("~"), ".heimdall")
@@ -205,6 +205,43 @@ class Recorder:
             self.proc = None
         if self.av:
             self.av.stop(); self.av = None
+
+
+# ─────────────────────────────────────────── 입력 창
+# rumps 의 입력창은 엔터를 누르면 바로 확인으로 넘어가 여러 줄을 받을 수 없습니다.
+# 그래서 맥 기본 대화상자를 씁니다. 비밀번호는 점으로 가려집니다.
+def _q(t):
+    """AppleScript 문자열. 한글을 그대로 넣습니다."""
+    return json.dumps(t, ensure_ascii=False)
+
+
+def ask(prompt, title="HEIMDALL", default="", secret=False, ok="확인"):
+    script = (
+        f"display dialog {_q(prompt)} "
+        f"with title {_q(title)} "
+        f"default answer {_q(default)} "
+        f"buttons {{{_q('취소')}, {_q(ok)}}} default button 2"
+        + (" with hidden answer" if secret else "")
+    )
+    try:
+        r = subprocess.run(["osascript", "-e", script],
+                           capture_output=True, text=True, timeout=300)
+    except Exception:
+        return None
+    if r.returncode != 0:
+        return None                      # 취소를 눌렀습니다
+    m = re.search(r"text returned:(.*)$", r.stdout.strip())
+    return m.group(1) if m else ""
+
+
+def say_ok(title, msg):
+    try:
+        subprocess.run(["osascript", "-e",
+                        f"display dialog {_q(msg)} with title {_q(title)} "
+                        f"buttons {{{_q('확인')}}} default button 1"],
+                       capture_output=True, timeout=120)
+    except Exception:
+        pass
 
 
 # ─────────────────────────────────────────── 스스로 자동 실행 등록하기
@@ -427,24 +464,43 @@ class Client(rumps.App):
     def login(self, _):
         if self.auth.token():
             self.auth.logout(); self.refresh_who(); return
-        w = rumps.Window("이메일과 비밀번호를 한 줄씩 적어주세요\n(웹에서 가입한 계정입니다)",
-                         "HEIMDALL 로그인", default_text="", ok="로그인", cancel="취소",
-                         dimensions=(300, 60))
-        r = w.run()
-        if not r.clicked:
+
+        email = ask("웹에서 가입하신 이메일을 적어주세요", "HEIMDALL 로그인",
+                    default=self._load("email"), ok="다음")
+        if email is None:
             return
-        lines = [x.strip() for x in r.text.splitlines() if x.strip()]
-        if len(lines) < 2:
-            rumps.alert("입력이 부족합니다", "첫 줄에 이메일, 둘째 줄에 비밀번호를 적어주세요.")
+        email = email.strip()
+        if not email:
+            say_ok("HEIMDALL", "이메일을 적어주세요.")
             return
+
+        pw = ask(f"{email}\n비밀번호를 적어주세요", "HEIMDALL 로그인",
+                 secret=True, ok="로그인")
+        if pw is None:
+            return
+        if not pw:
+            say_ok("HEIMDALL", "비밀번호를 적어주세요.")
+            return
+
         try:
-            self.auth.login(lines[0], lines[1])
-            self.refresh_who()
-            self.notify("로그인했습니다", lines[0])
+            self.auth.login(email, pw)
         except urllib.error.HTTPError:
-            rumps.alert("로그인 실패", "이메일 또는 비밀번호가 맞지 않습니다.")
+            say_ok("로그인 실패", "이메일 또는 비밀번호가 맞지 않습니다.\n"
+                                "웹에서 가입은 하셨는지 확인해주세요.")
+            return
         except Exception as e:
-            rumps.alert("로그인 실패", str(e))
+            say_ok("로그인 실패", str(e))
+            return
+
+        self._save("email", email)
+        self.refresh_who()
+        me = self.auth.me() or {}
+        if me.get("approved"):
+            say_ok("로그인했습니다", f"{me.get('name') or email} 님, 이제 녹음하실 수 있습니다.")
+        else:
+            say_ok("가입 승인 대기 중",
+                   "관리자가 승인하면 녹음하실 수 있습니다.\n"
+                   "번개 아이콘의 상태 줄을 눌러 확인하실 수 있습니다.")
 
     # 녹음
     def toggle(self, _):
@@ -460,13 +516,11 @@ class Client(rumps.App):
         if not self.auth.token():
             rumps.alert("로그인이 필요합니다", "메뉴에서 로그인해주세요.")
             return
-        w = rumps.Window("회의명을 입력하세요", "HEIMDALL",
-                         default_text=datetime.date.today().strftime("%y%m%d") + " 회의",
-                         ok="녹음 시작", cancel="취소", dimensions=(300, 22))
-        r = w.run()
-        if not r.clicked:
+        default = datetime.date.today().strftime("%y%m%d") + " 회의"
+        t = ask("회의명을 적어주세요", "HEIMDALL", default=default, ok="녹음 시작")
+        if t is None:
             return
-        self.title_text = r.text.strip() or datetime.date.today().strftime("%y%m%d") + " 회의"
+        self.title_text = t.strip() or default
         self.path = os.path.join(CONF_DIR, f"rec_{int(time.time())}.m4a")
         try:
             self.rec.start(self.path)
@@ -532,12 +586,11 @@ class Client(rumps.App):
 
     # 메뉴
     def set_parts(self, _):
-        w = rumps.Window("참석자를 쉼표로 구분해 적어주세요\n예: 홍석진, 김윤회, 김현우",
-                         "참석자", default_text=self.parts, ok="저장", cancel="취소",
-                         dimensions=(320, 60))
-        r = w.run()
-        if r.clicked:
-            self.parts = r.text.strip(); self._save("participants", self.parts)
+        t = ask("참석자를 쉼표로 구분해 적어주세요  (예: 홍석진, 김윤회, 김현우)",
+                "참석자", default=self.parts, ok="저장")
+        if t is not None:
+            self.parts = t.strip(); self._save("participants", self.parts)
+            say_ok("참석자", self.parts or "비워 두었습니다.")
 
     def open_web(self, _=None):
         # 서버 주소(SB_URL)로는 절대 보내지 않습니다. 사람이 볼 화면이 아닙니다.
