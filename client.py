@@ -169,7 +169,7 @@ def find_mic():
     return None, "기본 입력"
 
 
-def mic_permission(wait=8):
+def mic_permission(wait=60):
     """마이크 사용 권한을 확인하고, 안 물어봤으면 물어봅니다.
     돌려주는 값: "ok" | "denied" | "unknown"
     """
@@ -200,7 +200,7 @@ def mic_permission(wait=8):
         AVCaptureDevice.requestAccessForMediaType_completionHandler_(AUDIO, cb)
     except Exception:
         return "unknown"
-    done.wait(60)
+    done.wait(wait)
     if box.get("ok"):
         return "ok"
     return "denied" if "ok" in box else "unknown"
@@ -212,6 +212,64 @@ def open_mic_settings():
             "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"])
     except Exception:
         pass
+
+
+def mic_setup():
+    """설치할 때 실행 — 허용 창을 지금 띄우고, 실제로 소리가 담기는지 확인합니다.
+    이 확인을 설치 단계에서 끝내면 기기마다 권한 문제가 제각각 생기는 일이 없습니다."""
+    print("  마이크 권한을 확인합니다…", flush=True)
+    st = mic_permission(wait=300)          # 허용 창을 누를 때까지 넉넉히 기다립니다
+    if st == "denied":
+        print("  ✗ 이 맥에 마이크가 「거부」로 기록되어 있습니다.")
+        print("    지금 열리는 설정 화면 목록에서 Python 을 켜신 뒤,")
+        print("    이 설치 파일을 한 번 더 실행해주세요.")
+        open_mic_settings()
+        return 1
+    time.sleep(2)                          # 허용 직후에는 반영이 늦을 수 있습니다
+    print("  3초만 아무 말이나 해주세요 — 소리가 담기는지 확인합니다…", flush=True)
+    path = os.path.join(CONF_DIR, "mic_test.caf")
+    try:
+        from AVFoundation import AVAudioRecorder
+        from Foundation import NSURL
+        settings = {"AVFormatIDKey": 1819304813,
+                    "AVSampleRateKey": 16000.0,
+                    "AVNumberOfChannelsKey": 1,
+                    "AVLinearPCMBitDepthKey": 16,
+                    "AVLinearPCMIsFloatKey": False,
+                    "AVLinearPCMIsBigEndianKey": False}
+        rec, err = AVAudioRecorder.alloc().initWithURL_settings_error_(
+            NSURL.fileURLWithPath_(path), settings, None)
+        if rec is None:
+            raise RuntimeError(str(err))
+        rec.setMeteringEnabled_(True)
+        rec.prepareToRecord()
+        if not rec.record():
+            raise RuntimeError("마이크를 열지 못했습니다")
+        peak = -160.0
+        for _ in range(30):                # 3초 동안 가장 큰 소리를 잽니다
+            time.sleep(0.1)
+            rec.updateMeters()
+            peak = max(peak, float(rec.peakPowerForChannel_(0)))
+        rec.stop()
+    except Exception as e:
+        print(f"  ✗ 녹음 시험에 실패했습니다: {e}")
+        print("    지금 열리는 설정 화면 목록에서 Python 을 켜신 뒤,")
+        print("    이 설치 파일을 한 번 더 실행해주세요.")
+        open_mic_settings()
+        return 1
+    finally:
+        try:
+            os.remove(path)
+        except Exception:
+            pass
+    if peak < -50:
+        print("  ✗ 녹음은 켜지지만 소리가 하나도 안 담깁니다 (무음).")
+        print("    지금 열리는 설정 화면 목록에서 Python 을 켜신 뒤,")
+        print("    이 설치 파일을 한 번 더 실행해주세요.")
+        open_mic_settings()
+        return 1
+    print("  ✓ 마이크 정상 — 소리가 잘 담깁니다")
+    return 0
 
 
 class Recorder:
@@ -895,6 +953,8 @@ class Client(rumps.App):
 
 
 if __name__ == "__main__":
+    if "--mic-setup" in sys.argv:
+        sys.exit(mic_setup())
     if not SB_URL or not SB_KEY:
         sys.exit("설정 파일이 없습니다. 설치 프로그램을 다시 실행해주세요.")
     ensure_autostart()
