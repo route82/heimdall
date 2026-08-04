@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ko"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>HEIMDALL</title>
 <link rel="manifest" href="./manifest.webmanifest">
 <meta name="theme-color" content="#1B1F26">
@@ -11,12 +11,15 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 400 400%22%3E%3Crect width=%22400%22 height=%22400%22 rx=%2280%22 fill=%22%231B1F26%22/%3E%3Cpolygon points=%2230,187 266,150 266,200 370,200 370,212 194,250 194,200 30,200%22 fill=%22%23fff%22/%3E%3C/svg%3E">
 <style>
 *{box-sizing:border-box}
-body{margin:0;background:#F5F6F8;color:#1B1F26;line-height:1.7;
+body{margin:0;background:#F5F6F8;color:#1B1F26;line-height:1.7;-webkit-text-size-adjust:100%;
  font-family:-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif}
 a{color:inherit;text-decoration:none}
 button{font-family:inherit}
 .top{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid #E6EAF0;
  display:flex;align-items:center;gap:6px;padding:0 22px}
+.navwrap{display:flex;align-items:center;gap:2px;overflow-x:auto;flex:1;min-width:0;
+ scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.navwrap::-webkit-scrollbar{display:none}
 .brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:17px;
  letter-spacing:.03em;margin-right:14px;padding:15px 0}
 .bolt{height:.62em;width:auto;display:block;flex:none}
@@ -24,10 +27,16 @@ button{font-family:inherit}
 .login .mark .bolt{height:26px}
 .login .mark span{font-weight:800;font-size:23px;letter-spacing:.03em}
 .login h2{margin:0 0 6px;font-size:21px}
+.opts{display:flex;gap:18px;margin:2px 0 14px;font-size:13.5px;color:#5B6472}
+.opts label{display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none}
+.opts input{width:17px;height:17px;margin:0;accent-color:#0B65D8}
 .nav{appearance:none;border:0;background:none;font-size:14.5px;font-weight:600;color:#8A93A1;
- padding:16px 13px;cursor:pointer;border-bottom:2.5px solid transparent}
+ padding:16px 13px;cursor:pointer;border-bottom:2.5px solid transparent;
+ white-space:nowrap;flex:none}
 .nav[aria-current=true]{color:#0B65D8;border-bottom-color:#0B65D8}
-.me{margin-left:auto;font-size:13px;color:#8A93A1;display:flex;align-items:center;gap:10px}
+.me{margin-left:auto;font-size:13px;color:#8A93A1;display:flex;align-items:center;gap:8px;
+ flex:none;white-space:nowrap}
+.me .who{max-width:180px;overflow:hidden;text-overflow:ellipsis}
 .role{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:#EEF2F7;color:#4A5464}
 .wrap{max-width:1000px;margin:0 auto;padding:26px 22px 90px}
 .page{display:none}.page.on{display:block}
@@ -87,7 +96,10 @@ th{background:#F5F7FA;font-weight:600}
 mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
 .empty{padding:52px;text-align:center;color:#98A0AC;background:#fff;border:1px dashed #DDE2E9;border-radius:12px}
 .login{max-width:400px;margin:14vh auto;background:#fff;border:1px solid #E6EAF0;border-radius:14px;padding:34px}
-.login h2{margin:0 0 6px;font-size:21px}.login p{margin:0 0 20px;color:#8A93A1;font-size:14px}
+.login h2{margin:0 0 6px;font-size:21px}
+.opts{display:flex;gap:18px;margin:2px 0 14px;font-size:13.5px;color:#5B6472}
+.opts label{display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none}
+.opts input{width:17px;height:17px;margin:0;accent-color:#0B65D8}.login p{margin:0 0 20px;color:#8A93A1;font-size:14px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:26px;background:#1B1F26;color:#fff;
  padding:13px 20px;border-radius:10px;font-size:14px;z-index:80;box-shadow:0 6px 22px rgba(0,0,0,.25)}
 .bar{position:fixed;right:22px;bottom:22px;display:flex;gap:9px;z-index:50}
@@ -99,7 +111,60 @@ mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
 .upd{position:fixed;left:50%;transform:translateX(-50%);bottom:26px;background:#0B65D8;color:#fff;
  padding:11px 18px;border-radius:10px;font-size:14px;z-index:90;cursor:pointer;
  box-shadow:0 6px 22px rgba(11,101,216,.35)}
-@media(max-width:640px){.wrap{padding:18px 14px 90px}.seg{grid-template-columns:58px 1fr;gap:9px}}
+
+/* ── 좁은 화면 ─────────────────────────────────────── */
+@media(max-width:760px){
+  .top{flex-wrap:wrap;padding:0 14px;gap:0}
+  .brand{order:1;padding:11px 0;font-size:15.5px;margin-right:auto}
+  .brand .bolt{height:.58em}
+  .me{order:2;font-size:12px;gap:6px;padding:11px 0}
+  .me .who{max-width:96px}
+  .me .btn{padding:4px 9px;font-size:12px}
+  .role{font-size:10.5px;padding:2px 6px}
+  .navwrap{order:3;flex-basis:100%;border-top:1px solid #F0F2F5;
+   margin:0 -14px;padding:0 14px;gap:0}
+  .nav{padding:11px 12px;font-size:14px}
+
+  .wrap{padding:16px 14px 84px}
+  h1{font-size:20px} .sub{font-size:12.5px;margin-bottom:16px}
+  .card{padding:14px 16px;border-radius:11px}
+  .ct{font-size:15.5px} .cm{font-size:12px;gap:8px}
+  .box{padding:16px 15px}
+  .tabs{margin:14px 0 16px;overflow-x:auto;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{font-size:14px;padding:10px 12px;white-space:nowrap;flex:none}
+
+  /* 전사: 시각을 위에 두고 본문을 넓게 */
+  .seg{grid-template-columns:1fr;gap:2px;padding:10px 0;border-top:1px solid #F5F7FA}
+  .seg .ts{font-size:11.5px;padding-top:0}
+  .seg p{font-size:15.5px}
+
+  .hl{padding-left:14px;margin-bottom:20px}
+  .hl h3{font-size:16px} .hl li{font-size:14.5px}
+
+  /* 표는 가로로 밀어서 봅니다 */
+  .md{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{font-size:13px;min-width:520px}
+  th,td{padding:8px 9px}
+
+  .act{grid-template-columns:24px 1fr;gap:10px}
+  .act .tag{grid-column:2;justify-self:start;margin-top:4px}
+  .act input[type=checkbox]{width:22px;height:22px}
+
+  .row{gap:7px}
+  input,select,textarea{font-size:16px;padding:11px 12px}   /* 16px 미만이면 아이폰이 확대합니다 */
+  .btn{padding:11px 15px}
+  .bar{right:14px;bottom:14px}
+  .bar .btn{padding:13px 20px;font-size:15px}
+  .login{margin:6vh auto;padding:26px 22px;width:94%}
+  .opts{gap:14px;font-size:13px}
+  .toast{bottom:74px;font-size:13.5px;padding:12px 16px}
+  .hit{padding:12px 14px}
+}
+@media(max-width:400px){
+  .me .who{display:none}
+  .nav{padding:11px 9px;font-size:13.5px}
+}
 </style></head><body>
 
 <div id="app"><div class="login"><div class="mark"><svg class="bolt" viewBox="0 0 400 100" fill="currentColor" aria-hidden="true"><polygon points="0,37.5 236,0 236,50 400,50 400,62.5 164,100 164,50 0,50"/></svg><span>HEIMDALL</span></div>
@@ -138,8 +203,10 @@ function loginPage(mode='in', msg=''){
       <button class="tab" data-m="in" ${!isUp?'aria-selected="true"':''}>로그인</button>
       <button class="tab" data-m="up" ${isUp?'aria-selected="true"':''}>가입</button>
     </div>
-    <input class="full" id="em" type="email" placeholder="회사 이메일" style="margin-bottom:10px">
-    <input class="full" id="pw" type="password" placeholder="비밀번호 (6자 이상)" style="margin-bottom:10px">
+    <input class="full" id="em" type="email" placeholder="회사 이메일" autocomplete="username"
+           value="${esc(localStorage.getItem('hd_email')||'')}" style="margin-bottom:10px">
+    <input class="full" id="pw" type="password" placeholder="비밀번호 (6자 이상)"
+           autocomplete="current-password" style="margin-bottom:10px">
     ${isUp?`
       <input class="full" id="nm" placeholder="이름 (예: 김현우)" style="margin-bottom:10px">
       <select class="full" id="co" style="margin-bottom:10px">
@@ -147,6 +214,10 @@ function loginPage(mode='in', msg=''){
         ${COMPANIES.map(c=>`<option>${c}</option>`).join('')}
       </select>
       <input class="full" id="dp" placeholder="부서 (예: 글로벌커머스팀)" style="margin-bottom:10px">`:''}
+    ${!isUp?`<div class="opts">
+      <label><input type="checkbox" id="rem" ${localStorage.getItem('hd_email')?'checked':''}> 아이디 저장</label>
+      <label><input type="checkbox" id="auto" ${localStorage.getItem('hd_auto')==='1'?'checked':''}> 자동 로그인</label>
+    </div>`:''}
     <button class="btn p full" id="go">${isUp?'가입하고 시작하기':'로그인'}</button>
     ${!isUp?'<button class="btn full" id="reset" style="margin-top:9px;border:0;color:#8A93A1;font-size:13px">비밀번호를 잊으셨나요?</button>':''}
     <p style="margin-top:14px;font-size:13px;color:${msg.startsWith('!')?'#C0392B':'#98A0AC'}">${esc(msg.replace(/^!/,''))}</p>
@@ -169,10 +240,17 @@ function loginPage(mode='in', msg=''){
         return loginPage('in','가입되었습니다. 메일 확인이 필요한 설정이라면 메일함을 확인해주세요.');
       // 트리거가 못 채운 경우를 대비해 한 번 더 저장합니다
       await SB.from('hd_member').update({name:nm, company:co, dept:dp}).eq('id',data.user.id);
+      localStorage.setItem('hd_email', email());
+      localStorage.setItem('hd_auto', '1');
+      sessionStorage.setItem('hd_live','1');
       boot();
     } else {
       const {error} = await SB.auth.signInWithPassword({email:email(), password:pw()});
       if(error) return loginPage('in','!'+authErr(error.message));
+      const rem=$('#rem')?.checked, auto=$('#auto')?.checked;
+      if(rem) localStorage.setItem('hd_email', email()); else localStorage.removeItem('hd_email');
+      localStorage.setItem('hd_auto', auto?'1':'0');
+      sessionStorage.setItem('hd_live','1');
       boot();
     }
   };
@@ -239,11 +317,15 @@ function shell(){
   const tabs = [['list','회의'],['search','검색'],['actions','액션아이템'],['brief','브리핑']];
   if(['admin','exec'].includes(me.role)) tabs.push(['members','구성원']);
   $('#app').innerHTML = `
-   <div class="top"><div class="brand"><svg class="bolt" viewBox="0 0 400 100" fill="currentColor" aria-hidden="true"><polygon points="0,37.5 236,0 236,50 400,50 400,62.5 164,100 164,50 0,50"/></svg>HEIMDALL</div>
-     ${tabs.map(([k,l])=>`<button class="nav" data-v="${k}">${l}</button>`).join('')}
-     <div class="me"><span>${esc(me.company||'')} ${esc(me.name)}</span><span class="role">${ROLE[me.role]||me.role}</span>
+   <div class="top">
+     <div class="brand"><svg class="bolt" viewBox="0 0 400 100" fill="currentColor" aria-hidden="true"><polygon points="0,37.5 236,0 236,50 400,50 400,62.5 164,100 164,50 0,50"/></svg><span class="bname">HEIMDALL</span></div>
+     <div class="navwrap">
+       ${tabs.map(([k,l])=>`<button class="nav" data-v="${k}">${l}</button>`).join('')}
+     </div>
+     <div class="me">
+       <span class="who">${esc(me.name)}</span><span class="role">${ROLE[me.role]||me.role}</span>
        <button class="install" id="inst" style="display:none">앱으로 설치</button>
-       <button class="btn" id="out" style="padding:5px 11px;font-size:12.5px">로그아웃</button></div>
+       <button class="btn" id="out" title="로그아웃">나가기</button></div>
    </div>
    <div class="wrap">
      <div class="page" id="p-list"></div><div class="page" id="p-search"></div>
@@ -252,7 +334,9 @@ function shell(){
      <div class="page" id="p-meeting"></div>
    </div>`;
   document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>go(b.dataset.v));
-  $('#out').onclick = async()=>{await SB.auth.signOut();location.reload();};
+  $('#out').onclick = async()=>{
+    localStorage.setItem('hd_auto','0'); sessionStorage.removeItem('hd_live');
+    await SB.auth.signOut(); location.reload();};
   wireInstall();
 }
 
@@ -678,6 +762,13 @@ if('serviceWorker' in navigator){
 async function boot(){
   const {data:{session}} = await SB.auth.getSession();
   if(!session) return loginPage();
+  // 자동 로그인을 끄셨으면, 브라우저를 닫았다 연 경우 다시 로그인하게 합니다.
+  // (같은 창에서 새로고침한 것은 그대로 유지합니다)
+  if(localStorage.getItem('hd_auto')!=='1' && !sessionStorage.getItem('hd_live')){
+    await SB.auth.signOut();
+    return loginPage('in','자동 로그인이 꺼져 있어 다시 로그인해주세요.');
+  }
+  sessionStorage.setItem('hd_live','1');
   let {data,error} = await SB.from('hd_member').select('*').eq('id',session.user.id).single();
   if(error||!data){
     // 트리거가 아직 안 돌았거나 실패한 경우 직접 만들어 봅니다
