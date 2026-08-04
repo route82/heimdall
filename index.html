@@ -870,17 +870,30 @@ async function loadRooms(){
 function drawRooms(){
   const box=$('#rooms'); if(!box) return;
   box.innerHTML=`<button class="btn newbtn" id="newroom">+ 새 대화</button>`+
-    (rooms.length? rooms.map(r=>`<div class="room ${r.id===curRoom?'on':''}" data-id="${r.id}">
+    (rooms.length? rooms.map(r=>{
+      return `<div class="room ${r.id===curRoom?'on':''}" data-id="${r.id}">
       <span class="nm">${r.pinned?'★ ':''}${esc(r.title)}</span>
+      <button class="ic ren" data-id="${r.id}" title="이름 바꾸기">✎</button>
       <button class="ic pin ${r.pinned?'on':''}" data-id="${r.id}" title="${r.pinned?'고정 해제':'위에 고정'}">${r.pinned?'★':'☆'}</button>
       <button class="ic del" data-id="${r.id}" title="삭제">×</button>
-    </div>`).join('')
+    </div>`;}).join('')
     :'<div style="padding:12px;font-size:12.5px;color:#98A0AC">질문을 보내면 대화가 여기에 쌓입니다</div>');
 
   $('#newroom').onclick=()=>{curRoom=null; drawRooms(); $('#chatlog').innerHTML=''; $('#qq').focus();};
   box.querySelectorAll('.room').forEach(r=>r.onclick=e=>{
     if(e.target.closest('.ic')) return;
     curRoom=r.dataset.id; drawRooms(); loadMsgs();});
+  box.querySelectorAll('.ren').forEach(b=>b.onclick=async e=>{
+    e.stopPropagation();
+    const r=rooms.find(x=>x.id===b.dataset.id);
+    const name=prompt('대화 이름을 입력하세요', r.title);
+    if(name===null) return;
+    const t=name.trim();
+    if(!t) return toast('이름을 입력해주세요');
+    const {error}=await SB.from('hd_chat_room').update({title:t.slice(0,60)}).eq('id',r.id);
+    if(error) return toast('실패: '+esc(error.message));
+    loadRooms();});
+
   box.querySelectorAll('.pin').forEach(b=>b.onclick=async e=>{
     e.stopPropagation();
     const r=rooms.find(x=>x.id===b.dataset.id);
