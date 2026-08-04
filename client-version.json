@@ -1,7 +1,7 @@
 {
- "version": "2.1",
+ "version": "2.3",
  "url": "https://route82.github.io/heimdall/client.py",
- "sha256": "208d65091420e3cdd152672271347e00bf212609acd9c4535568347546ece5d0",
+ "sha256": "3fec4803a98547ad3b6a7b827d34d4ba343977cb777a0bbe35816b608ffe9617",
  "files": [
   {
    "name": "menubarTemplate.png",

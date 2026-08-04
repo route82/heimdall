@@ -10,7 +10,7 @@ import hashlib, json, os, re, shutil, subprocess, sys, threading, time, datetime
 import urllib.error, urllib.parse, urllib.request, webbrowser
 
 # 이 숫자를 올리면 이미 깔린 녹음기들이 「업데이트 있음」 을 표시합니다
-VERSION = "2.1"
+VERSION = "2.3"
 
 HOME = os.path.dirname(os.path.abspath(__file__))
 CONF_DIR = os.path.join(os.path.expanduser("~"), ".heimdall")
@@ -184,10 +184,11 @@ def mic_permission(wait=8):
         return "unknown"
     if st == 3:                   # 이미 허용
         return "ok"
-    if st in (1, 2):              # 제한·거부
+    if st in (1, 2):              # 제한·거부로 기록되어 있음
         return "denied"
 
-    # 아직 물어본 적이 없으면 지금 물어봅니다
+    # 아직 물어본 적이 없으면 지금 물어봅니다.
+    # 사람이 허용을 누를 때까지 넉넉히 기다립니다.
     done = threading.Event()
     box = {}
 
@@ -199,8 +200,10 @@ def mic_permission(wait=8):
         AVCaptureDevice.requestAccessForMediaType_completionHandler_(AUDIO, cb)
     except Exception:
         return "unknown"
-    done.wait(wait)
-    return "ok" if box.get("ok") else "denied"
+    done.wait(60)
+    if box.get("ok"):
+        return "ok"
+    return "denied" if "ok" in box else "unknown"
 
 
 def open_mic_settings():
@@ -230,13 +233,17 @@ class Recorder:
                 stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
             return True
         # ffmpeg 이 없을 때 — macOS 내장 녹음기
+        # AAC 압축은 일부 맥에서 준비 단계부터 거부됩니다 (실측).
+        # 무압축 PCM 은 어디서나 됩니다. 파일이 크지만 서버에서 변환하므로 문제없습니다.
         try:
             from AVFoundation import AVAudioRecorder
             from Foundation import NSURL
-            settings = {"AVFormatIDKey": 1633772320,      # 'aac '
+            settings = {"AVFormatIDKey": 1819304813,      # 'lpcm'
                         "AVSampleRateKey": 16000.0,
                         "AVNumberOfChannelsKey": 1,
-                        "AVEncoderBitRateKey": 64000}
+                        "AVLinearPCMBitDepthKey": 16,
+                        "AVLinearPCMIsFloatKey": False,
+                        "AVLinearPCMIsBigEndianKey": False}
             url = NSURL.fileURLWithPath_(path)
             rec, err = AVAudioRecorder.alloc().initWithURL_settings_error_(url, settings, None)
             if rec is None:
@@ -659,18 +666,20 @@ class Client(rumps.App):
             return
         self.title_text = t.strip() or default
 
-        # 마이크 권한 — 처음 한 번은 macOS 가 물어봅니다
-        st = mic_permission()
-        if st == "denied":
-            say_ok("마이크 사용이 막혀 있습니다",
-                   "시스템 설정 → 개인정보 보호 및 보안 → 마이크 에서\n"
-                   "HEIMDALL 녹음기 를 켜주신 뒤 다시 시도해주세요.")
-            open_mic_settings()
-            return
+        # 마이크 권한 — 아직 안 물어봤으면 여기서 물어봅니다.
+        # 검사 결과가 어떻든 실제 녹음 시도가 최종 판정입니다.
+        # (권한 기록이 꼬여 있어도 실제로는 되는 경우가 있습니다)
+        mic_permission()
 
-        self.path = os.path.join(CONF_DIR, f"rec_{int(time.time())}.m4a")
+        # ffmpeg 이 있으면 압축(m4a), 없으면 무압축(caf) 으로 녹음합니다
+        ext = ".m4a" if ffmpeg_path() else ".caf"
+        self.path = os.path.join(CONF_DIR, f"rec_{int(time.time())}{ext}")
         try:
-            self.rec.start(self.path)
+            try:
+                self.rec.start(self.path)
+            except Exception:
+                time.sleep(3)          # 허용 직후에는 반영이 늦을 수 있습니다
+                self.rec.start(self.path)
         except Exception as e:
             say_ok("녹음을 시작하지 못했습니다",
                    f"{e}\n\n"
@@ -729,10 +738,11 @@ class Client(rumps.App):
         dur = int(meta.get("duration") or 0)
         name = f"jobs/{int(time.time())}_{os.getpid()}_{os.path.basename(path)}"
         data = open(path, "rb").read()
+        ctype = "audio/mp4" if path.endswith(".m4a") else "audio/x-caf"
         u = f"{SB_URL}/storage/v1/object/hd-audio/{name}"
         req = urllib.request.Request(u, data=data, method="POST", headers={
             "apikey": SB_KEY, "Authorization": f"Bearer {token}",
-            "Content-Type": "audio/mp4", "x-upsert": "true"})
+            "Content-Type": ctype, "x-upsert": "true"})
         urllib.request.urlopen(req, timeout=1800)
 
         me = self.auth.me() or {}
