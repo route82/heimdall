@@ -10,7 +10,7 @@ import hashlib, json, os, re, shutil, subprocess, sys, threading, time, datetime
 import urllib.error, urllib.parse, urllib.request, webbrowser
 
 # 이 숫자를 올리면 이미 깔린 녹음기들이 「업데이트 있음」 을 표시합니다
-VERSION = "1.1"
+VERSION = "1.2"
 
 HOME = os.path.dirname(os.path.abspath(__file__))
 CONF_DIR = os.path.join(os.path.expanduser("~"), ".heimdall")
@@ -205,6 +205,69 @@ class Recorder:
             self.proc = None
         if self.av:
             self.av.stop(); self.av = None
+
+
+# ─────────────────────────────────────────── 스스로 자동 실행 등록하기
+# 맥을 켤 때마다 뜨게 하고, 꺼지면 다시 살아나게 합니다.
+# 프로그램이 직접 등록하므로, 나중에 이 부분이 바뀌어도 업데이트만으로 고쳐집니다.
+LABEL = "group.almighty.heimdall.recorder"
+PLIST = os.path.expanduser(f"~/Library/LaunchAgents/{LABEL}.plist")
+
+PLIST_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>{label}</string>
+  <key>ProgramArguments</key>
+  <array><string>{py}</string><string>{script}</string></array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>LimitLoadToSessionType</key><string>Aqua</string>
+  <key>StandardOutPath</key><string>{log}</string>
+  <key>StandardErrorPath</key><string>{log}</string>
+</dict></plist>
+"""
+
+
+def agent_running():
+    try:
+        out = subprocess.run(["launchctl", "list"], capture_output=True, text=True).stdout
+        return LABEL in out
+    except Exception:
+        return False
+
+
+def ensure_autostart():
+    """자동 실행이 등록돼 있는지 확인하고, 없으면 등록합니다.
+    터미널이나 앱에서 직접 띄운 경우에는 서비스 쪽에 넘기고 이 창은 물러납니다."""
+    want = PLIST_XML.format(label=LABEL, py=sys.executable,
+                            script=os.path.join(HOME, "client.py"),
+                            log=os.path.join(CONF_DIR, "log.txt"))
+    have = ""
+    if os.path.exists(PLIST):
+        try:
+            have = open(PLIST, encoding="utf-8").read()
+        except Exception:
+            pass
+    try:
+        if have.strip() != want.strip():
+            os.makedirs(os.path.dirname(PLIST), exist_ok=True)
+            open(PLIST, "w", encoding="utf-8").write(want)
+            subprocess.run(["launchctl", "unload", PLIST], capture_output=True)
+            subprocess.run(["launchctl", "load", PLIST], capture_output=True)
+        elif not agent_running():
+            subprocess.run(["launchctl", "load", PLIST], capture_output=True)
+    except Exception:
+        return
+
+    # 서비스가 아닌 곳(터미널 등)에서 띄운 것이라면 서비스에 맡기고 물러납니다.
+    # 그래야 번개 아이콘이 두 개 뜨지 않습니다.
+    if os.getppid() != 1 and agent_running():
+        try:
+            subprocess.run(["launchctl", "kickstart", "-k",
+                            f"gui/{os.getuid()}/{LABEL}"], capture_output=True)
+        except Exception:
+            pass
+        sys.exit(0)
 
 
 # ─────────────────────────────────────────── 스스로 갱신하기
@@ -508,4 +571,5 @@ class Client(rumps.App):
 if __name__ == "__main__":
     if not SB_URL or not SB_KEY:
         sys.exit("설정 파일이 없습니다. 설치 프로그램을 다시 실행해주세요.")
+    ensure_autostart()
     Client().run()
