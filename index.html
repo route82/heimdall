@@ -386,7 +386,7 @@ function profilePage(row, msg=''){
 // ─────────────────────────── 뼈대
 function shell(){
   const tabs = [['list','회의'],['chat','물어보기'],['projects','프로젝트'],
-                ['search','검색'],['actions','액션아이템'],['brief','브리핑']];
+                ['upload','업로드'],['search','검색'],['actions','액션아이템'],['brief','브리핑']];
   if(['admin','exec'].includes(me.role)) tabs.push(['members','구성원']);
   $('#app').innerHTML = `
    <div class="top">
@@ -403,6 +403,7 @@ function shell(){
      <div class="page" id="p-list"></div><div class="page" id="p-search"></div>
      <div class="page" id="p-actions"></div><div class="page" id="p-brief"></div>
      <div class="page" id="p-chat"></div><div class="page" id="p-projects"></div>
+     <div class="page" id="p-upload"></div>
      <div class="page" id="p-members"></div>
      <div class="page" id="p-meeting"></div>
    </div>`;
@@ -419,7 +420,8 @@ function go(v){
   document.querySelectorAll('.nav').forEach(b=>b.setAttribute('aria-current', b.dataset.v===v));
   const el=$('#p-'+v); if(el) el.classList.add('on');
   ({list:renderList, search:renderSearch, actions:renderActions, brief:renderBrief,
-    members:renderMembers, chat:renderChat, projects:renderProjects}[v]||(()=>{}))();
+    members:renderMembers, chat:renderChat, projects:renderProjects,
+    upload:renderUpload}[v]||(()=>{}))();
 }
 
 // ─────────────────────────── 회의 목록
@@ -1195,6 +1197,92 @@ function showProject(pid, projects, meetings){
   };
 
   box.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+// ─────────────────────────── 업로드
+const AUDIO_EXT = ['m4a','mp3','wav','caf','mp4','aac','ogg','flac','wma','webm'];
+const DOC_EXT = ['docx','txt','md','pdf','pptx','hwpx'];
+
+async function renderUpload(){
+  const el=$('#p-upload');
+  el.innerHTML=`<h1>업로드</h1>
+    <div class="sub">직접 쓴 회의록 문서나 다른 기기로 녹음한 음성을 올리면,
+      전사·요약·하이라이트가 똑같이 만들어집니다</div>
+    <div class="box">
+      <div class="row" style="margin-bottom:9px">
+        <input id="up-title" placeholder="회의명 (비우면 파일 이름을 씁니다)" style="flex:2;min-width:220px">
+        <input id="up-parts" placeholder="참석자 (쉼표로 구분 · 선택)" style="flex:2;min-width:180px">
+      </div>
+      <div class="row">
+        <input type="file" id="up-file" style="flex:1;min-width:240px"
+          accept=".m4a,.mp3,.wav,.caf,.mp4,.aac,.ogg,.flac,.wma,.webm,.docx,.txt,.md,.pdf,.pptx,.hwpx,.hwp">
+        <button class="btn p" id="up-go">올리기</button>
+      </div>
+      <div class="sub" style="margin:12px 0 0">
+        음성: ${AUDIO_EXT.join(' · ')}<br>
+        문서: 워드(docx) · 텍스트(txt) · PDF · PPT(pptx) · 한글(hwpx)<br>
+        <span style="color:#B36B00">옛 한글(.hwp)은 읽지 못합니다 —
+        한글 프로그램에서 「다른 이름으로 저장 → hwpx」 후 올려주세요</span>
+      </div>
+    </div>
+    <h1 style="font-size:16px;margin-top:24px">최근 올린 것</h1>
+    <div id="up-list" class="box" style="color:#98A0AC">불러오는 중…</div>`;
+  $('#up-go').onclick=doUpload;
+  loadUploads();
+}
+
+async function loadUploads(){
+  const box=$('#up-list'); if(!box) return;
+  const {data,error}=await SB.from('hd_job').select('title,orig_name,status,error,created_at,kind')
+    .order('created_at',{ascending:false}).limit(10);
+  if(error){ box.textContent=error.message; return; }
+  const L={queued:'대기 중',working:'처리 중',done:'완료',failed:'실패'};
+  const C={queued:'t-review',working:'t-review',done:'t-reported',failed:'t-draft'};
+  box.innerHTML=(data&&data.length)? data.map(j=>`
+    <div class="act" style="grid-template-columns:1fr auto">
+      <div><div class="task">${esc(j.title||j.orig_name||'?')}</div>
+        <div class="meta">${j.created_at.slice(0,16).replace('T',' ')}
+          ${j.kind==='doc'?' · 문서':''}${j.status==='failed'?' · '+esc((j.error||'').slice(0,90)):''}</div></div>
+      <span class="tag ${C[j.status]}">${L[j.status]}</span>
+    </div>`).join('')
+    : '아직 올린 것이 없습니다.';
+  if((data||[]).some(j=>j.status==='queued'||j.status==='working'))
+    setTimeout(loadUploads, 5000);
+}
+
+async function doUpload(){
+  const f=$('#up-file').files[0];
+  if(!f) return toast('파일을 골라주세요');
+  const ext=(f.name.split('.').pop()||'').toLowerCase();
+  if(ext==='hwp')
+    return toast('옛 한글(.hwp)은 읽지 못합니다.<br>한글에서 「hwpx」 로 저장해 올려주세요.', 6000);
+  const isAudio=AUDIO_EXT.includes(ext);
+  if(!isAudio && !DOC_EXT.includes(ext))
+    return toast('지원하지 않는 형식입니다: .'+esc(ext), 5000);
+  if(f.size > 900*1024*1024) return toast('900MB 를 넘는 파일은 올릴 수 없습니다');
+
+  const btn=$('#up-go'); btn.disabled=true; btn.textContent='올리는 중…';
+  try{
+    const safe=f.name.replace(/[^0-9A-Za-z가-힣._-]/g,'_');
+    const name=`jobs/${Date.now()}_${safe}`;
+    const {error:e1}=await SB.storage.from('hd-audio').upload(name, f, {upsert:true});
+    if(e1) throw e1;
+    const title=$('#up-title').value.trim()
+      || f.name.replace(/\.[^.]+$/,'');
+    const {error:e2}=await SB.from('hd_job').insert({
+      title, participants:$('#up-parts').value.trim(),
+      audio_path:name, kind:isAudio?'audio':'doc', orig_name:f.name,
+      device:'웹 업로드', created_by:me.id, created_name:me.name,
+      company:me.company||'', dept:me.dept||''});
+    if(e2) throw e2;
+    toast(`<b>${esc(title)}</b> 올렸습니다.<br>처리가 끝나면 회의 목록에 나타납니다.`);
+    $('#up-file').value=''; $('#up-title').value='';
+    loadUploads();
+  }catch(e){
+    toast('올리지 못했습니다: '+esc(e.message||e), 6000);
+  }finally{
+    btn.disabled=false; btn.textContent='올리기';
+  }
 }
 
 // ─────────────────────────── 마크다운
