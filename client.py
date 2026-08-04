@@ -10,7 +10,7 @@ import hashlib, json, os, re, shutil, subprocess, sys, threading, time, datetime
 import urllib.error, urllib.parse, urllib.request, webbrowser
 
 # 이 숫자를 올리면 이미 깔린 녹음기들이 「업데이트 있음」 을 표시합니다
-VERSION = "2.0"
+VERSION = "2.1"
 
 HOME = os.path.dirname(os.path.abspath(__file__))
 CONF_DIR = os.path.join(os.path.expanduser("~"), ".heimdall")
@@ -313,7 +313,7 @@ PLIST_XML = """<?xml version="1.0" encoding="UTF-8"?>
 <plist version="1.0"><dict>
   <key>Label</key><string>{label}</string>
   <key>ProgramArguments</key>
-  <array><string>{py}</string><string>{script}</string></array>
+  <array>{args}</array>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
   <key>LimitLoadToSessionType</key><string>Aqua</string>
@@ -334,8 +334,14 @@ def agent_running():
 def ensure_autostart():
     """자동 실행이 등록돼 있는지 확인하고, 없으면 등록합니다.
     터미널이나 앱에서 직접 띄운 경우에는 서비스 쪽에 넘기고 이 창은 물러납니다."""
-    want = PLIST_XML.format(label=LABEL, py=sys.executable,
-                            script=os.path.join(HOME, "client.py"),
+    # 앱 껍데기 안의 실행기를 거쳐야 macOS 가 마이크 사용을 물어봅니다.
+    runner = os.path.expanduser("~/Applications/HEIMDALL 녹음기.app/Contents/MacOS/run")
+    if os.path.exists(runner):
+        args = f"<string>{runner}</string>"
+    else:
+        args = (f"<string>{sys.executable}</string>"
+                f"<string>{os.path.join(HOME, 'client.py')}</string>")
+    want = PLIST_XML.format(label=LABEL, args=args,
                             log=os.path.join(CONF_DIR, "log.txt"))
     have = ""
     if os.path.exists(PLIST):
@@ -666,7 +672,15 @@ class Client(rumps.App):
         try:
             self.rec.start(self.path)
         except Exception as e:
-            rumps.alert("녹음을 시작하지 못했습니다", str(e))
+            say_ok("녹음을 시작하지 못했습니다",
+                   f"{e}\n\n"
+                   "시스템 설정 → 개인정보 보호 및 보안 → 마이크 에서\n"
+                   "「HEIMDALL 녹음기」 를 켜주세요.\n"
+                   "목록에 없으면 왼쪽 아래 + 를 눌러 응용 프로그램 폴더의\n"
+                   "HEIMDALL 녹음기 를 더해주세요.\n\n"
+                   "확인을 누르면 그 화면을 열어드립니다.")
+            open_mic_settings()
+            clear_pending(self.path)
             return
         save_pending(self.path, self.title_text, self.parts)
         self.t0 = time.time()
