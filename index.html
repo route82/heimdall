@@ -803,6 +803,22 @@ async function renderChat(){
   const {data}=await SB.from('hd_chat').select('*').order('created_at').limit(30);
   (data||[]).forEach(drawMsg);
   scrollChat();
+  // 아직 답을 기다리는 질문이 있으면 이어서 확인합니다
+  (data||[]).filter(c=>c.status==='queued'||c.status==='working').forEach(c=>watch(c.id));
+}
+
+// 답이 올 때까지 지켜봅니다 (최대 3분)
+async function watch(id){
+  for(let i=0;i<90;i++){
+    await new Promise(r=>setTimeout(r,2000));
+    const {data:c}=await SB.from('hd_chat').select('*').eq('id',id).single();
+    if(!c) return;
+    drawMsg(c);
+    if(c.status==='done'||c.status==='failed') return;
+  }
+  const a=$('#chatlog')?.querySelector(`[data-a="${id}"]`);
+  if(a && a.classList.contains('wait'))
+    a.textContent='답이 오지 않습니다. 사무실 처리 컴퓨터가 켜져 있는지 확인해주세요.';
 }
 
 function drawMsg(c){
@@ -836,17 +852,9 @@ async function ask(){
     .insert({asker_id:me.id, asker_name:me.name, question:q}).select().single();
   if(error){ chatBusy=false; $('#send').disabled=false; return toast('보내지 못했습니다: '+esc(error.message)); }
   drawMsg(data); scrollChat();
-
-  // 워커가 답을 쓸 때까지 확인합니다 (최대 2분)
-  for(let i=0;i<60;i++){
-    await new Promise(r=>setTimeout(r,2000));
-    const {data:c}=await SB.from('hd_chat').select('*').eq('id',data.id).single();
-    if(c){ drawMsg(c); scrollChat(); if(c.status==='done'||c.status==='failed') break; }
-  }
   chatBusy=false; $('#send').disabled=false;
-  const last=$('#chatlog').lastElementChild;
-  if(last && last.classList.contains('wait'))
-    last.textContent='답이 오지 않습니다. 사무실 처리 컴퓨터가 켜져 있는지 확인해주세요.';
+  await watch(data.id);
+  scrollChat();
 }
 
 // ─────────────────────────── 프로젝트 고르는 창
