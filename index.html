@@ -854,7 +854,8 @@ async function renderProjects(){
         <div class="d">${p.meeting_count}건${p.last_held_on?' · 최근 '+p.last_held_on:''}
           ${p.description?'<br>'+esc(p.description):''}</div></div>`).join('')}
       <div class="pjc" data-id=""><div class="pjbar" style="background:#C9D0DA"></div>
-        <div class="n">분류 안 됨</div><div class="d">${unassigned}건</div></div>
+        <div class="n">분류 안 됨</div>
+        <div class="d">${unassigned}건${unassigned?' · 눌러서 프로젝트로 옮기세요':''}</div></div>
     </div>
     <div id="pjlist" style="margin-top:24px"></div>`;
 
@@ -878,12 +879,58 @@ function showProject(pid, projects, meetings){
   const box=$('#pjlist');
   const p=projects.find(x=>x.id===pid);
   const list=meetings.filter(m=>(m.project_id||'')===(pid||''));
+  const canSet=['admin','manager'].includes(me.role);
+  const opts=(cur)=>`<option value="">분류 안 됨</option>`+
+    projects.map(x=>`<option value="${x.id}" ${cur===x.id?'selected':''}>${esc(x.name)}</option>`).join('');
+
   box.innerHTML=`<h1 style="font-size:18px">${p?esc(p.name):'분류 안 됨'}</h1>
-    <div class="sub">회의 ${list.length}건</div>
-    ${list.length?list.map(m=>`<div class="card" data-id="${m.id}">
-      <div class="ct">${esc(m.title)}</div><div class="cm"><span>${m.held_on}</span></div></div>`).join('')
-      :'<div class="empty">이 프로젝트에 묶인 회의가 없습니다.<br><br>회의를 열고 위쪽에서 프로젝트를 고르시면 됩니다.</div>'}`;
-  box.querySelectorAll('.card').forEach(c=>c.onclick=()=>openMeeting(c.dataset.id));
+    <div class="sub">회의 ${list.length}건${canSet?' · 오른쪽에서 프로젝트를 고르면 바로 옮겨집니다':''}</div>
+    ${canSet&&list.length?`<div class="box" style="padding:14px 16px;margin-bottom:12px">
+      <div class="row">
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px">
+          <input type="checkbox" id="pj-all" style="width:19px;height:19px"> 전체 선택</label>
+        <select id="pj-bulk" style="min-width:170px">${opts(pid)}</select>
+        <button class="btn p" id="pj-move">선택한 회의 옮기기</button>
+      </div></div>`:''}
+    ${list.length?list.map(m=>`<div class="card" data-id="${m.id}" style="display:flex;
+        align-items:center;gap:12px;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:11px;min-width:0;flex:1">
+          ${canSet?`<input type="checkbox" class="pjchk" data-id="${m.id}"
+             style="width:19px;height:19px;flex:none">`:''}
+          <div style="min-width:0">
+            <div class="ct">${esc(m.title)}</div>
+            <div class="cm"><span>${m.held_on}</span></div></div>
+        </div>
+        ${canSet?`<select class="pjone" data-id="${m.id}" style="flex:none;max-width:150px">
+          ${opts(m.project_id||'')}</select>`:''}
+      </div>`).join('')
+      :'<div class="empty">이 프로젝트에 묶인 회의가 없습니다.<br><br>「분류 안 됨」 을 눌러 회의를 옮겨오세요.</div>'}`;
+
+  // 카드를 누르면 회의를 엽니다. 다만 체크박스·드롭다운을 누른 건 제외합니다.
+  box.querySelectorAll('.card').forEach(c=>c.onclick=(e)=>{
+    if(e.target.closest('select') || e.target.closest('input')) return;
+    openMeeting(c.dataset.id);});
+
+  const move=async(ids, to)=>{
+    if(!ids.length) return toast('옮길 회의를 골라주세요');
+    const {error}=await SB.from('hd_meeting').update({project_id:to||null}).in('id',ids);
+    if(error) return toast('옮기지 못했습니다: '+esc(error.message));
+    const name=to?(projects.find(x=>x.id===to)||{}).name:'분류 안 됨';
+    toast(`${ids.length}건을 <b>${esc(name)}</b> 으로 옮겼습니다`);
+    renderProjects();
+  };
+
+  box.querySelectorAll('.pjone').forEach(sel=>{
+    sel.onclick=e=>e.stopPropagation();
+    sel.onchange=()=>move([sel.dataset.id], sel.value);
+  });
+  const all=$('#pj-all');
+  if(all) all.onchange=()=>box.querySelectorAll('.pjchk').forEach(c=>c.checked=all.checked);
+  const mv=$('#pj-move');
+  if(mv) mv.onclick=()=>move(
+    [...box.querySelectorAll('.pjchk')].filter(c=>c.checked).map(c=>c.dataset.id),
+    $('#pj-bulk').value);
+
   box.scrollIntoView({behavior:'smooth', block:'start'});
 }
 
