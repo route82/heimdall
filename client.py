@@ -10,7 +10,7 @@ import hashlib, json, os, re, shutil, subprocess, sys, threading, time, datetime
 import urllib.error, urllib.parse, urllib.request, webbrowser
 
 # 이 숫자를 올리면 이미 깔린 녹음기들이 「업데이트 있음」 을 표시합니다
-VERSION = "2.4"
+VERSION = "2.5"
 
 HOME = os.path.dirname(os.path.abspath(__file__))
 CONF_DIR = os.path.join(os.path.expanduser("~"), ".heimdall")
@@ -248,6 +248,7 @@ class Recorder:
             rec, err = AVAudioRecorder.alloc().initWithURL_settings_error_(url, settings, None)
             if rec is None:
                 raise RuntimeError(str(err))
+            rec.setMeteringEnabled_(True)
             rec.prepareToRecord()
             if not rec.record():
                 raise RuntimeError("마이크를 열지 못했습니다.")
@@ -255,6 +256,16 @@ class Recorder:
             return True
         except Exception as e:
             raise RuntimeError(f"녹음을 시작하지 못했습니다: {e}")
+
+    def level(self):
+        """지금 들어오는 소리 크기(dB). 확인이 안 되면 None."""
+        if self.av:
+            try:
+                self.av.updateMeters()
+                return float(self.av.peakPowerForChannel_(0))
+            except Exception:
+                return None
+        return None
 
     def stop(self):
         if self.proc:
@@ -667,9 +678,18 @@ class Client(rumps.App):
         self.title_text = t.strip() or default
 
         # 마이크 권한 — 아직 안 물어봤으면 여기서 물어봅니다.
-        # 검사 결과가 어떻든 실제 녹음 시도가 최종 판정입니다.
-        # (권한 기록이 꼬여 있어도 실제로는 되는 경우가 있습니다)
-        mic_permission()
+        # 권한이 없으면 macOS 가 「무음」을 녹음시켜 주기 때문에
+        # (녹음이 되는 것처럼 보이지만 소리가 하나도 안 담깁니다)
+        # 거부 상태면 시작 자체를 막습니다.
+        if mic_permission() == "denied":
+            say_ok("마이크 사용이 허용되지 않았습니다",
+                   "이대로 녹음하면 소리가 하나도 안 담깁니다.\n\n"
+                   "확인을 누르면 설정 화면을 열어드립니다.\n"
+                   "목록에서 Python (또는 HEIMDALL 녹음기) 를 켜신 뒤\n"
+                   "다시 「회의 녹음 시작」을 눌러주세요.\n"
+                   "목록에 없으면 왼쪽 아래 + 를 눌러 더해주세요.")
+            open_mic_settings()
+            return
 
         # ffmpeg 이 있으면 압축(m4a), 없으면 무압축(caf) 으로 녹음합니다
         ext = ".m4a" if ffmpeg_path() else ".caf"
@@ -698,6 +718,20 @@ class Client(rumps.App):
         self.m_state.set_callback(None)
         self.timer.start()
         self.notify("녹음을 시작했습니다", self.title_text)
+        threading.Timer(10, self.check_sound).start()
+
+    def check_sound(self):
+        """시작 10초 뒤, 소리가 실제로 들어오는지 확인합니다."""
+        if not (self.rec.av or self.rec.proc) or not self.t0:
+            return
+        lv = self.rec.level()
+        if lv is not None and lv < -50:
+            say_ok("소리가 들어오지 않습니다",
+                   "녹음은 켜졌지만 마이크 소리가 하나도 안 들립니다.\n\n"
+                   "시스템 설정 → 개인정보 보호 및 보안 → 마이크 에서\n"
+                   "Python (또는 HEIMDALL 녹음기) 를 켜주시고,\n"
+                   "녹음을 종료했다가 다시 시작해주세요.")
+            open_mic_settings()
 
     def stop(self):
         self.timer.stop()
