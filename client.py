@@ -10,7 +10,7 @@ import hashlib, json, os, re, shutil, subprocess, sys, threading, time, datetime
 import urllib.error, urllib.parse, urllib.request, webbrowser
 
 # 이 숫자를 올리면 이미 깔린 녹음기들이 「업데이트 있음」 을 표시합니다
-VERSION = "2.3"
+VERSION = "2.4"
 
 HOME = os.path.dirname(os.path.abspath(__file__))
 CONF_DIR = os.path.join(os.path.expanduser("~"), ".heimdall")
@@ -749,7 +749,9 @@ class Client(rumps.App):
         api("hd_job", "POST", [{
             "title": title, "participants": meta.get("participants", ""),
             "audio_path": name, "duration_sec": dur, "device": "맥 녹음기",
+            "created_by": self.auth.uid,                 # 접수 정책이 이 값을 요구합니다
             "created_name": me.get("name") or self.auth.email,
+            "company": me.get("company", ""), "dept": me.get("dept", ""),
         }], token=token)
         clear_pending(path)
         return title
