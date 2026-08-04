@@ -10,7 +10,7 @@ import hashlib, json, os, re, shutil, subprocess, sys, threading, time, datetime
 import urllib.error, urllib.parse, urllib.request, webbrowser
 
 # 이 숫자를 올리면 이미 깔린 녹음기들이 「업데이트 있음」 을 표시합니다
-VERSION = "1.8"
+VERSION = "1.9"
 
 HOME = os.path.dirname(os.path.abspath(__file__))
 CONF_DIR = os.path.join(os.path.expanduser("~"), ".heimdall")
@@ -53,6 +53,7 @@ class Auth:
     def __init__(self):
         self.access = self.refresh = None
         self.email = ""
+        self.uid = ""
         self.load()
 
     def load(self):
@@ -60,12 +61,13 @@ class Auth:
             try:
                 d = json.load(open(SESSION, encoding="utf-8"))
                 self.refresh, self.email = d.get("refresh"), d.get("email", "")
+                self.uid = d.get("uid", "")
                 self.renew()
             except Exception:
                 pass
 
     def save(self):
-        json.dump({"refresh": self.refresh, "email": self.email},
+        json.dump({"refresh": self.refresh, "email": self.email, "uid": self.uid},
                   open(SESSION, "w", encoding="utf-8"))
         try:
             os.chmod(SESSION, 0o600)
@@ -77,6 +79,7 @@ class Auth:
                 {"email": email, "password": password}, base="auth/v1")
         self.access, self.refresh = d["access_token"], d["refresh_token"]
         self.email = email
+        self.uid = (d.get("user") or {}).get("id", "")
         self.save()
 
     def renew(self):
@@ -86,6 +89,7 @@ class Auth:
             d = api("token?grant_type=refresh_token", "POST",
                     {"refresh_token": self.refresh}, base="auth/v1")
             self.access, self.refresh = d["access_token"], d["refresh_token"]
+            self.uid = (d.get("user") or {}).get("id", "") or self.uid
             self.save()
             return True
         except Exception:
@@ -100,17 +104,27 @@ class Auth:
     def logout(self):
         self.access = self.refresh = None
         self.email = ""
+        self.uid = ""
         try:
             os.remove(SESSION)
         except Exception:
             pass
 
     def me(self):
+        """반드시 「내」 정보만 가져옵니다.
+        조건 없이 부르면 남의 첫 줄이 딸려오므로 내 id 로 좁힙니다."""
         t = self.token()
         if not t:
             return None
+        if not self.uid:
+            try:
+                self.uid = (api("user", token=t, base="auth/v1") or {}).get("id", "")
+                self.save()
+            except Exception:
+                return None
         try:
-            r = api("hd_member?select=name,approved,role&limit=1", token=t)
+            r = api(f"hd_member?id=eq.{self.uid}&select=name,approved,role,company,dept",
+                    token=t)
             return r[0] if r else None
         except Exception:
             return None
@@ -155,6 +169,48 @@ def find_mic():
     return None, "기본 입력"
 
 
+def mic_permission(wait=8):
+    """마이크 사용 권한을 확인하고, 안 물어봤으면 물어봅니다.
+    돌려주는 값: "ok" | "denied" | "unknown"
+    """
+    try:
+        from AVFoundation import AVCaptureDevice
+    except Exception:
+        return "unknown"          # 확인할 방법이 없으면 그냥 진행합니다
+    AUDIO = "soun"                # AVMediaTypeAudio
+    try:
+        st = AVCaptureDevice.authorizationStatusForMediaType_(AUDIO)
+    except Exception:
+        return "unknown"
+    if st == 3:                   # 이미 허용
+        return "ok"
+    if st in (1, 2):              # 제한·거부
+        return "denied"
+
+    # 아직 물어본 적이 없으면 지금 물어봅니다
+    done = threading.Event()
+    box = {}
+
+    def cb(granted):
+        box["ok"] = bool(granted)
+        done.set()
+
+    try:
+        AVCaptureDevice.requestAccessForMediaType_completionHandler_(AUDIO, cb)
+    except Exception:
+        return "unknown"
+    done.wait(wait)
+    return "ok" if box.get("ok") else "denied"
+
+
+def open_mic_settings():
+    try:
+        subprocess.run(["open",
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"])
+    except Exception:
+        pass
+
+
 class Recorder:
     """ffmpeg 이 있으면 장치를 지정해 녹음하고, 없으면 macOS 기본 입력으로 녹음합니다."""
 
@@ -185,7 +241,9 @@ class Recorder:
             rec, err = AVAudioRecorder.alloc().initWithURL_settings_error_(url, settings, None)
             if rec is None:
                 raise RuntimeError(str(err))
-            rec.record()
+            rec.prepareToRecord()
+            if not rec.record():
+                raise RuntimeError("마이크를 열지 못했습니다.")
             self.av = rec
             return True
         except Exception as e:
@@ -538,6 +596,16 @@ class Client(rumps.App):
         if t is None:
             return
         self.title_text = t.strip() or default
+
+        # 마이크 권한 — 처음 한 번은 macOS 가 물어봅니다
+        st = mic_permission()
+        if st == "denied":
+            say_ok("마이크 사용이 막혀 있습니다",
+                   "시스템 설정 → 개인정보 보호 및 보안 → 마이크 에서\n"
+                   "HEIMDALL 녹음기 를 켜주신 뒤 다시 시도해주세요.")
+            open_mic_settings()
+            return
+
         self.path = os.path.join(CONF_DIR, f"rec_{int(time.time())}.m4a")
         try:
             self.rec.start(self.path)
@@ -558,9 +626,14 @@ class Client(rumps.App):
         self.m_rec.title = "회의 녹음 시작"
         dur = int(time.time() - (self.t0 or time.time()))
         if not self.path or not os.path.exists(self.path) or os.path.getsize(self.path) < 4000:
-            self.m_state.title = "녹음이 비어 있습니다"
-            rumps.alert("녹음이 비어 있습니다",
-                        "시스템 설정 → 개인정보 보호 및 보안 → 마이크 에서 HEIMDALL 을 허용해주세요.")
+            self.m_state.title = "녹음이 비어 있습니다 — 마이크 권한 확인"
+            self.m_state.set_callback(lambda _: open_mic_settings())
+            say_ok("녹음이 비어 있습니다",
+                   "마이크 사용이 허용되지 않은 것 같습니다.\n\n"
+                   "시스템 설정 → 개인정보 보호 및 보안 → 마이크 에서\n"
+                   "HEIMDALL 녹음기 (또는 Python) 를 켜주세요.\n\n"
+                   "확인을 누르면 그 화면을 열어드립니다.")
+            open_mic_settings()
             return
         self.busy = True
         self.m_state.title = "서버로 올리는 중…"
