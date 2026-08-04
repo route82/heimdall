@@ -1,6 +1,18 @@
 {
- "version": "1.5",
+ "version": "1.6",
  "url": "https://route82.github.io/heimdall/client.py",
- "sha256": "4dd7992e098dbff77c8288be1b9864caa88e5b8ca55e3af54c88aa4cf81b8ddf",
+ "sha256": "959e5077fb549b07aa1a2869eab5b32c09688bd4027d4656ecbd07c778f5711a",
+ "files": [
+  {
+   "name": "menubarTemplate.png",
+   "url": "https://route82.github.io/heimdall/menubarTemplate.png",
+   "sha256": "43a6d03b0ab9c9339fed5b6474a19a03f237a05bac6f9c7d421f4bb8c4d08ca3"
+  },
+  {
+   "name": "menubarTemplate@2x.png",
+   "url": "https://route82.github.io/heimdall/menubarTemplate@2x.png",
+   "sha256": "9473b1a0e13bdf1836b792922e3fcfd6842f4e88c0c9956c9bbd3297b50f7b45"
+  }
+ ],
  "notes": ""
 }

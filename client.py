@@ -10,7 +10,7 @@ import hashlib, json, os, re, shutil, subprocess, sys, threading, time, datetime
 import urllib.error, urllib.parse, urllib.request, webbrowser
 
 # 이 숫자를 올리면 이미 깔린 녹음기들이 「업데이트 있음」 을 표시합니다
-VERSION = "1.5"
+VERSION = "1.6"
 
 HOME = os.path.dirname(os.path.abspath(__file__))
 CONF_DIR = os.path.join(os.path.expanduser("~"), ".heimdall")
@@ -335,20 +335,37 @@ def check_update():
     return info
 
 
-def apply_update(info):
-    """새 파일을 받아 바꿔 끼웁니다. 내용이 다르면 건드리지 않습니다."""
-    with urllib.request.urlopen(info["url"] + f"?t={int(time.time())}", timeout=60) as r:
+def fetch(url, sha=""):
+    with urllib.request.urlopen(url + f"?t={int(time.time())}", timeout=60) as r:
         data = r.read()
-    want = (info.get("sha256") or "").lower()
-    got = hashlib.sha256(data).hexdigest()
-    if want and want != got:
+    if sha and sha.lower() != hashlib.sha256(data).hexdigest():
         raise RuntimeError("받은 파일이 손상되었습니다.")
+    return data
+
+
+def apply_update(info):
+    """새 파일을 받아 바꿔 끼웁니다. 아이콘 같은 곁들이 파일도 함께 받습니다."""
+    data = fetch(info["url"], info.get("sha256", ""))
     if b"class Client" not in data or len(data) < 3000:
         raise RuntimeError("받은 파일이 녹음기 프로그램이 아닙니다.")
     target = os.path.join(HOME, "client.py")
     shutil.copy2(target, target + ".bak")
     with open(target, "wb") as f:
         f.write(data)
+
+    # 아이콘은 없어도 그만이므로 실패해도 넘어갑니다
+    base = (WEB_URL or "").rstrip("/")
+    for item in (info.get("files") or []):
+        try:
+            u = item.get("url", "")
+            if not u.startswith(base):
+                continue
+            name = os.path.basename(item.get("name") or u.split("/")[-1])
+            if not re.fullmatch(r"[A-Za-z0-9@._-]+", name):
+                continue
+            open(os.path.join(HOME, name), "wb").write(fetch(u, item.get("sha256", "")))
+        except Exception:
+            pass
     return True
 
 
