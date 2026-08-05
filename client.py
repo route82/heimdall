@@ -10,7 +10,7 @@ import hashlib, json, os, re, shutil, subprocess, sys, threading, time, datetime
 import urllib.error, urllib.parse, urllib.request, webbrowser
 
 # 이 숫자를 올리면 이미 깔린 녹음기들이 「업데이트 있음」 을 표시합니다
-VERSION = "2.5"
+VERSION = "3.0"
 
 HOME = os.path.dirname(os.path.abspath(__file__))
 CONF_DIR = os.path.join(os.path.expanduser("~"), ".heimdall")
@@ -214,6 +214,68 @@ def open_mic_settings():
         pass
 
 
+MIC_STATUS = os.path.join(CONF_DIR, "mic_status.json")
+
+
+def save_mic_status(ok, msg):
+    """설치 프로그램이 읽을 수 있게 결과를 남깁니다."""
+    try:
+        json.dump({"ok": bool(ok), "msg": msg, "ts": int(time.time())},
+                  open(MIC_STATUS, "w", encoding="utf-8"), ensure_ascii=False)
+    except Exception:
+        pass
+
+
+def mic_check(quiet=False):
+    """마이크 권한을 요청하고, 실제로 소리가 담기는지 3초 녹음해 확인합니다.
+    돌려주는 값: (성공 여부, 안내 문구)"""
+    st = mic_permission(wait=300)
+    if st == "denied":
+        m = "이 맥에 마이크가 「거부」로 기록되어 있습니다. 설정에서 켜주세요."
+        save_mic_status(False, m)
+        return False, m
+    time.sleep(2)
+    path = os.path.join(CONF_DIR, "mic_test.caf")
+    try:
+        from AVFoundation import AVAudioRecorder
+        from Foundation import NSURL
+        settings = {"AVFormatIDKey": 1819304813,
+                    "AVSampleRateKey": 16000.0,
+                    "AVNumberOfChannelsKey": 1,
+                    "AVLinearPCMBitDepthKey": 16,
+                    "AVLinearPCMIsFloatKey": False,
+                    "AVLinearPCMIsBigEndianKey": False}
+        rec, err = AVAudioRecorder.alloc().initWithURL_settings_error_(
+            NSURL.fileURLWithPath_(path), settings, None)
+        if rec is None:
+            raise RuntimeError(str(err))
+        rec.setMeteringEnabled_(True)
+        rec.prepareToRecord()
+        if not rec.record():
+            raise RuntimeError("마이크를 열지 못했습니다")
+        peak = -160.0
+        for _ in range(30):
+            time.sleep(0.1)
+            rec.updateMeters()
+            peak = max(peak, float(rec.peakPowerForChannel_(0)))
+        rec.stop()
+    except Exception as e:
+        m = f"녹음 시험에 실패했습니다: {e}"
+        save_mic_status(False, m)
+        return False, m
+    finally:
+        try:
+            os.remove(path)
+        except Exception:
+            pass
+    if peak < -50:
+        m = "녹음은 켜지지만 소리가 담기지 않습니다 (무음)."
+        save_mic_status(False, m)
+        return False, m
+    save_mic_status(True, "마이크 정상")
+    return True, "마이크 정상 — 소리가 잘 담깁니다"
+
+
 def mic_setup():
     """설치할 때 실행 — 허용 창을 지금 띄우고, 실제로 소리가 담기는지 확인합니다.
     이 확인을 설치 단계에서 끝내면 기기마다 권한 문제가 제각각 생기는 일이 없습니다."""
@@ -390,6 +452,7 @@ PLIST_XML = """<?xml version="1.0" encoding="UTF-8"?>
   <key>Label</key><string>{label}</string>
   <key>ProgramArguments</key>
   <array>{args}</array>
+  {env}
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
   <key>LimitLoadToSessionType</key><string>Aqua</string>
@@ -410,14 +473,24 @@ def agent_running():
 def ensure_autostart():
     """자동 실행이 등록돼 있는지 확인하고, 없으면 등록합니다.
     터미널이나 앱에서 직접 띄운 경우에는 서비스 쪽에 넘기고 이 창은 물러납니다."""
-    # 앱 껍데기 안의 실행기를 거쳐야 macOS 가 마이크 사용을 물어봅니다.
-    runner = os.path.expanduser("~/Applications/HEIMDALL 녹음기.app/Contents/MacOS/run")
-    if os.path.exists(runner):
-        args = f"<string>{runner}</string>"
+    # macOS 26 은 앱 껍데기 안의 실행 파일에만 마이크 사용을 물어봅니다.
+    # 껍데기 안에 파이썬이 들어 있으면 그것을, 없으면 바깥 파이썬을 씁니다.
+    exe = os.path.expanduser(
+        "~/Applications/HEIMDALL 녹음기.app/Contents/MacOS/heimdall")
+    env = ""
+    if os.path.exists(exe) and os.access(exe, os.X_OK):
+        # 껍데기 안의 파이썬은 라이브러리 위치를 환경변수로 알려줘야 합니다
+        home = os.environ.get("PYTHONHOME") or sys.base_prefix
+        path = os.environ.get("PYTHONPATH") or os.path.expanduser(
+            "~/.heimdall/venv/lib/python%d.%d/site-packages" % sys.version_info[:2])
+        env = ("<key>EnvironmentVariables</key><dict>"
+               f"<key>PYTHONHOME</key><string>{home}</string>"
+               f"<key>PYTHONPATH</key><string>{path}</string></dict>")
     else:
-        args = (f"<string>{sys.executable}</string>"
-                f"<string>{os.path.join(HOME, 'client.py')}</string>")
-    want = PLIST_XML.format(label=LABEL, args=args,
+        exe = sys.executable
+    args = (f"<string>{exe}</string>"
+            f"<string>{os.path.join(HOME, 'client.py')}</string>")
+    want = PLIST_XML.format(label=LABEL, args=args, env=env,
                             log=os.path.join(CONF_DIR, "log.txt"))
     have = ""
     if os.path.exists(PLIST):
@@ -425,15 +498,26 @@ def ensure_autostart():
             have = open(PLIST, encoding="utf-8").read()
         except Exception:
             pass
+
+    # 내가 지금 서비스로 실행된 상태인가?
+    im_the_agent = (os.getppid() == 1)
+
     try:
         if have.strip() != want.strip():
             os.makedirs(os.path.dirname(PLIST), exist_ok=True)
             open(PLIST, "w", encoding="utf-8").write(want)
-            subprocess.run(["launchctl", "unload", PLIST], capture_output=True)
-            subprocess.run(["launchctl", "load", PLIST], capture_output=True)
-        elif not agent_running():
+            # 서비스로 돌고 있는 중에 unload 를 하면 나 자신이 죽어서
+            # 그다음 줄(load)이 실행되지 않습니다. 그래서 내가 서비스일 때는
+            # 설정만 고쳐두고, 다음 로그인부터 새 설정이 쓰이게 둡니다.
+            if not im_the_agent:
+                subprocess.run(["launchctl", "unload", PLIST], capture_output=True)
+                subprocess.run(["launchctl", "load", PLIST], capture_output=True)
+        elif not agent_running() and not im_the_agent:
             subprocess.run(["launchctl", "load", PLIST], capture_output=True)
     except Exception:
+        return
+
+    if im_the_agent:
         return
 
     # 서비스가 아닌 곳(터미널 등)에서 띄운 것이라면 서비스에 맡기고 물러납니다.
@@ -608,6 +692,27 @@ class Client(rumps.App):
             target=self.resume_pending, daemon=True).start(), 300)
         self.retry.start()
         threading.Thread(target=self.first_run, daemon=True).start()
+        threading.Thread(target=self.ask_mic, daemon=True).start()
+
+    def ask_mic(self):
+        """켜지자마자 마이크 권한을 확인합니다.
+        「회의 녹음 시작」을 눌러야 물어보게 하면, 메뉴막대가 꽉 차서
+        번개가 안 보이는 맥에서는 영원히 못 물어보게 됩니다(실측)."""
+        try:
+            ok, msg = mic_check()
+        except Exception:
+            return
+        if ok:
+            return
+        self.m_state.title = "마이크 권한이 필요합니다 — 눌러주세요"
+        self.m_state.set_callback(lambda _: open_mic_settings())
+        say_ok("마이크 사용을 켜주세요",
+               f"{msg}\n\n"
+               "시스템 설정 → 개인정보 보호 및 보안 → 마이크 에서\n"
+               "Python 을 켜주세요. 목록에 없으면 왼쪽 아래 + 를 눌러\n"
+               "이 프로그램을 더해주세요.\n\n"
+               "확인을 누르면 그 화면을 열어드립니다.")
+        open_mic_settings()
 
     def first_run(self):
         self.refresh_who()

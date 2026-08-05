@@ -385,7 +385,7 @@ function profilePage(row, msg=''){
 
 // ─────────────────────────── 뼈대
 function shell(){
-  const tabs = [['list','회의'],['chat','물어보기'],['projects','프로젝트'],
+  const tabs = [['list','회의'],['rec','녹음'],['chat','물어보기'],['projects','프로젝트'],
                 ['upload','업로드'],['search','검색'],['actions','액션아이템'],['brief','브리핑']];
   if(['admin','exec'].includes(me.role)) tabs.push(['members','구성원']);
   $('#app').innerHTML = `
@@ -403,7 +403,7 @@ function shell(){
      <div class="page" id="p-list"></div><div class="page" id="p-search"></div>
      <div class="page" id="p-actions"></div><div class="page" id="p-brief"></div>
      <div class="page" id="p-chat"></div><div class="page" id="p-projects"></div>
-     <div class="page" id="p-upload"></div>
+     <div class="page" id="p-upload"></div><div class="page" id="p-rec"></div>
      <div class="page" id="p-members"></div>
      <div class="page" id="p-meeting"></div>
    </div>`;
@@ -421,7 +421,7 @@ function go(v){
   const el=$('#p-'+v); if(el) el.classList.add('on');
   ({list:renderList, search:renderSearch, actions:renderActions, brief:renderBrief,
     members:renderMembers, chat:renderChat, projects:renderProjects,
-    upload:renderUpload}[v]||(()=>{}))();
+    upload:renderUpload, rec:renderRec}[v]||(()=>{}))();
 }
 
 // ─────────────────────────── 회의 목록
@@ -1202,6 +1202,137 @@ function showProject(pid, projects, meetings){
 // ─────────────────────────── 업로드
 const AUDIO_EXT = ['m4a','mp3','wav','caf','mp4','aac','ogg','flac','wma','webm'];
 const DOC_EXT = ['docx','txt','md','pdf','pptx','hwpx'];
+
+// ─────────────────────────── 웹에서 바로 녹음
+// 브라우저 마이크를 씁니다. 이미 마이크를 쓰는 브라우저라면
+// 따로 설치할 것도, 권한을 새로 받을 것도 없습니다.
+let REC = {mr:null, chunks:[], t0:0, timer:null, stream:null};
+
+function recFmt(s){
+  const m=Math.floor(s/60), x=s%60;
+  return (m<60? `${m}:${String(x).padStart(2,'0')}`
+              : `${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}:${String(x).padStart(2,'0')}`);
+}
+
+async function renderRec(){
+  const el=$('#p-rec');
+  const on = !!(REC.mr && REC.mr.state==='recording');
+  el.innerHTML=`<h1>녹음</h1>
+    <div class="sub">이 기기의 마이크로 회의를 녹음합니다.
+      끝내면 자동으로 올라가고, 전사·요약·하이라이트가 만들어집니다</div>
+    <div class="box">
+      <div class="row" style="margin-bottom:9px">
+        <input id="rc-title" placeholder="회의명" style="flex:2;min-width:220px" ${on?'disabled':''}>
+        <input id="rc-parts" placeholder="참석자 (쉼표로 구분 · 선택)" style="flex:2;min-width:180px" ${on?'disabled':''}>
+      </div>
+      <div class="row" style="align-items:center">
+        <button class="btn p" id="rc-go" style="min-width:150px">${on?'■ 녹음 종료':'● 회의 녹음 시작'}</button>
+        <span id="rc-time" style="font-size:22px;font-weight:700;letter-spacing:1px">0:00</span>
+        <span id="rc-lv" class="sub" style="margin:0"></span>
+      </div>
+      <div class="sub" style="margin:12px 0 0">
+        녹음 중에는 이 화면을 켜둔 채로 두세요. 다른 탭으로 옮겨도 계속 녹음됩니다.<br>
+        <span style="color:#B36B00">브라우저가 마이크 사용을 물어보면 「허용」 을 눌러주세요.</span>
+      </div>
+    </div>
+    <h1 style="font-size:16px;margin-top:24px">최근 올린 것</h1>
+    <div id="up-list" class="box" style="color:#98A0AC">불러오는 중…</div>`;
+  $('#rc-go').onclick = on ? recStop : recStart;
+  if(on) recTick();
+  loadUploads();
+}
+
+function recTick(){
+  const t=$('#rc-time'); if(!t) return;
+  t.textContent = recFmt(Math.floor((Date.now()-REC.t0)/1000));
+}
+
+async function recStart(){
+  const title=($('#rc-title').value||'').trim()
+    || new Date().toISOString().slice(2,10).replace(/-/g,'')+' 회의';
+  let stream;
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({audio:{
+      echoCancellation:true, noiseSuppression:true, autoGainControl:true}});
+  }catch(e){
+    return toast('마이크를 쓸 수 없습니다.<br>브라우저 주소창 왼쪽의 자물쇠를 눌러 마이크를 허용해주세요.', 7000);
+  }
+  // 브라우저마다 되는 형식이 다릅니다. 되는 것을 골라 씁니다.
+  let mime='';
+  for(const m of ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg']){
+    if(window.MediaRecorder && MediaRecorder.isTypeSupported(m)){ mime=m; break; }
+  }
+  REC.chunks=[]; REC.stream=stream; REC.title=title;
+  REC.parts=($('#rc-parts').value||'').trim();
+  REC.mr = mime? new MediaRecorder(stream,{mimeType:mime, audioBitsPerSecond:64000})
+                : new MediaRecorder(stream);
+  REC.mr.ondataavailable = e=>{ if(e.data && e.data.size) REC.chunks.push(e.data); };
+  REC.mr.onstop = recDone;
+  REC.mr.start(5000);            // 5초마다 조각으로 모읍니다 (길게 녹음해도 안전)
+  REC.t0 = Date.now();
+  REC.timer = setInterval(recTick, 1000);
+  recWatchLevel(stream);
+  renderRec();
+  toast('녹음을 시작했습니다: <b>'+esc(title)+'</b>');
+}
+
+function recWatchLevel(stream){
+  // 소리가 안 들어오면 알려줍니다 (권한은 있는데 마이크가 꺼진 경우)
+  try{
+    const ac=new (window.AudioContext||window.webkitAudioContext)();
+    const an=ac.createAnalyser(); an.fftSize=512;
+    ac.createMediaStreamSource(stream).connect(an);
+    const buf=new Uint8Array(an.fftSize); let peak=0, n=0;
+    const iv=setInterval(()=>{
+      if(!REC.mr || REC.mr.state!=='recording'){ clearInterval(iv); ac.close(); return; }
+      an.getByteTimeDomainData(buf);
+      let m=0; for(const v of buf) m=Math.max(m, Math.abs(v-128));
+      peak=Math.max(peak,m); n++;
+      const lv=$('#rc-lv');
+      if(lv) lv.textContent = m>2? '● 소리 들어오는 중' : '';
+      if(n===12 && peak<=2)
+        toast('소리가 들어오지 않습니다.<br>마이크가 켜져 있는지 확인해주세요.', 7000);
+    }, 1000);
+  }catch(e){}
+}
+
+function recStop(){
+  if(!REC.mr || REC.mr.state!=='recording') return;
+  clearInterval(REC.timer); REC.timer=null;
+  REC.dur = Math.floor((Date.now()-REC.t0)/1000);
+  REC.mr.stop();
+  (REC.stream.getTracks()||[]).forEach(t=>t.stop());
+  toast('올리는 중입니다…');
+}
+
+async function recDone(){
+  const type = REC.mr.mimeType || 'audio/webm';
+  const ext = type.includes('mp4')? 'mp4' : type.includes('ogg')? 'ogg' : 'webm';
+  const blob = new Blob(REC.chunks, {type});
+  REC.mr=null; REC.chunks=[];
+  if(blob.size < 4000){ renderRec(); return toast('녹음이 비어 있습니다.', 6000); }
+  try{
+    const safe=(REC.title||'회의').replace(/[^0-9A-Za-z가-힣._-]/g,'_');
+    const name=`jobs/${Date.now()}_${safe}.${ext}`;
+    const {error:e1}=await SB.storage.from('hd-audio').upload(name, blob, {upsert:true, contentType:type});
+    if(e1) throw e1;
+    const {error:e2}=await SB.from('hd_job').insert({
+      title:REC.title, participants:REC.parts||'',
+      audio_path:name, kind:'audio', orig_name:`${safe}.${ext}`,
+      device:'웹 녹음', created_by:me.id, created_name:me.name,
+      company:me.company||'', dept:me.dept||''});
+    if(e2) throw e2;
+    toast(`<b>${esc(REC.title)}</b> (${recFmt(REC.dur||0)}) 올렸습니다.<br>처리가 끝나면 회의 목록에 나타납니다.`);
+  }catch(e){
+    toast('올리지 못했습니다: '+esc(e.message||e), 8000);
+  }
+  renderRec();
+}
+
+// 녹음 중에 실수로 창을 닫는 것을 막습니다
+window.addEventListener('beforeunload', e=>{
+  if(REC.mr && REC.mr.state==='recording'){ e.preventDefault(); e.returnValue=''; }
+});
 
 async function renderUpload(){
   const el=$('#p-upload');
