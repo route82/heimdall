@@ -1312,13 +1312,12 @@ async function recDone(){
   REC.mr=null; REC.chunks=[];
   if(blob.size < 4000){ renderRec(); return toast('녹음이 비어 있습니다.', 6000); }
   try{
-    const safe=(REC.title||'회의').replace(/[^0-9A-Za-z가-힣._-]/g,'_');
-    const name=`jobs/${Date.now()}_${safe}.${ext}`;
+    const name=`jobs/${Date.now()}_web.${ext}`;   // 이름은 영문·숫자만 (한글 불가)
     const {error:e1}=await SB.storage.from('hd-audio').upload(name, blob, {upsert:true, contentType:type});
     if(e1) throw e1;
     const {error:e2}=await SB.from('hd_job').insert({
       title:REC.title, participants:REC.parts||'',
-      audio_path:name, kind:'audio', orig_name:`${safe}.${ext}`,
+      audio_path:name, kind:'audio', orig_name:`${REC.title}.${ext}`,
       device:'웹 녹음', created_by:me.id, created_name:me.name,
       company:me.company||'', dept:me.dept||''});
     if(e2) throw e2;
@@ -1394,8 +1393,11 @@ async function doUpload(){
 
   const btn=$('#up-go'); btn.disabled=true; btn.textContent='올리는 중…';
   try{
-    const safe=f.name.replace(/[^0-9A-Za-z가-힣._-]/g,'_');
-    const name=`jobs/${Date.now()}_${safe}`;
+    // 저장소 파일 이름에는 영문·숫자만 쓸 수 있습니다.
+    // 원래 이름(한글 포함)은 orig_name 에 그대로 남겨둡니다.
+    // 확장자는 반드시 붙입니다 — 처리 서버가 형식을 그걸로 알아봅니다.
+    const base=f.name.replace(/\.[^.]+$/,'').replace(/[^0-9A-Za-z_-]/g,'').slice(0,40);
+    const name=`jobs/${Date.now()}_${base||'file'}.${ext}`;
     const {error:e1}=await SB.storage.from('hd-audio').upload(name, f, {upsert:true});
     if(e1) throw e1;
     const title=$('#up-title').value.trim()
