@@ -7,7 +7,7 @@
 import ctypes, hashlib, json, os, re, shutil, subprocess, sys, threading, time
 import urllib.error, urllib.request, webbrowser
 
-VERSION = "1.0"
+VERSION = "1.1"
 
 HOME = os.path.dirname(os.path.abspath(__file__))
 CONF_DIR = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")),
@@ -441,7 +441,9 @@ class App:
         if not token:
             raise RuntimeError("로그인이 필요합니다")
         path = m["audio"]
-        name = f"jobs/{int(time.time())}_{os.getpid()}_{os.path.basename(path)}"
+        # 저장소 이름에는 영문·숫자만 씁니다 (한글이 들어가면 서버가 거부합니다)
+        ext = os.path.splitext(path)[1] or ".m4a"
+        name = f"jobs/{int(time.time())}_{os.getpid()}{ext}"
         data = open(path, "rb").read()
         req = urllib.request.Request(
             f"{SB_URL}/storage/v1/object/hd-audio/{name}", data=data, method="POST",

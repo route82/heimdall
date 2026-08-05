@@ -10,7 +10,7 @@ import hashlib, json, os, re, shutil, subprocess, sys, threading, time, datetime
 import urllib.error, urllib.parse, urllib.request, webbrowser
 
 # 이 숫자를 올리면 이미 깔린 녹음기들이 「업데이트 있음」 을 표시합니다
-VERSION = "3.0"
+VERSION = "3.1"
 
 HOME = os.path.dirname(os.path.abspath(__file__))
 CONF_DIR = os.path.join(os.path.expanduser("~"), ".heimdall")
@@ -933,7 +933,9 @@ class Client(rumps.App):
             raise RuntimeError("로그인이 필요합니다")
 
         dur = int(meta.get("duration") or 0)
-        name = f"jobs/{int(time.time())}_{os.getpid()}_{os.path.basename(path)}"
+        # 저장소 이름에는 영문·숫자만 씁니다 (한글이 들어가면 서버가 거부합니다)
+        ext = os.path.splitext(path)[1] or ".m4a"
+        name = f"jobs/{int(time.time())}_{os.getpid()}{ext}"
         data = open(path, "rb").read()
         ctype = "audio/mp4" if path.endswith(".m4a") else "audio/x-caf"
         u = f"{SB_URL}/storage/v1/object/hd-audio/{name}"
