@@ -1206,7 +1206,26 @@ const DOC_EXT = ['docx','txt','md','pdf','pptx','hwpx'];
 // ─────────────────────────── 웹에서 바로 녹음
 // 브라우저 마이크를 씁니다. 이미 마이크를 쓰는 브라우저라면
 // 따로 설치할 것도, 권한을 새로 받을 것도 없습니다.
-let REC = {mr:null, chunks:[], t0:0, timer:null, stream:null};
+let REC = {mr:null, chunks:[], t0:0, timer:null, stream:null, lock:null};
+
+async function keepAwake(on){
+  // 녹음 중에는 화면이 꺼지지 않게 잡아둡니다.
+  // 폰은 화면이 꺼지면 녹음이 멈추는 경우가 있습니다.
+  try{
+    if(on){
+      if('wakeLock' in navigator && !REC.lock)
+        REC.lock = await navigator.wakeLock.request('screen');
+    }else if(REC.lock){
+      await REC.lock.release(); REC.lock=null;
+    }
+  }catch(e){ REC.lock=null; }
+}
+
+// 화면을 잠깐 봤다가 돌아오면 잠금이 풀려 있으므로 다시 겁니다
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState==='visible' && REC.mr && REC.mr.state==='recording')
+    keepAwake(true);
+});
 
 function recFmt(s){
   const m=Math.floor(s/60), x=s%60;
@@ -1231,7 +1250,8 @@ async function renderRec(){
         <span id="rc-lv" class="sub" style="margin:0"></span>
       </div>
       <div class="sub" style="margin:12px 0 0">
-        녹음 중에는 이 화면을 켜둔 채로 두세요. 다른 탭으로 옮겨도 계속 녹음됩니다.<br>
+        녹음 중에는 화면이 꺼지지 않게 잡아둡니다. 다른 탭으로 옮겨도 계속 녹음됩니다.<br>
+        폰으로 녹음하실 때는 <b>다른 앱으로 나가지 마세요</b> (녹음이 멈출 수 있습니다).<br>
         <span style="color:#B36B00">브라우저가 마이크 사용을 물어보면 「허용」 을 눌러주세요.</span>
       </div>
     </div>
@@ -1269,6 +1289,7 @@ async function recStart(){
   REC.mr.ondataavailable = e=>{ if(e.data && e.data.size) REC.chunks.push(e.data); };
   REC.mr.onstop = recDone;
   REC.mr.start(5000);            // 5초마다 조각으로 모읍니다 (길게 녹음해도 안전)
+  keepAwake(true);               // 화면이 꺼지지 않게 잡아둡니다
   REC.t0 = Date.now();
   REC.timer = setInterval(recTick, 1000);
   recWatchLevel(stream);
@@ -1299,6 +1320,7 @@ function recWatchLevel(stream){
 function recStop(){
   if(!REC.mr || REC.mr.state!=='recording') return;
   clearInterval(REC.timer); REC.timer=null;
+  keepAwake(false);
   REC.dur = Math.floor((Date.now()-REC.t0)/1000);
   REC.mr.stop();
   (REC.stream.getTracks()||[]).forEach(t=>t.stop());
