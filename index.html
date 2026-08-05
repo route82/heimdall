@@ -1464,14 +1464,26 @@ window.addEventListener('beforeinstallprompt', e => {
 function wireInstall(){
   const b = $('#inst'); if(!b) return;
   const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
-  if(standalone || !deferredPrompt) return;
+  if(standalone) return;                       // 이미 앱으로 열려 있습니다
   b.style.display='';
   b.onclick = async () => {
-    b.disabled = true;
-    deferredPrompt.prompt();
-    const {outcome} = await deferredPrompt.userChoice;
-    deferredPrompt = null; b.style.display='none';
-    if(outcome==='accepted') toast('설치했습니다. 이제 앱 아이콘으로 바로 여실 수 있습니다.');
+    if(deferredPrompt){                        // 크롬·엣지 — 바로 설치
+      b.disabled = true;
+      deferredPrompt.prompt();
+      const {outcome} = await deferredPrompt.userChoice;
+      deferredPrompt = null; b.disabled = false;
+      if(outcome==='accepted'){ b.style.display='none';
+        toast('설치했습니다. 바탕화면·독의 <b>HEIMDALL</b> 아이콘으로 바로 여실 수 있습니다.', 7000); }
+      return;
+    }
+    // 사파리 등 — 브라우저마다 방법이 달라 안내만 합니다
+    const ua = navigator.userAgent;
+    const msg = /iPhone|iPad/.test(ua)
+      ? '사파리 아래쪽 <b>공유</b> 버튼 → <b>홈 화면에 추가</b>'
+      : /Safari/.test(ua) && !/Chrome/.test(ua)
+      ? '사파리 메뉴의 <b>파일 → Dock에 추가</b><br>(또는 크롬으로 열면 설치 버튼이 바로 뜹니다)'
+      : '주소창 오른쪽의 <b>설치 아이콘</b>을 눌러주세요<br>(크롬·엣지에서 잘 됩니다)';
+    toast('바탕화면에 앱으로 두려면<br>' + msg, 9000);
   };
 }
 window.addEventListener('appinstalled', ()=>{ const b=$('#inst'); if(b) b.style.display='none'; });
