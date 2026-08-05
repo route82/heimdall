@@ -689,7 +689,9 @@ function renderSearch(){
 // ─────────────────────────── 액션아이템
 async function renderActions(){
   const el=$('#p-actions'); el.innerHTML='<div class="sub">불러오는 중…</div>';
-  const {data,error}=await SB.from('hd_action_board').select('*').order('held_on',{ascending:false});
+  const {data,error}=await SB.from('hd_action_board').select('*')
+    .neq('meeting_status','archived')                 // 보관한 회의는 빼고 봅니다
+    .order('held_on',{ascending:false});
   if(error) return el.innerHTML=`<div class="empty">${esc(error.message)}</div>`;
   const open=data.filter(a=>a.state==='open'), done=data.filter(a=>a.state!=='open');
   const card=a=>`<div class="act ${a.state!=='open'?'done':''}" data-id="${a.id}">
@@ -1078,7 +1080,9 @@ async function renderProjects(){
   const el=$('#p-projects'); el.innerHTML='<div class="sub">불러오는 중…</div>';
   const [pj,ms]=await Promise.all([
     SB.from('hd_project_board').select('*').eq('archived',false).order('created_at'),
-    SB.from('hd_meeting').select('id,title,held_on,project_id').order('held_on',{ascending:false})]);
+    SB.from('hd_meeting').select('id,title,held_on,project_id')
+      .neq('status','archived')                       // 보관한 회의는 빼고 봅니다
+      .order('held_on',{ascending:false})]);
   if(pj.error) return el.innerHTML=`<div class="empty">${esc(pj.error.message)}</div>`;
   const projects=pj.data||[], meetings=ms.data||[];
   const unassigned=meetings.filter(m=>!m.project_id).length;
