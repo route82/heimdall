@@ -388,8 +388,8 @@ function profilePage(row, msg=''){
 // ─────────────────────────── 뼈대
 function shell(){
   const tabs = [['list','회의'],['rec','녹음'],['chat','물어보기'],['projects','프로젝트'],
-                ['upload','업로드'],['search','검색'],['actions','액션아이템'],['brief','브리핑']];
-  if(['admin','exec'].includes(me.role)) tabs.push(['members','구성원']);
+                ['upload','업로드'],['search','검색'],['actions','액션아이템']];
+  if(['admin','exec'].includes(me.role)) tabs.push(['brief','브리핑'],['members','구성원']);
   $('#app').innerHTML = `
    <div class="top">
      <div class="brand"><svg class="bolt" viewBox="0 0 400 100" fill="currentColor" aria-hidden="true"><polygon points="0,37.5 236,0 236,50 400,50 400,62.5 164,100 164,50 0,50"/></svg><span class="bname">HEIMDALL</span></div>
