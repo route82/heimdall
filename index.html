@@ -1086,6 +1086,8 @@ function pickProject(projects, curId, title='프로젝트 고르기'){
 
 // ─────────────────────────── 프로젝트
 const COLORS=['blue','green','orange','purple','red','teal'];
+// 슈퍼홀릭 그룹사 — 프로젝트 소속 선택지
+const GROUP_COMPANIES=['더올마이티','라피스인터내셔널','슈퍼홀릭','슈퍼홀릭인베스트먼트','루트82'];
 async function renderProjects(){
   const el=$('#p-projects'); el.innerHTML='<div class="sub">불러오는 중…</div>';
   const [pj,ms]=await Promise.all([
@@ -1110,12 +1112,17 @@ async function renderProjects(){
         </select>
         <button class="btn p" id="pj-add">만들기</button>
       </div>
-      ${me.role==='admin'?`<div class="row" style="margin-top:8px">
-        <input id="pj-co" placeholder="회사 (필수)" value="${esc(me.company||'')}" style="flex:1;min-width:140px">
-        <input id="pj-dp" placeholder="부서 (비우면 회사 전체 공개)" value="${esc(me.dept||'')}" style="flex:1;min-width:140px">
+      <div class="row" style="margin-top:10px;flex-wrap:wrap;gap:6px 14px">
+        <span style="font-size:13px;color:#8A93A1">함께하는 회사</span>
+        ${GROUP_COMPANIES.map(c=>`<label style="display:flex;align-items:center;gap:5px;font-size:13.5px">
+          <input type="checkbox" class="pj-cos" value="${c}"
+            ${c===me.company?'checked':''}
+            ${c===me.company&&me.role!=='admin'?'disabled':''}> ${c}</label>`).join('')}
       </div>
-      <div class="sub" style="margin:8px 0 0">이 소속의 구성원에게만 보입니다. 회사는 반드시 적어주세요</div>`
-      :`<div class="sub" style="margin:10px 0 0">${esc(me.company||'')} ${esc(me.dept||'')} 소속으로 만들어집니다</div>`}
+      ${me.role==='admin'?`<div class="row" style="margin-top:8px">
+        <input id="pj-dp" placeholder="부서 (비우면 회사 전체 공개)" value="${esc(me.dept||'')}" style="flex:1;min-width:140px;max-width:260px">
+      </div>`:''}
+      <div class="sub" style="margin:8px 0 0">체크한 회사의 구성원에게 보입니다. 여러 회사가 함께하면 모두 체크하세요</div>
     </div>`:''}
     <div class="pj">
       ${projects.map(p=>`<div class="pjc" data-id="${p.id}">
@@ -1125,7 +1132,8 @@ async function renderProjects(){
             <button class="pjop" data-ed="${p.id}" title="이름·설명 수정">✎</button>
             <button class="pjop" data-del="${p.id}" title="삭제">×</button></span>`:''}</div>
         <div class="d">${p.meeting_count}건${p.last_held_on?' · 최근 '+p.last_held_on:''}
-          · ${(p.company||p.dept)?esc((p.company||'')+' '+(p.dept||'')).trim():'⚠ 소속 없음'}
+          · ${(p.companies&&p.companies.length)?esc(p.companies.join(' + '))+(p.dept?' '+esc(p.dept):'')
+              :(p.company||p.dept)?esc((p.company||'')+' '+(p.dept||'')).trim():'⚠ 소속 없음'}
           ${p.description?'<br>'+esc(p.description):''}</div></div>`).join('')}
       <div class="pjc" data-id=""><div class="pjbar" style="background:#C9D0DA"></div>
         <div class="n">분류 안 됨</div>
@@ -1138,12 +1146,13 @@ async function renderProjects(){
     const name=$('#pj-name').value.trim();
     if(!name) return toast('이름을 입력해주세요');
     add.disabled=true;
-    const co = me.role==='admin' ? ($('#pj-co').value||'').trim() : (me.company||'');
-    const dp = me.role==='admin' ? ($('#pj-dp').value||'').trim() : (me.dept||'');
-    if(!co) return toast('회사를 적어주세요. 소속 없는 프로젝트는 만들 수 없습니다.');
+    let cos=[...el.querySelectorAll('.pj-cos:checked')].map(x=>x.value);
+    if(me.role!=='admin' && me.company && !cos.includes(me.company)) cos.unshift(me.company);
+    if(!cos.length) return toast('함께하는 회사를 하나 이상 체크해주세요.');
+    const dp = me.role==='admin' ? (($('#pj-dp')||{value:''}).value||'').trim() : (me.dept||'');
     const {error}=await SB.from('hd_project').insert({
       name, description:$('#pj-desc').value.trim(), color:$('#pj-color').value,
-      company:co, dept:dp, created_by:me.id, created_name:me.name});
+      company:cos[0], companies:cos, dept:dp, created_by:me.id, created_name:me.name});
     add.disabled=false;
     if(error) return toast('만들지 못했습니다: '+esc(error.message));
     toast(`<b>${esc(name)}</b> 만들었습니다`); renderProjects();
@@ -1162,13 +1171,20 @@ async function renderProjects(){
     const desc=prompt('한 줄 설명 (비워도 됩니다)', p.description||'');
     if(desc===null) return;
     const upd={name:name.trim(), description:desc.trim()};
-    if(me.role==='admin'){
-      const co=prompt('회사 (필수)', p.company||'');
+    {
+      const cur=(p.companies&&p.companies.length)?p.companies.join(', '):(p.company||'');
+      const co=prompt('함께하는 회사 (쉼표로 구분)\n가능: '+GROUP_COMPANIES.join(', '), cur);
       if(co===null) return;
-      if(!co.trim()) return toast('회사는 비울 수 없습니다.');
-      const dp=prompt('부서 (비우면 회사 전체 공개)', p.dept||'');
-      if(dp===null) return;
-      upd.company=co.trim(); upd.dept=dp.trim();
+      const cos=co.split(',').map(x=>x.trim()).filter(Boolean);
+      if(!cos.length) return toast('회사는 하나 이상 있어야 합니다.');
+      const bad=cos.filter(c=>!GROUP_COMPANIES.includes(c));
+      if(bad.length) return toast('없는 회사입니다: '+esc(bad.join(', '))+'<br>가능: '+GROUP_COMPANIES.join(', '), 7000);
+      upd.company=cos[0]; upd.companies=cos;
+      if(me.role==='admin'){
+        const dp=prompt('부서 (비우면 회사 전체 공개)', p.dept||'');
+        if(dp===null) return;
+        upd.dept=dp.trim();
+      }
     }
     const {error}=await SB.from('hd_project').update(upd).eq('id',p.id);
     if(error) return toast('수정하지 못했습니다: '+esc(error.message));
