@@ -138,6 +138,8 @@ mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
 .chip:hover{border-color:#0B65D8;color:#0B65D8}
 .pj{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:11px}
 .pjc{background:#fff;border:1px solid #E6EAF0;border-radius:12px;padding:16px 18px;cursor:pointer}
+.pjop{border:none;background:none;color:#98A0AC;font-size:15px;cursor:pointer;padding:2px 5px;border-radius:6px}
+.pjop:hover{background:#EEF2F7;color:#1B1F26}
 .pjc:hover{border-color:#0B65D8}
 .pjc .n{font-size:16px;font-weight:700;margin-bottom:3px}
 .pjc .d{font-size:12.5px;color:#98A0AC}
@@ -1113,7 +1115,10 @@ async function renderProjects(){
     <div class="pj">
       ${projects.map(p=>`<div class="pjc" data-id="${p.id}">
         <div class="pjbar c-${p.color||'blue'}"></div>
-        <div class="n">${esc(p.name)}</div>
+        <div class="n">${esc(p.name)}
+          ${canMake?`<span style="float:right;white-space:nowrap">
+            <button class="pjop" data-ed="${p.id}" title="이름·설명 수정">✎</button>
+            <button class="pjop" data-del="${p.id}" title="삭제">×</button></span>`:''}</div>
         <div class="d">${p.meeting_count}건${p.last_held_on?' · 최근 '+p.last_held_on:''}
           ${p.description?'<br>'+esc(p.description):''}</div></div>`).join('')}
       <div class="pjc" data-id=""><div class="pjbar" style="background:#C9D0DA"></div>
@@ -1135,7 +1140,32 @@ async function renderProjects(){
     toast(`<b>${esc(name)}</b> 만들었습니다`); renderProjects();
   };
 
-  el.querySelectorAll('.pjc').forEach(c=>c.onclick=()=>showProject(c.dataset.id, projects, meetings));
+  el.querySelectorAll('.pjc').forEach(c=>c.onclick=(e)=>{
+    if(e.target.closest('.pjop')) return;          // 수정·삭제 버튼은 제외
+    showProject(c.dataset.id, projects, meetings);});
+
+  // 이름·설명 수정
+  el.querySelectorAll('[data-ed]').forEach(b=>b.onclick=async()=>{
+    const p=projects.find(x=>x.id===b.dataset.ed); if(!p) return;
+    const name=prompt('프로젝트 이름', p.name);
+    if(name===null) return;
+    if(!name.trim()) return toast('이름은 비울 수 없습니다');
+    const desc=prompt('한 줄 설명 (비워도 됩니다)', p.description||'');
+    if(desc===null) return;
+    const {error}=await SB.from('hd_project')
+      .update({name:name.trim(), description:desc.trim()}).eq('id',p.id);
+    if(error) return toast('수정하지 못했습니다: '+esc(error.message));
+    toast('수정했습니다'); renderProjects();
+  });
+
+  // 삭제 — 회의는 지워지지 않고 「분류 안 됨」으로 돌아갑니다
+  el.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{
+    const p=projects.find(x=>x.id===b.dataset.del); if(!p) return;
+    if(!confirm(`「${p.name}」 프로젝트를 삭제합니다.\n\n묶여 있던 회의 ${p.meeting_count}건은 지워지지 않고\n「분류 안 됨」으로 돌아갑니다.`)) return;
+    const {error}=await SB.from('hd_project').delete().eq('id',p.id);
+    if(error) return toast('삭제하지 못했습니다: '+esc(error.message));
+    toast(`<b>${esc(p.name)}</b> 삭제했습니다`); renderProjects();
+  });
 }
 
 function showProject(pid, projects, meetings){
