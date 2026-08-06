@@ -429,7 +429,7 @@ async function renderList(){
   const el=$('#p-list'); el.innerHTML='<div class="sub">불러오는 중…</div>';
   const showArch = sessionStorage.getItem('hd_show_arch')==='1';
   let q = SB.from('hd_meeting')
-      .select('id,title,held_on,status,duration_sec,company,dept,summary_md,project_id')
+      .select('id,title,held_on,status,duration_sec,company,dept,summary_md,project_id,source')
       .order('held_on',{ascending:false}).limit(200);
   if(!showArch) q = q.neq('status','archived');
   const [mres, pres] = await Promise.all([q,
@@ -444,6 +444,7 @@ async function renderList(){
    + (data.length? data.map(m=>`<div class="card" data-id="${m.id}">
         <div class="ct">${esc(m.title)}</div>
         <div class="cm"><span class="tag t-${m.status}">${STATUS[m.status]}</span>
+          ${m.source?`<span class="tag" style="background:#FFF0E0;color:#B36B00">${esc(m.source)}</span>`:''}
           ${PJ[m.project_id]?`<span class="tag" style="background:#EEF2F7;color:#3A424F">${esc(PJ[m.project_id].name)}</span>`:''}
           <span>${m.held_on}</span>${m.duration_sec?`<span>${hms(m.duration_sec)}</span>`:''}
           ${m.company?`<span>${esc(m.company)}${m.dept?' '+esc(m.dept):''}</span>`:''}
@@ -484,7 +485,7 @@ function drawMeeting(){
     <span class="tag t-${m.status}">${STATUS[m.status]}</span>
     ${m.reported_at?`<span class="sub" style="margin:0">보고 ${m.reported_at.slice(0,10)}</span>`:''}</div>
   <h1>${esc(m.title)}</h1>
-  <div class="sub">${m.held_on} · ${hms(m.duration_sec)} · ${att.length?esc(att.join(', ')):'참석자 미기재'}
+  <div class="sub">${m.source?`<span class="tag" style="background:#FFF0E0;color:#B36B00;margin-right:6px">${esc(m.source)} 사용 회의</span>`:''}${m.held_on} · ${hms(m.duration_sec)} · ${att.length?esc(att.join(', ')):'참석자 미기재'}
     ${(m.company||m.dept)?` · ${esc(m.company||'')} ${esc(m.dept||'')}`:''}</div>
   <div class="row" style="margin-bottom:6px">
     <span style="font-size:13px;color:#8A93A1">프로젝트</span>
@@ -524,6 +525,7 @@ function drawMeeting(){
        : '<button class="btn" id="arch">보관</button>') : ''}
     ${canReport && m.status!=='reported' ? '<button class="btn g" id="rep">경영진 보고</button>':''}
     ${canReport && m.status==='reported' ? '<button class="btn" id="unrep">보고 취소</button>':''}
+    <button class="btn" id="expdoc">워드로 내보내기</button>
     <button class="btn" id="cancel" style="display:none">취소</button>
     <button class="btn p" id="edit">편집</button></div>`;
 
@@ -532,6 +534,7 @@ function drawMeeting(){
     panes.forEach(p=>p.classList.remove('on'));t.setAttribute('aria-selected','true');panes[i].classList.add('on');
     if(t.textContent.trim()==='마인드맵') drawMindmap(m);});
   $('#back').onclick=()=>go('list');
+  $('#expdoc').onclick=()=>exportDoc();
 
   const q=$('#q2'); q.oninput=()=>{const v=q.value.trim().toLowerCase();
     el.querySelectorAll('#segs .seg').forEach(s=>{const p=s.querySelector('p');
@@ -1460,6 +1463,56 @@ async function doUpload(){
   }finally{
     btn.disabled=false; btn.textContent='올리기';
   }
+}
+
+// ─────────────────────────── 워드로 내보내기
+// 하이라이트·전사·요약·액션아이템을 한 파일에 담아 내려받습니다.
+// 워드가 읽을 수 있는 HTML 형식(.doc)이라 워드·한글에서 바로 열립니다.
+function exportDoc(){
+  if(!cur) return;
+  const {m,segs,hls,acts,att}=cur;
+  const S=`body{font-family:'맑은 고딕',sans-serif;font-size:10.5pt;line-height:1.7;color:#1B1F26}
+    h1{font-size:18pt;margin:0 0 6pt} h2{font-size:13pt;color:#0B65D8;border-bottom:1.5pt solid #0B65D8;
+    padding-bottom:3pt;margin:18pt 0 8pt} table{border-collapse:collapse;width:100%;font-size:9.5pt}
+    td,th{border:1pt solid #C9D1DC;padding:4pt 7pt;vertical-align:top} th{background:#EEF2F7}
+    .ts{color:#8A93A1;font-size:8.5pt} .spk{font-weight:bold;color:#0B65D8}
+    .hl{margin:0 0 10pt} .hl h3{font-size:11pt;margin:0 0 3pt} .hl ul{margin:2pt 0 0 14pt}
+    .meta{color:#5A6472;font-size:9.5pt;margin-bottom:14pt}`;
+  const esc2=t=>String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  let h='<h1>'+esc2(m.title)+'</h1>';
+  h+='<div class="meta">'+m.held_on+' · '+hms(m.duration_sec)
+    +(att.length?' · 참석: '+esc2(att.join(', ')):'')
+    +(m.source?' · '+esc2(m.source)+' 사용 회의':'')
+    +'<br>HEIMDALL 자동 생성 · 내보낸 날짜 '+new Date().toISOString().slice(0,10)+'</div>';
+
+  h+='<h2>하이라이트</h2>';
+  h+=hls.length? hls.map(x=>'<div class="hl"><div class="ts">'+hms(x.start_sec)+'</div><h3>'
+      +esc2(x.headline)+'</h3>'
+      +((x.points||[]).length?'<ul>'+x.points.map(p=>'<li>'+esc2(p)+'</li>').join('')+'</ul>':'')
+      +'</div>').join('') : '<p>하이라이트가 없습니다.</p>';
+
+  h+='<h2>요약</h2>'+mdHtml(m.summary_md||'(요약 없음)');
+
+  h+='<h2>액션아이템</h2>';
+  h+=acts.length? '<table><tr><th>할 일</th><th>담당</th><th>기한</th><th>상태</th></tr>'
+      +acts.map(a=>'<tr><td>'+esc2(a.task)+'</td><td>'+esc2(a.owner_name||'미정')
+      +'</td><td>'+esc2(a.due||'')+'</td><td>'+(a.state==='done'?'완료':'진행')+'</td></tr>').join('')
+      +'</table>' : '<p>액션아이템이 없습니다.</p>';
+
+  h+='<h2>전사 전문</h2>';
+  h+=segs.map(sg=>'<p><span class="ts">['+hms(sg.start_sec)+']</span> '
+      +(sg.speaker?'<span class="spk">'+esc2(sg.speaker)+'</span> · ':'')
+      +esc2(sg.text)+'</p>').join('');
+
+  const doc='<html xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8">'
+      +'<title>'+esc2(m.title)+'</title><style>'+S+'</style></head><body>'+h+'</body></html>';
+  const blob=new Blob(['\ufeff', doc], {type:'application/msword'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=(m.held_on||'')+'_'+(m.title||'회의').replace(/[\\/:*?"<>|]/g,'_')+'.doc';
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+  toast('워드 파일로 내려받았습니다.<br>워드·한글에서 바로 열립니다.');
 }
 
 // ─────────────────────────── 마인드맵
