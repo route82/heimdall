@@ -390,6 +390,7 @@ function shell(){
   const tabs = [['list','회의'],['rec','녹음'],['chat','물어보기'],['projects','프로젝트'],
                 ['upload','업로드'],['search','검색'],['actions','액션아이템']];
   if(['admin','exec'].includes(me.role)) tabs.push(['brief','브리핑'],['members','구성원']);
+  if(me.role==='admin') tabs.push(['server','처리서버']);
   $('#app').innerHTML = `
    <div class="top">
      <div class="brand"><svg class="bolt" viewBox="0 0 400 100" fill="currentColor" aria-hidden="true"><polygon points="0,37.5 236,0 236,50 400,50 400,62.5 164,100 164,50 0,50"/></svg><span class="bname">HEIMDALL</span></div>
@@ -406,7 +407,7 @@ function shell(){
      <div class="page" id="p-actions"></div><div class="page" id="p-brief"></div>
      <div class="page" id="p-chat"></div><div class="page" id="p-projects"></div>
      <div class="page" id="p-upload"></div><div class="page" id="p-rec"></div>
-     <div class="page" id="p-members"></div>
+     <div class="page" id="p-members"></div><div class="page" id="p-server"></div>
      <div class="page" id="p-meeting"></div>
    </div>`;
   document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>go(b.dataset.v));
@@ -423,7 +424,7 @@ function go(v){
   const el=$('#p-'+v); if(el) el.classList.add('on');
   ({list:renderList, search:renderSearch, actions:renderActions, brief:renderBrief,
     members:renderMembers, chat:renderChat, projects:renderProjects,
-    upload:renderUpload, rec:renderRec}[v]||(()=>{}))();
+    upload:renderUpload, rec:renderRec, server:renderServer}[v]||(()=>{}))();
 }
 
 // ─────────────────────────── 회의 목록
@@ -1530,6 +1531,96 @@ async function doUpload(){
   }finally{
     btn.disabled=false; btn.textContent='올리기';
   }
+}
+
+// ─────────────────────────── 처리 서버 원격 관리
+// 사무실에 가지 않고도 상태 확인·다시 시작·설정 변경을 합니다.
+// 실제 실행은 사무실 PC 의 처리 서버가 합니다.
+const CMDS = [
+  ['status',  '상태 보기',      '버전·모델·설정을 확인합니다'],
+  ['gpu',     '그래픽카드 확인', '실제로 가속이 되는지 시험합니다 (1분)'],
+  ['log',     '기록 보기',      '최근 기록 60줄을 가져옵니다'],
+  ['update',  '새 버전 받기',   '배포된 최신 버전으로 갱신합니다'],
+  ['restart', '다시 시작',      '처리 서버를 껐다 켭니다 (15초 뒤 자동 복귀)'],
+];
+
+async function renderServer(){
+  const el=$('#p-server');
+  el.innerHTML=`<h1>처리 서버</h1>
+    <div class="sub">사무실 컴퓨터에서 도는 전사·회의록 처리기입니다.
+      여기서 상태를 보고 조작할 수 있습니다</div>
+    <div class="box" id="sv-state">상태 확인 중…</div>
+    <div class="box">
+      <div class="row" style="flex-wrap:wrap;gap:8px">
+        ${CMDS.map(([k,l,d])=>`<button class="btn" data-cmd="${k}" title="${d}">${l}</button>`).join('')}
+      </div>
+      <div class="sub" style="margin:12px 0 0">
+        설정 바꾸기 — 바꾼 뒤에는 「다시 시작」을 눌러야 적용됩니다</div>
+      <div class="row" style="margin-top:8px">
+        <select id="sv-key" style="min-width:170px">
+          <option value="WHISPER_MODEL">전사 모델</option>
+          <option value="CLAUDE_MODEL">회의록 모델</option>
+          <option value="BRIEF_HOUR">브리핑 시각</option>
+        </select>
+        <input id="sv-val" placeholder="예: large-v3 · claude-sonnet-5 · 7" style="flex:1;min-width:200px">
+        <button class="btn p" id="sv-set">바꾸기</button>
+      </div>
+    </div>
+    <h1 style="font-size:16px;margin-top:22px">결과</h1>
+    <div class="box"><pre id="sv-out" style="margin:0;white-space:pre-wrap;
+      font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:#3A424F">명령을 눌러주세요.</pre></div>`;
+
+  el.querySelectorAll('[data-cmd]').forEach(b=>b.onclick=()=>sendCmd(b.dataset.cmd,{},b));
+  $('#sv-set').onclick=()=>{
+    const v=($('#sv-val').value||'').trim();
+    if(!v) return toast('값을 적어주세요');
+    sendCmd('conf_set',{key:$('#sv-key').value, value:v}, $('#sv-set'));
+  };
+  loadAgent();
+}
+
+async function loadAgent(){
+  const box=$('#sv-state'); if(!box) return;
+  const {data,error}=await SB.from('hd_agent').select('*').eq('id','worker').maybeSingle();
+  if(error||!data) return box.innerHTML='<span style="color:#B36B00">아직 상태를 받지 못했습니다. '
+    +'처리 서버가 최신 버전인지 확인해주세요.</span>';
+  const age=(Date.now()-new Date(data.beat_at).getTime())/1000;
+  const live=age<180;
+  const i=data.info||{};
+  box.innerHTML=`<div class="row" style="align-items:center;gap:10px">
+      <span class="tag ${live?'t-reported':'t-draft'}">${live?'정상 작동 중':'응답 없음'}</span>
+      <b>버전 ${esc(data.version||'?')}</b>
+      <span class="sub" style="margin:0">전사 ${esc(i.model||'?')} · 회의록 ${esc(i.claude||'?')}
+        · 브리핑 ${esc(String(i.brief_hour||'7'))}시</span>
+    </div>
+    <div class="sub" style="margin:8px 0 0">마지막 신호 ${Math.round(age)}초 전
+      ${live?'':'· 3분 넘게 소식이 없습니다. 사무실 컴퓨터가 꺼져 있을 수 있습니다'}</div>`;
+}
+
+async function sendCmd(kind, args, btn){
+  const out=$('#sv-out');
+  const old=btn?btn.textContent:'';
+  if(btn){ btn.disabled=true; btn.textContent='보내는 중…'; }
+  out.textContent='처리 서버에 명령을 보냈습니다. 기다리는 중…';
+  const {data,error}=await SB.from('hd_cmd').insert({
+    kind, args, asked_by:me.id, asked_name:me.name}).select('id').single();
+  if(error){ if(btn){btn.disabled=false;btn.textContent=old;}
+    return out.textContent='보내지 못했습니다: '+error.message; }
+
+  // 결과가 적힐 때까지 기다립니다 (최대 3분)
+  for(let i=0;i<90;i++){
+    await new Promise(r=>setTimeout(r,2000));
+    const {data:d}=await SB.from('hd_cmd').select('status,result').eq('id',data.id).maybeSingle();
+    if(!d) continue;
+    if(d.status==='done'||d.status==='failed'){
+      out.textContent=(d.status==='failed'?'실패: ':'')+(d.result||'(내용 없음)');
+      if(btn){ btn.disabled=false; btn.textContent=old; }
+      loadAgent();
+      return;
+    }
+  }
+  out.textContent='응답이 없습니다. 처리 서버가 꺼져 있거나 처리 중일 수 있습니다.';
+  if(btn){ btn.disabled=false; btn.textContent=old; }
 }
 
 // ─────────────────────────── 워드로 내보내기
