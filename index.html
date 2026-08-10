@@ -139,6 +139,8 @@ mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
 .pj{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:11px}
 .pjc{background:#fff;border:1px solid #E6EAF0;border-radius:12px;padding:16px 18px;cursor:pointer}
 .pjop{border:none;background:none;color:#98A0AC;font-size:15px;cursor:pointer;padding:2px 5px;border-radius:6px}
+.delx{border:none;background:none;color:#C0C6CF;font-size:16px;cursor:pointer;padding:2px 7px;border-radius:6px}
+.delx:hover{background:#FDECEC;color:#C0392B}
 .pjop:hover{background:#EEF2F7;color:#1B1F26}
 .pjc:hover{border-color:#0B65D8}
 .pjc .n{font-size:16px;font-weight:700;margin-bottom:3px}
@@ -518,7 +520,10 @@ function drawMeeting(){
       <div><div class="task">${esc(a.task)}</div>
         <div class="meta">${esc(a.owner_name||'담당 미정')}${a.due?' · '+esc(a.due):''}
         ${a.done_at?' · 완료 '+a.done_at.slice(0,10):''}</div></div>
-      <span class="tag ${a.state==='done'?'t-reported':'t-review'}">${a.state==='done'?'완료':'진행'}</span>
+      <div class="row" style="gap:4px;align-items:center">
+        <span class="tag ${a.state==='done'?'t-reported':'t-review'}">${a.state==='done'?'완료':'진행'}</span>
+        ${['admin','exec','manager'].includes(me.role)?`<button class="delx" data-adel="${a.id}" title="잘못 만들어진 항목 지우기">×</button>`:''}
+      </div>
     </div>`).join('') : '<div class="empty">액션아이템이 없습니다.</div>'}</div>
   ${edits.length?`<div class="hist"><b>편집 이력</b>${edits.map(e=>
      `<div>${e.at.slice(0,16).replace('T',' ')} · ${esc(e.editor)} · ${e.kind}</div>`).join('')}</div>`:''}
@@ -551,6 +556,9 @@ function drawMeeting(){
     cb.closest('.act').classList.toggle('done',cb.checked);
     toast(cb.checked?'완료 처리했습니다':'다시 진행으로 되돌렸습니다',1800);
   });
+
+  el.querySelectorAll('[data-adel]').forEach(b=>b.onclick=()=>
+    delAction(b.dataset.adel, ()=>openMeeting(m.id)));
 
   const arch=$('#arch');
   if(arch) arch.onclick=async()=>{
@@ -705,11 +713,15 @@ async function renderActions(){
     .order('held_on',{ascending:false});
   if(error) return el.innerHTML=`<div class="empty">${esc(error.message)}</div>`;
   const open=data.filter(a=>a.state==='open'), done=data.filter(a=>a.state!=='open');
+  const canDel=['admin','exec','manager'].includes(me.role);
   const card=a=>`<div class="act ${a.state!=='open'?'done':''}" data-id="${a.id}">
      <input type="checkbox" ${a.state==='done'?'checked':''}>
      <div><div class="task">${esc(a.task)}</div>
        <div class="meta">${esc(a.owner_name||'담당 미정')}${a.due?' · '+esc(a.due):''} · ${esc(a.meeting_title)} (${a.held_on})</div></div>
-     <span class="tag ${a.state==='done'?'t-reported':'t-review'}">${a.state==='done'?'완료':'진행'}</span></div>`;
+     <div class="row" style="gap:4px;align-items:center">
+       <span class="tag ${a.state==='done'?'t-reported':'t-review'}">${a.state==='done'?'완료':'진행'}</span>
+       ${canDel?`<button class="delx" data-del="${a.id}" title="잘못 만들어진 항목 지우기">×</button>`:''}
+     </div></div>`;
   el.innerHTML=`<h1>액션아이템</h1><div class="sub">진행 ${open.length}건 · 완료 ${done.length}건</div>
     <div class="box">${open.length?open.map(card).join(''):'<div style="color:#98A0AC">진행 중인 항목이 없습니다.</div>'}</div>
     ${done.length?`<h1 style="font-size:17px;margin-top:26px">완료</h1><div class="box">${done.map(card).join('')}</div>`:''}`;
@@ -719,6 +731,16 @@ async function renderActions(){
       done_at:cb.checked?new Date().toISOString():null}).eq('id',id);
     if(error){toast('변경 실패: '+esc(error.message));cb.checked=!cb.checked;return;}
     renderActions();});
+  el.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>delAction(b.dataset.del, renderActions));
+}
+
+// 잘못 만들어진 액션아이템 지우기 (관리자·경영진·부서 관리자)
+async function delAction(id, after){
+  if(!confirm('이 액션아이템을 지웁니다.\n회의록 본문은 그대로 남고, 목록에서만 사라집니다.')) return;
+  const {error}=await SB.from('hd_action').delete().eq('id',id);
+  if(error) return toast('지우지 못했습니다: '+esc(error.message), 6000);
+  toast('지웠습니다');
+  if(after) after();
 }
 
 // ─────────────────────────── 브리핑
