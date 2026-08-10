@@ -1320,7 +1320,19 @@ async function renderRec(){
         <input id="rc-title" placeholder="회의명" style="flex:2;min-width:220px" ${on?'disabled':''}>
         <input id="rc-parts" placeholder="참석자 (쉼표로 구분 · 선택)" style="flex:2;min-width:180px" ${on?'disabled':''}>
       </div>
-      ${me.role==='admin'?`<div class="row" style="margin-bottom:9px">
+      <div class="row" style="margin-bottom:9px">
+        <select id="rc-type" style="min-width:230px" ${on?'disabled':''}>
+          <option value="meeting">회의 녹음 — 소속 규칙대로 공개</option>
+          <option value="idea">아이디어 노트 — 나만 보기</option>
+          <option value="order">지시사항 — 나만 보기 (공유 선택 가능)</option>
+        </select>
+        <button class="btn" id="rc-share-btn" style="display:none" ${on?'disabled':''}>공유 대상 선택 (<span id="rc-share-n">0</span>명)</button>
+      </div>
+      <div class="box" id="rc-share-box" style="display:none;margin-bottom:9px;max-height:220px;overflow:auto">
+        <div class="sub" style="margin:0 0 8px">체크한 사람도 이 녹음을 볼 수 있습니다</div>
+        <div id="rc-share-list" class="row" style="flex-wrap:wrap;gap:6px 16px">불러오는 중…</div>
+      </div>
+      ${me.role==='admin'?`<div class="row" style="margin-bottom:9px" id="rc-scope-row">
         <select id="rc-scope" style="min-width:230px" ${on?'disabled':''}>
           <option value="mine">내 소속 (${esc(me.company||'')} ${esc(me.dept||'')})</option>
           <option value="exec">그룹 · 전사 경영진 — 관리자·경영진만 열람</option>
@@ -1341,6 +1353,34 @@ async function renderRec(){
     <h1 style="font-size:16px;margin-top:24px">최근 올린 것</h1>
     <div id="up-list" class="box" style="color:#98A0AC">불러오는 중…</div>`;
   $('#rc-go').onclick = on ? recStop : recStart;
+  const ty=$('#rc-type'), shb=$('#rc-share-btn'), box=$('#rc-share-box');
+  ty.onchange=()=>{
+    const p=ty.value!=='meeting';
+    shb.style.display=p?'':'none';
+    if(!p) box.style.display='none';
+    const sr=$('#rc-scope-row'); if(sr) sr.style.display=p?'none':'';
+  };
+  shb.onclick=async()=>{
+    if(box.style.display==='none'){
+      box.style.display='';
+      const list=$('#rc-share-list');
+      if(!list.dataset.loaded){
+        const {data}=await SB.from('hd_member').select('id,name,company,dept')
+          .eq('approved',true).neq('id',me.id).order('name');
+        list.innerHTML=(data||[]).map(m=>`<label style="display:flex;align-items:center;gap:5px;font-size:13.5px">
+          <input type="checkbox" class="rc-share" value="${m.id}"> ${esc(m.name)}
+          <span class="sub" style="margin:0;font-size:11.5px">${esc(m.company||'')}</span></label>`).join('')
+          || '구성원이 없습니다';
+        list.dataset.loaded='1';
+      }
+    } else box.style.display='none';
+  };
+  document.addEventListener('change', e=>{
+    if(e.target.classList&&e.target.classList.contains('rc-share')){
+      const n=document.querySelectorAll('.rc-share:checked').length;
+      const el2=$('#rc-share-n'); if(el2) el2.textContent=n;
+    }
+  });
   if(on) recTick();
   loadUploads();
 }
@@ -1351,6 +1391,11 @@ function recTick(){
 }
 
 async function recStart(){
+  const t0=($('#rc-type')||{value:'meeting'}).value;
+  if(t0!=='meeting' && !($('#rc-title').value||'').trim()){
+    $('#rc-title').value = new Date().toISOString().slice(2,10).replace(/-/g,'')
+      + (t0==='idea' ? ' 아이디어 노트' : ' 지시사항');
+  }
   if(!(me.company||'').trim())
     return toast('계정에 소속(회사)이 등록되어 있지 않습니다.<br>관리자에게 소속 등록을 요청해주세요.', 7000);
   const title=($('#rc-title').value||'').trim()
@@ -1370,6 +1415,8 @@ async function recStart(){
   REC.chunks=[]; REC.stream=stream; REC.title=title;
   REC.parts=($('#rc-parts').value||'').trim();
   REC.scope=($('#rc-scope')||{value:'mine'}).value;
+  REC.type=($('#rc-type')||{value:'meeting'}).value;
+  REC.shares=[...document.querySelectorAll('.rc-share:checked')].map(x=>x.value);
   REC.mr = mime? new MediaRecorder(stream,{mimeType:mime, audioBitsPerSecond:64000})
                 : new MediaRecorder(stream);
   REC.mr.ondataavailable = e=>{ if(e.data && e.data.size) REC.chunks.push(e.data); };
@@ -1423,12 +1470,16 @@ async function recDone(){
     const name=`jobs/${Date.now()}_web.${ext}`;   // 이름은 영문·숫자만 (한글 불가)
     const {error:e1}=await SB.storage.from('hd-audio').upload(name, blob, {upsert:true, contentType:type});
     if(e1) throw e1;
-    const sc=(me.role==='admin' && REC.scope==='exec')
+    const priv = REC.type && REC.type!=='meeting';
+    const sc=(me.role==='admin' && !priv && REC.scope==='exec')
       ? {company:'그룹', dept:'전사 경영진'} : {company:me.company||'', dept:me.dept||''};
+    const extra = priv ? {visibility:'private',
+      note_label: REC.type==='idea' ? '아이디어 노트' : '지시사항',
+      share_ids: REC.shares||[]} : {};
     const {error:e2}=await SB.from('hd_job').insert({
       title:REC.title, participants:REC.parts||'',
       audio_path:name, kind:'audio', orig_name:`${REC.title}.${ext}`,
-      device:'웹 녹음', created_by:me.id, created_name:me.name, ...sc});
+      device:'웹 녹음', created_by:me.id, created_name:me.name, ...sc, ...extra});
     if(e2) throw e2;
     toast(`<b>${esc(REC.title)}</b> (${recFmt(REC.dur||0)}) 올렸습니다.<br>처리가 끝나면 회의 목록에 나타납니다.`);
   }catch(e){
