@@ -1320,6 +1320,13 @@ async function renderRec(){
         <input id="rc-title" placeholder="회의명" style="flex:2;min-width:220px" ${on?'disabled':''}>
         <input id="rc-parts" placeholder="참석자 (쉼표로 구분 · 선택)" style="flex:2;min-width:180px" ${on?'disabled':''}>
       </div>
+      ${me.role==='admin'?`<div class="row" style="margin-bottom:9px">
+        <select id="rc-scope" style="min-width:230px" ${on?'disabled':''}>
+          <option value="mine">내 소속 (${esc(me.company||'')} ${esc(me.dept||'')})</option>
+          <option value="exec">그룹 · 전사 경영진 — 관리자·경영진만 열람</option>
+        </select>
+        <span class="sub" style="margin:0">민감한 회의는 「전사 경영진」으로 — 일반 직원에게 보이지 않습니다</span>
+      </div>`:''}
       <div class="row" style="align-items:center">
         <button class="btn p" id="rc-go" style="min-width:150px">${on?'■ 녹음 종료':'● 회의 녹음 시작'}</button>
         <span id="rc-time" style="font-size:22px;font-weight:700;letter-spacing:1px">0:00</span>
@@ -1362,6 +1369,7 @@ async function recStart(){
   }
   REC.chunks=[]; REC.stream=stream; REC.title=title;
   REC.parts=($('#rc-parts').value||'').trim();
+  REC.scope=($('#rc-scope')||{value:'mine'}).value;
   REC.mr = mime? new MediaRecorder(stream,{mimeType:mime, audioBitsPerSecond:64000})
                 : new MediaRecorder(stream);
   REC.mr.ondataavailable = e=>{ if(e.data && e.data.size) REC.chunks.push(e.data); };
@@ -1415,11 +1423,12 @@ async function recDone(){
     const name=`jobs/${Date.now()}_web.${ext}`;   // 이름은 영문·숫자만 (한글 불가)
     const {error:e1}=await SB.storage.from('hd-audio').upload(name, blob, {upsert:true, contentType:type});
     if(e1) throw e1;
+    const sc=(me.role==='admin' && REC.scope==='exec')
+      ? {company:'그룹', dept:'전사 경영진'} : {company:me.company||'', dept:me.dept||''};
     const {error:e2}=await SB.from('hd_job').insert({
       title:REC.title, participants:REC.parts||'',
       audio_path:name, kind:'audio', orig_name:`${REC.title}.${ext}`,
-      device:'웹 녹음', created_by:me.id, created_name:me.name,
-      company:me.company||'', dept:me.dept||''});
+      device:'웹 녹음', created_by:me.id, created_name:me.name, ...sc});
     if(e2) throw e2;
     toast(`<b>${esc(REC.title)}</b> (${recFmt(REC.dur||0)}) 올렸습니다.<br>처리가 끝나면 회의 목록에 나타납니다.`);
   }catch(e){
@@ -1443,6 +1452,12 @@ async function renderUpload(){
         <input id="up-title" placeholder="회의명 (비우면 파일 이름을 씁니다)" style="flex:2;min-width:220px">
         <input id="up-parts" placeholder="참석자 (쉼표로 구분 · 선택)" style="flex:2;min-width:180px">
       </div>
+      ${me.role==='admin'?`<div class="row" style="margin-bottom:9px">
+        <select id="up-scope" style="min-width:230px">
+          <option value="mine">내 소속 (${esc(me.company||'')} ${esc(me.dept||'')})</option>
+          <option value="exec">그룹 · 전사 경영진 — 관리자·경영진만 열람</option>
+        </select>
+      </div>`:''}
       <div class="row">
         <input type="file" id="up-file" style="flex:1;min-width:240px"
           accept=".m4a,.mp3,.wav,.caf,.mp4,.aac,.ogg,.flac,.wma,.webm,.docx,.txt,.md,.pdf,.pptx,.hwpx,.hwp">
@@ -1517,11 +1532,12 @@ async function doUpload(){
     if(e1) throw e1;
     const title=$('#up-title').value.trim()
       || f.name.replace(/\.[^.]+$/,'');
+    const usc=(me.role==='admin' && ($('#up-scope')||{value:'mine'}).value==='exec')
+      ? {company:'그룹', dept:'전사 경영진'} : {company:me.company||'', dept:me.dept||''};
     const {error:e2}=await SB.from('hd_job').insert({
       title, participants:$('#up-parts').value.trim(),
       audio_path:name, kind:isAudio?'audio':'doc', orig_name:f.name,
-      device:'웹 업로드', created_by:me.id, created_name:me.name,
-      company:me.company||'', dept:me.dept||''});
+      device:'웹 업로드', created_by:me.id, created_name:me.name, ...usc});
     if(e2) throw e2;
     toast(`<b>${esc(title)}</b> 올렸습니다.<br>처리가 끝나면 회의 목록에 나타납니다.`);
     $('#up-file').value=''; $('#up-title').value='';
