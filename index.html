@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="HEIMDALL">
 <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 400 400%22%3E%3Crect width=%22400%22 height=%22400%22 rx=%2280%22 fill=%22%231B1F26%22/%3E%3Cpolygon points=%2230,187 266,150 266,200 370,200 370,212 194,250 194,200 30,200%22 fill=%22%23fff%22/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20400%20400%22%3E%3Crect%20width%3D%22400%22%20height%3D%22400%22%20rx%3D%2280%22%20fill%3D%22%231B1F26%22%2F%3E%3Cpolygon%20points%3D%2250.0%2C192.3%2071.0%2C192.3%2071.4%2C206.5%20227.9%2C206.5%20261.9%2C168.5%20349.6%2C147.4%20349.6%2C238.8%20278.4%2C221.8%20185.0%2C253.0%2072.6%2C223.0%2071.4%2C223.0%2070.6%2C236.4%2050.0%2C236.0%22%20fill%3D%22%23fff%22%2F%3E%3C%2Fsvg%3E">
 <style>
 *{box-sizing:border-box}
 body{margin:0;background:#F5F6F8;color:#1B1F26;line-height:1.7;-webkit-text-size-adjust:100%;word-break:keep-all;overflow-wrap:break-word;
@@ -22,9 +22,9 @@ button{font-family:inherit}
 .navwrap::-webkit-scrollbar{display:none}
 .brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:17px;
  letter-spacing:.03em;margin-right:14px;padding:15px 0}
-.bolt{height:.62em;width:auto;display:block;flex:none}
+.bolt{height:.55em;width:auto;display:block;flex:none}
 .login .mark{display:flex;align-items:center;gap:11px;margin-bottom:18px}
-.login .mark .bolt{height:26px}
+.login .mark .bolt{height:24px}
 .login .mark span{font-weight:800;font-size:23px;letter-spacing:.03em}
 .login h2{margin:0 0 6px;font-size:21px}
 .opts{display:flex;gap:18px;margin:2px 0 14px;font-size:13.5px;color:#5B6472}
@@ -178,7 +178,7 @@ mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
 @media(max-width:760px){
   .top{flex-wrap:wrap;padding:0 14px;gap:0}
   .brand{order:1;padding:11px 0;font-size:15.5px;margin-right:auto}
-  .brand .bolt{height:.58em}
+  .brand .bolt{height:.5em}
   .me{order:2;font-size:12px;gap:6px;padding:11px 0}
   .me .who{max-width:96px}
   .me .btn{padding:4px 9px;font-size:12px}
@@ -240,7 +240,7 @@ mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
 }
 </style></head><body>
 
-<div id="app"><div class="login"><div class="mark"><svg class="bolt" viewBox="0 0 400 100" fill="currentColor" aria-hidden="true"><polygon points="0,37.5 236,0 236,50 400,50 400,62.5 164,100 164,50 0,50"/></svg><span>HEIMDALL</span></div>
+<div id="app"><div class="login"><div class="mark"><svg class="bolt" viewBox="0 0 742 262" fill="currentColor" aria-hidden="true"><polygon points="0,112 52,112 53,147 440,147 524,53 741,1 741,227 565,185 334,262 56,188 53,188 51,221 0,220"/></svg><span>HEIMDALL</span></div>
 <p>불러오는 중…</p></div></div>
 
 <script type="module">
@@ -271,7 +271,7 @@ const authErr = m => AUTH_MSG[m] || m;
 function loginPage(mode='in', msg=''){
   const isUp = mode==='up';
   $('#app').innerHTML = `<div class="login">
-    <div class="mark"><svg class="bolt" viewBox="0 0 400 100" fill="currentColor" aria-hidden="true"><polygon points="0,37.5 236,0 236,50 400,50 400,62.5 164,100 164,50 0,50"/></svg><span>HEIMDALL</span></div>
+    <div class="mark"><svg class="bolt" viewBox="0 0 742 262" fill="currentColor" aria-hidden="true"><polygon points="0,112 52,112 53,147 440,147 524,53 741,1 741,227 565,185 334,262 56,188 53,188 51,221 0,220"/></svg><span>HEIMDALL</span></div>
     <div class="tabs" style="margin:4px 0 20px">
       <button class="tab" data-m="in" ${!isUp?'aria-selected="true"':''}>로그인</button>
       <button class="tab" data-m="up" ${isUp?'aria-selected="true"':''}>가입</button>
@@ -342,7 +342,7 @@ const ADMIN_MAILS = ['seokinho@gmail.com','Kdamian2025@gmail.com',
   'zeus@thealmighty.co.kr','khw@jhhds.co.kr','route82biz@gmail.com'];
 function pendingPage(row){
   $('#app').innerHTML = `<div class="login">
-    <div class="mark"><svg class="bolt" viewBox="0 0 400 100" fill="currentColor" aria-hidden="true"><polygon points="0,37.5 236,0 236,50 400,50 400,62.5 164,100 164,50 0,50"/></svg><span>HEIMDALL</span></div>
+    <div class="mark"><svg class="bolt" viewBox="0 0 742 262" fill="currentColor" aria-hidden="true"><polygon points="0,112 52,112 53,147 440,147 524,53 741,1 741,227 565,185 334,262 56,188 53,188 51,221 0,220"/></svg><span>HEIMDALL</span></div>
     <h2>가입 승인 대기</h2>
     <p><b>${esc(row.name)}</b> 님, 가입 신청이 접수되었습니다.<br>
        관리자가 승인해야 회의를 보실 수 있습니다.</p>
@@ -362,7 +362,7 @@ function pendingPage(row){
 // 가입 정보가 비어 있으면 채우게 합니다 (예전 계정 대응)
 function profilePage(row, msg=''){
   $('#app').innerHTML = `<div class="login">
-    <div class="mark"><svg class="bolt" viewBox="0 0 400 100" fill="currentColor" aria-hidden="true"><polygon points="0,37.5 236,0 236,50 400,50 400,62.5 164,100 164,50 0,50"/></svg><span>HEIMDALL</span></div>
+    <div class="mark"><svg class="bolt" viewBox="0 0 742 262" fill="currentColor" aria-hidden="true"><polygon points="0,112 52,112 53,147 440,147 524,53 741,1 741,227 565,185 334,262 56,188 53,188 51,221 0,220"/></svg><span>HEIMDALL</span></div>
     <h2>프로필 확인</h2>
     <p>직함은 넣지 마세요. 이름만 적으시면 됩니다.</p>
     <input class="full" id="nm" placeholder="이름 (예: 김현우)" value="${esc(row.name||'')}" style="margin-bottom:10px">
@@ -393,7 +393,7 @@ function shell(){
   if(me.role==='admin') tabs.push(['server','처리서버']);
   $('#app').innerHTML = `
    <div class="top">
-     <div class="brand"><svg class="bolt" viewBox="0 0 400 100" fill="currentColor" aria-hidden="true"><polygon points="0,37.5 236,0 236,50 400,50 400,62.5 164,100 164,50 0,50"/></svg><span class="bname">HEIMDALL</span></div>
+     <div class="brand"><svg class="bolt" viewBox="0 0 742 262" fill="currentColor" aria-hidden="true"><polygon points="0,112 52,112 53,147 440,147 524,53 741,1 741,227 565,185 334,262 56,188 53,188 51,221 0,220"/></svg><span class="bname">HEIMDALL</span></div>
      <div class="navwrap">
        ${tabs.map(([k,l])=>`<button class="nav" data-v="${k}">${l}</button>`).join('')}
      </div>
