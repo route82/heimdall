@@ -15,13 +15,22 @@ body{margin:0;background:#F5F6F8;color:#1B1F26;line-height:1.7;-webkit-text-size
  font-family:-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif}
 a{color:inherit;text-decoration:none}
 button{font-family:inherit}
-.top{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid #E6EAF0;
- display:flex;align-items:center;gap:6px;padding:0 22px}
-.navwrap{display:flex;align-items:center;gap:2px;overflow-x:auto;flex:1;min-width:0;
- scrollbar-width:none;-webkit-overflow-scrolling:touch}
-.navwrap::-webkit-scrollbar{display:none}
+/* ── 왼쪽 사이드바 얼개 */
+.side{position:fixed;left:0;top:0;bottom:0;width:238px;z-index:30;background:#fff;
+ border-right:1px solid #E6EAF0;display:flex;flex-direction:column;overflow-y:auto}
+.main{margin-left:238px;min-height:100vh}
+.mtop{display:none}
 .brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:17px;
- letter-spacing:.03em;margin-right:14px;padding:15px 0}
+ letter-spacing:.03em;padding:20px 20px 16px}
+.sgroup{padding:6px 12px 2px}
+.sgt{font-size:11px;font-weight:700;letter-spacing:.06em;color:#A8B0BC;
+ padding:10px 10px 5px;text-transform:uppercase}
+.sfoot{margin-top:auto;border-top:1px solid #F0F2F5;padding:13px 16px 16px}
+.sfoot .who{font-size:13.5px;font-weight:600;display:block;
+ overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sfoot .frow{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap}
+.sfoot .btn{padding:6px 11px;font-size:12.5px}
+.scrim{display:none}
 .bolt{height:.55em;width:auto;display:block;flex:none}
 .login .mark{display:flex;align-items:center;gap:11px;margin-bottom:18px}
 .login .mark .bolt{height:24px}
@@ -30,15 +39,18 @@ button{font-family:inherit}
 .opts{display:flex;gap:18px;margin:2px 0 14px;font-size:13.5px;color:#5B6472}
 .opts label{display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none}
 .opts input{width:17px;height:17px;margin:0;accent-color:#0B65D8}
-.nav{appearance:none;border:0;background:none;font-size:14.5px;font-weight:600;color:#8A93A1;
- padding:16px 13px;cursor:pointer;border-bottom:2.5px solid transparent;
- white-space:nowrap;flex:none}
-.nav[aria-current=true]{color:#0B65D8;border-bottom-color:#0B65D8}
-.me{margin-left:auto;font-size:13px;color:#8A93A1;display:flex;align-items:center;gap:8px;
+.nav{appearance:none;border:0;background:none;font-size:14.5px;font-weight:600;color:#4A5464;
+ padding:9px 10px;cursor:pointer;border-radius:9px;width:100%;text-align:left;
+ display:flex;align-items:center;gap:10px;line-height:1.4}
+.nav svg{width:17px;height:17px;flex:none;color:#98A0AC}
+.nav:hover{background:#F2F5F9}
+.nav[aria-current=true]{background:#EAF2FD;color:#0B65D8}
+.nav[aria-current=true] svg{color:#0B65D8}
+.me{font-size:13px;color:#8A93A1;display:flex;align-items:center;gap:8px;
  flex:none;white-space:nowrap}
 .me .who{max-width:180px;overflow:hidden;text-overflow:ellipsis}
 .role{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:#EEF2F7;color:#4A5464}
-.wrap{max-width:1000px;margin:0 auto;padding:26px 22px 90px}
+.wrap{max-width:1040px;margin:0 auto;padding:28px 30px 90px}
 .page{display:none}.page.on{display:block}
 h1{font-size:23px;margin:0 0 4px;letter-spacing:-.01em}
 .sub{color:#8A93A1;font-size:13.5px;margin-bottom:22px}
@@ -109,7 +121,7 @@ mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
 .hist div{padding:4px 0;border-top:1px solid #F2F4F7}
 .chatwrap{display:flex;gap:18px;align-items:flex-start}
 .rooms{width:230px;flex:none;background:#fff;border:1px solid #E6EAF0;border-radius:12px;
- padding:10px;position:sticky;top:86px;max-height:72vh;overflow-y:auto}
+ padding:10px;position:sticky;top:22px;max-height:78vh;overflow-y:auto}
 .rooms .newbtn{width:100%;margin-bottom:8px}
 .room{display:flex;align-items:center;gap:6px;padding:9px 10px;border-radius:8px;cursor:pointer;
  font-size:13.5px;color:#3A424F}
@@ -186,17 +198,25 @@ mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
  box-shadow:0 6px 22px rgba(11,101,216,.35)}
 
 /* ── 좁은 화면 ─────────────────────────────────────── */
-@media(max-width:760px){
-  .top{flex-wrap:wrap;padding:0 14px;gap:0}
-  .brand{order:1;padding:11px 0;font-size:15.5px;margin-right:auto}
-  .brand .bolt{height:.5em}
-  .me{order:2;font-size:12px;gap:6px;padding:11px 0}
-  .me .who{max-width:96px}
-  .me .btn{padding:4px 9px;font-size:12px}
+@media(max-width:900px){
+  /* 좁은 화면에서는 사이드바를 서랍으로 숨깁니다 */
+  .side{transform:translateX(-100%);transition:transform .22s ease;width:262px;
+   box-shadow:0 0 0 rgba(0,0,0,0)}
+  body.snav .side{transform:none;box-shadow:0 12px 40px rgba(0,0,0,.18)}
+  body.snav .scrim{display:block;position:fixed;inset:0;z-index:25;background:rgba(20,24,31,.38)}
+  .main{margin-left:0}
+  .mtop{display:flex;position:sticky;top:0;z-index:20;background:#fff;
+   border-bottom:1px solid #E6EAF0;align-items:center;gap:10px;padding:0 14px}
+  .mtop .brand{padding:11px 0;font-size:15.5px;margin-right:auto}
+  .mtop .brand .bolt{height:.5em}
+  .burger{appearance:none;border:1px solid #DDE2E9;background:#fff;border-radius:9px;
+   width:36px;height:36px;display:flex;align-items:center;justify-content:center;
+   cursor:pointer;color:#3A424F;flex:none}
+  .mtop .me{font-size:12px;gap:6px}
+  .mtop .me .who{max-width:96px}
+  .mtop .me .btn{padding:4px 9px;font-size:12px}
   .role{font-size:10.5px;padding:2px 6px}
-  .navwrap{order:3;flex-basis:100%;border-top:1px solid #F0F2F5;
-   margin:0 -14px;padding:0 14px;gap:0}
-  .nav{padding:11px 12px;font-size:14px}
+  .nav{padding:11px 11px;font-size:15px}
 
   .wrap{padding:16px 14px 84px}
   h1{font-size:20px} .sub{font-size:12.5px;margin-bottom:16px}
@@ -246,8 +266,7 @@ mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
   .chips{gap:6px}.chip{font-size:12.5px;padding:6px 11px}
 }
 @media(max-width:400px){
-  .me .who{display:none}
-  .nav{padding:11px 9px;font-size:13.5px}
+  .mtop .me .who{display:none}
 }
 </style></head><body>
 
@@ -396,37 +415,85 @@ function profilePage(row, msg=''){
   $('#out2').onclick = async()=>{await SB.auth.signOut(); loginPage();};
 }
 
-// ─────────────────────────── 뼈대
+// ─────────────────────────── 뼈대 (왼쪽 사이드바)
+const ICO = {
+  list:'<path d="M4 5h16M4 12h16M4 19h10"/>',
+  rec:'<path d="M12 4a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0V7a3 3 0 0 1 3-3z"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/>',
+  chat:'<path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.3A8 8 0 1 1 21 12z"/>',
+  projects:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  upload:'<path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>',
+  search:'<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
+  actions:'<path d="M9 11l2.5 2.5L20 5"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/>',
+  brief:'<path d="M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v6h6"/><path d="M9 14h7M9 17h5"/>',
+  members:'<circle cx="9" cy="8" r="3.3"/><path d="M3 20c0-3.3 2.7-5.4 6-5.4s6 2.1 6 5.4"/><path d="M17 8.2a3 3 0 0 1 0 5.6"/><path d="M18 20c0-2.3-.9-3.9-2.3-4.9"/>',
+  usage:'<path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/>',
+  server:'<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/>',
+  guide:'<circle cx="12" cy="12" r="9"/><path d="M9.6 9.2A2.5 2.5 0 0 1 14.4 10c0 1.7-2.4 2-2.4 3.6"/><path d="M12 17h.01"/>'
+};
+const svgIco = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[k]||''}</svg>`;
+
 function shell(){
-  const tabs = [['list','회의'],['rec','녹음'],['chat','물어보기'],['projects','프로젝트'],
-                ['upload','업로드'],['search','검색'],['actions','액션아이템']];
-  tabs.push(['guide','사용 가이드']);
-  if(['admin','exec'].includes(me.role)) tabs.push(['brief','브리핑'],['members','구성원'],['usage','사용료']);
-  if(me.role==='admin') tabs.push(['server','처리서버']);
+  // 사이드바는 묶음으로 보여줍니다 — 자주 쓰는 것 → 정리 → 관리 순
+  const groups = [
+    ['', [['list','회의'],['rec','녹음'],['chat','물어보기']]],
+    ['정리', [['projects','프로젝트'],['upload','업로드'],['search','검색'],['actions','액션아이템']]],
+  ];
+  const admin = [];
+  if(['admin','exec'].includes(me.role)) admin.push(['brief','브리핑'],['usage','사용료'],['members','구성원']);
+  if(me.role==='admin') admin.push(['server','처리서버']);
+  if(admin.length) groups.push(['관리', admin]);
+  groups.push(['도움말', [['guide','사용 가이드']]]);
+
+  const brand = `<div class="brand"><svg class="bolt" viewBox="0 0 742 262" fill="currentColor" aria-hidden="true"><polygon points="0,112 52,112 53,147 440,147 524,53 741,1 741,227 565,185 334,262 56,188 53,188 51,221 0,220"/></svg><span class="bname">HEIMDALL</span></div>`;
+
   $('#app').innerHTML = `
-   <div class="top">
-     <div class="brand"><svg class="bolt" viewBox="0 0 742 262" fill="currentColor" aria-hidden="true"><polygon points="0,112 52,112 53,147 440,147 524,53 741,1 741,227 565,185 334,262 56,188 53,188 51,221 0,220"/></svg><span class="bname">HEIMDALL</span></div>
-     <div class="navwrap">
-       ${tabs.map(([k,l])=>`<button class="nav" data-v="${k}">${l}</button>`).join('')}
+   <div class="scrim" id="scrim"></div>
+   <aside class="side" id="side">
+     ${brand}
+     ${groups.map(([t,items])=>`<div class="sgroup">
+       ${t?`<div class="sgt">${t}</div>`:''}
+       ${items.map(([k,l])=>`<button class="nav" data-v="${k}">${svgIco(k)}<span>${l}</span></button>`).join('')}
+     </div>`).join('')}
+     <div class="sfoot">
+       <span class="who">${esc(me.name)}</span>
+       <span class="role">${ROLE[me.role]||me.role}</span>
+       <div class="frow">
+         <button class="btn" id="out" title="로그아웃">나가기</button>
+         <button class="install" id="inst" style="display:none">앱으로 설치</button>
+       </div>
      </div>
-     <div class="me">
-       <span class="who">${esc(me.name)}</span><span class="role">${ROLE[me.role]||me.role}</span>
-       <button class="install" id="inst" style="display:none">앱으로 설치</button>
-       <button class="btn" id="out" title="로그아웃">나가기</button></div>
-   </div>
-   <div class="wrap">
-     <div class="page" id="p-list"></div><div class="page" id="p-search"></div>
-     <div class="page" id="p-actions"></div><div class="page" id="p-brief"></div>
-     <div class="page" id="p-chat"></div><div class="page" id="p-projects"></div>
-     <div class="page" id="p-upload"></div><div class="page" id="p-rec"></div>
-     <div class="page" id="p-members"></div><div class="page" id="p-server"></div>
-     <div class="page" id="p-guide"></div><div class="page" id="p-usage"></div>
-     <div class="page" id="p-meeting"></div>
+   </aside>
+   <div class="main">
+     <div class="mtop">
+       <button class="burger" id="burger" aria-label="메뉴 열기">
+         <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+       ${brand}
+       <div class="me"><span class="who">${esc(me.name)}</span>
+         <button class="btn" id="out-m" title="로그아웃">나가기</button></div>
+     </div>
+     <div class="wrap">
+       <div class="page" id="p-list"></div><div class="page" id="p-search"></div>
+       <div class="page" id="p-actions"></div><div class="page" id="p-brief"></div>
+       <div class="page" id="p-chat"></div><div class="page" id="p-projects"></div>
+       <div class="page" id="p-upload"></div><div class="page" id="p-rec"></div>
+       <div class="page" id="p-members"></div><div class="page" id="p-server"></div>
+       <div class="page" id="p-guide"></div><div class="page" id="p-usage"></div>
+       <div class="page" id="p-meeting"></div>
+     </div>
    </div>`;
-  document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>go(b.dataset.v));
-  $('#out').onclick = async()=>{
+
+  const closeNav=()=>document.body.classList.remove('snav');
+  document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>{ go(b.dataset.v); closeNav(); });
+  const bg=$('#burger'); if(bg) bg.onclick=()=>document.body.classList.toggle('snav');
+  const sc=$('#scrim'); if(sc) sc.onclick=closeNav;
+
+  const logout = async()=>{
     localStorage.setItem('hd_auto','0'); sessionStorage.removeItem('hd_live');
     await SB.auth.signOut(); location.reload();};
+  $('#out').onclick = logout;
+  const om=$('#out-m'); if(om) om.onclick = logout;
   wireInstall();
 }
 
