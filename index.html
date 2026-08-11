@@ -391,7 +391,8 @@ function profilePage(row, msg=''){
 function shell(){
   const tabs = [['list','회의'],['rec','녹음'],['chat','물어보기'],['projects','프로젝트'],
                 ['upload','업로드'],['search','검색'],['actions','액션아이템']];
-  if(['admin','exec'].includes(me.role)) tabs.push(['brief','브리핑'],['members','구성원']);
+  tabs.push(['guide','사용 가이드']);
+  if(['admin','exec'].includes(me.role)) tabs.push(['brief','브리핑'],['members','구성원'],['usage','사용료']);
   if(me.role==='admin') tabs.push(['server','처리서버']);
   $('#app').innerHTML = `
    <div class="top">
@@ -410,6 +411,7 @@ function shell(){
      <div class="page" id="p-chat"></div><div class="page" id="p-projects"></div>
      <div class="page" id="p-upload"></div><div class="page" id="p-rec"></div>
      <div class="page" id="p-members"></div><div class="page" id="p-server"></div>
+     <div class="page" id="p-guide"></div><div class="page" id="p-usage"></div>
      <div class="page" id="p-meeting"></div>
    </div>`;
   document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>go(b.dataset.v));
@@ -426,7 +428,8 @@ function go(v){
   const el=$('#p-'+v); if(el) el.classList.add('on');
   ({list:renderList, search:renderSearch, actions:renderActions, brief:renderBrief,
     members:renderMembers, chat:renderChat, projects:renderProjects,
-    upload:renderUpload, rec:renderRec, server:renderServer}[v]||(()=>{}))();
+    upload:renderUpload, rec:renderRec, server:renderServer,
+    guide:renderGuide, usage:renderUsage}[v]||(()=>{}))();
 }
 
 // ─────────────────────────── 회의 목록
@@ -1622,6 +1625,119 @@ async function doUpload(){
   }
 }
 
+// ─────────────────────────── 사용 가이드
+function renderGuide(){
+  $('#p-guide').innerHTML = `<h1>사용 가이드</h1>
+  <div class="sub">헤임달을 처음 쓰시는 분을 위한 한 장 안내입니다</div>
+
+  <div class="box">
+    <h1 style="font-size:17px;margin-bottom:10px">1. 회의를 녹음하려면</h1>
+    <div class="md"><ol>
+      <li><b>녹음</b> 탭 → 회의명을 적습니다 (참석자는 선택)</li>
+      <li><b>● 회의 녹음 시작</b> → 마이크 허용 창이 뜨면 <b>허용</b></li>
+      <li>회의가 끝나면 <b>■ 녹음 종료</b> — 자동으로 올라갑니다</li>
+      <li>몇 분 뒤 <b>회의</b> 탭에 회의록이 나타납니다</li>
+    </ol>
+    <p>녹음 중에는 화면이 꺼지지 않게 잡아둡니다. 휴대폰으로 녹음하실 때는
+       다른 앱으로 나가지 마세요 — 녹음이 멈출 수 있습니다.</p></div>
+  </div>
+
+  <div class="box">
+    <h1 style="font-size:17px;margin-bottom:10px">2. 나만 볼 녹음을 남기려면</h1>
+    <div class="md">
+      <p>녹음 탭에서 종류를 <b>아이디어 노트</b> 또는 <b>지시사항</b>으로 고르면
+         나만 볼 수 있습니다. 관리자도 볼 수 없습니다.</p>
+      <p>특정 사람에게만 보여주고 싶으면 <b>공유 대상 선택</b>에서 체크하세요.</p>
+    </div>
+  </div>
+
+  <div class="box">
+    <h1 style="font-size:17px;margin-bottom:10px">3. 이미 있는 파일을 올리려면</h1>
+    <div class="md">
+      <p><b>업로드</b> 탭에서 음성 파일이나 문서를 올리면 똑같이 회의록이 만들어집니다.</p>
+      <p>문서: 워드(docx) · 텍스트 · PDF · PPT · 한글(hwpx)<br>
+         <span style="color:#B36B00">옛 한글(.hwp)은 안 됩니다 — 「다른 이름으로 저장 → hwpx」 후 올려주세요</span></p>
+    </div>
+  </div>
+
+  <div class="box">
+    <h1 style="font-size:17px;margin-bottom:10px">4. 회의 내용을 찾으려면</h1>
+    <div class="md"><ul>
+      <li><b>검색</b> 탭 — 말한 내용으로 찾습니다 ("아마존 정산" 처럼)</li>
+      <li><b>물어보기</b> 탭 — 회의 내용을 근거로 AI가 답합니다.
+          "지난주 LBB 미팅에서 정해진 게 뭐야?" 처럼 물으면 됩니다</li>
+      <li><b>프로젝트</b> 탭 — 회의를 건별로 묶어서 봅니다</li>
+    </ul></div>
+  </div>
+
+  <div class="box">
+    <h1 style="font-size:17px;margin-bottom:10px">5. 회의록을 파일로 받으려면</h1>
+    <div class="md"><p>회의를 열고 아래쪽 <b>워드로 내보내기</b>를 누르면
+      하이라이트·요약·액션아이템·전사가 한 파일로 내려받아집니다.</p></div>
+  </div>
+
+  <div class="box">
+    <h1 style="font-size:17px;margin-bottom:10px">6. 알아두실 것</h1>
+    <div class="md"><ul>
+      <li><b>회의록은 AI가 만든 초안입니다.</b> 중요한 숫자·결정은 꼭 확인해주세요</li>
+      <li>내가 볼 수 있는 회의는 <b>내 소속 회의와 내가 참석한 회의</b>입니다</li>
+      <li>회의록 내용이 틀렸으면 회의 화면에서 <b>편집</b>으로 고칠 수 있습니다</li>
+      <li>잘못 만들어진 액션아이템은 <b>×</b> 로 지울 수 있습니다 (관리자·부서장)</li>
+      <li>처리가 오래 걸리면 회의 길이 때문입니다. 1시간 회의는 5~10분쯤 걸립니다</li>
+    </ul></div>
+  </div>
+
+  <div class="box">
+    <h1 style="font-size:17px;margin-bottom:10px">7. 앱처럼 쓰려면</h1>
+    <div class="md">
+      <p>크롬에서 오른쪽 위 <b>앱으로 설치</b>를 누르면 바탕화면(맥은 독)에 아이콘이 생깁니다.
+         휴대폰은 브라우저 메뉴에서 <b>홈 화면에 추가</b>를 누르시면 됩니다.</p>
+    </div>
+  </div>
+
+  <div class="sub" style="margin-top:18px">문제가 생기면 김현우 실장에게 알려주세요.
+    화면에 나온 오류 문구를 함께 보내주시면 빠르게 확인할 수 있습니다.</div>`;
+}
+
+// ─────────────────────────── AI 사용료 (관리자 · 경영진)
+async function renderUsage(){
+  const el=$('#p-usage'); el.innerHTML='<div class="sub">불러오는 중…</div>';
+  const {data,error}=await SB.from('hd_usage_month').select('*').order('ym',{ascending:false});
+  if(error) return el.innerHTML=`<div class="empty">${esc(error.message)}</div>`;
+  if(!data||!data.length) return el.innerHTML=`<h1>AI 사용료</h1>
+    <div class="empty">아직 기록이 없습니다.<br>
+    이 기능이 적용된 뒤 만들어지는 회의부터 집계됩니다.</div>`;
+
+  const yms=[...new Set(data.map(r=>r.ym))];
+  const won=v=>'약 ' + Math.round(v*1400).toLocaleString() + '원';
+  el.innerHTML = `<h1>AI 사용료</h1>
+    <div class="sub">회의록·챗봇·브리핑을 만들 때 쓴 AI 비용입니다 (달러 기준, 원화는 1,400원 환산)</div>`
+   + yms.map(ym=>{
+      const rows=data.filter(r=>r.ym===ym);
+      const tot=rows.reduce((a,b)=>a+Number(b.cost_usd||0),0);
+      const calls=rows.reduce((a,b)=>a+Number(b.calls||0),0);
+      return `<div class="box">
+        <div class="row" style="align-items:baseline;gap:10px;margin-bottom:10px">
+          <b style="font-size:17px">${ym}</b>
+          <span style="font-size:19px;font-weight:800;color:#0B65D8">$${tot.toFixed(2)}</span>
+          <span class="sub" style="margin:0">${won(tot)} · 호출 ${calls.toLocaleString()}회</span>
+        </div>
+        <table><tr><th>회사</th><th>부서</th><th style="text-align:right">호출</th>
+          <th style="text-align:right">입력 토큰</th><th style="text-align:right">출력 토큰</th>
+          <th style="text-align:right">비용</th></tr>
+        ${rows.sort((a,b)=>b.cost_usd-a.cost_usd).map(r=>`<tr>
+          <td>${esc(r.company)}</td><td>${esc(r.dept)}</td>
+          <td style="text-align:right">${Number(r.calls).toLocaleString()}</td>
+          <td style="text-align:right">${Number(r.in_tokens).toLocaleString()}</td>
+          <td style="text-align:right">${Number(r.out_tokens).toLocaleString()}</td>
+          <td style="text-align:right"><b>$${Number(r.cost_usd).toFixed(2)}</b></td></tr>`).join('')}
+        </table></div>`;
+     }).join('')
+   + `<div class="sub" style="margin-top:14px">
+      전사는 사무실 컴퓨터에서 직접 처리하므로 비용이 들지 않습니다.
+      여기 나오는 것은 회의록·요약·챗봇 답변을 만드는 AI 비용입니다.</div>`;
+}
+
 // ─────────────────────────── 처리 서버 원격 관리
 // 사무실에 가지 않고도 상태 확인·다시 시작·설정 변경을 합니다.
 // 실제 실행은 사무실 PC 의 처리 서버가 합니다.
@@ -1632,6 +1748,8 @@ const CMDS = [
   ['update',  '새 버전 받기',   '배포된 최신 버전으로 갱신합니다'],
   ['restart', '다시 시작',      '처리 서버를 껐다 켭니다 (15초 뒤 자동 복귀)'],
   ['diarize_setup', '화자 분리 설치', '화자 구분(누가 말했는지) 도구를 설치합니다 — 수 GB, 10분+'],
+  ['backup',  '지금 백업',    '회의록·전사를 파일로 내려받아 사무실 컴퓨터에 보관합니다'],
+  ['mailtest','알림 메일 시험', '처리 서버가 메일을 보낼 수 있는지 확인합니다'],
 ];
 
 async function renderServer(){
@@ -1652,6 +1770,8 @@ async function renderServer(){
           <option value="CLAUDE_MODEL">회의록 모델</option>
           <option value="BRIEF_HOUR">브리핑 시각</option>
           <option value="DIARIZE">화자 분리 (1=켬 · 0=끔)</option>
+          <option value="MAIL_TO">알림 받을 메일 주소</option>
+          <option value="BACKUP_DAY">백업 요일 (0=월 … 6=일)</option>
         </select>
         <input id="sv-val" placeholder="예: large-v3 · claude-sonnet-5 · 7" style="flex:1;min-width:200px">
         <button class="btn p" id="sv-set">바꾸기</button>

@@ -1,0 +1,42 @@
+name: HEIMDALL 처리서버 감시
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"     # 15분마다
+  workflow_dispatch:            # 손으로도 돌릴 수 있게
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 마지막 신호 확인
+        id: probe
+        run: |
+          SEC=$(curl -s -X POST "https://dwoiobqucmikbtikfjwk.supabase.co/rest/v1/rpc/hd_agent_stale" \
+            -H "apikey: sb_publishable_K6BW26u2jRkTBDwuMqaaFA_3HkfnOc9" \
+            -H "Content-Type: application/json" -d '{}')
+          echo "지난 신호로부터 ${SEC}초"
+          echo "sec=$SEC" >> $GITHUB_OUTPUT
+
+      - name: 멈췄으면 메일 보내기
+        if: ${{ fromJSON(steps.probe.outputs.sec) > 1800 }}
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.MAIL_USER }}
+          password: ${{ secrets.MAIL_PASS }}
+          from: HEIMDALL
+          to: ${{ secrets.MAIL_TO }}
+          subject: "[HEIMDALL] 처리 서버가 멈춘 것 같습니다"
+          body: |
+            사무실 처리 서버에서 30분 넘게 신호가 없습니다.
+
+            마지막 신호: ${{ steps.probe.outputs.sec }}초 전
+
+            확인할 것
+            1) 사무실 컴퓨터가 켜져 있는지
+            2) 헤임달 웹 → 처리서버 탭 → 상태 보기
+            3) 그래도 안 되면 원격으로 접속해 다시 시작
+
+            서버가 살아나면 복구 메일이 따로 갑니다.
