@@ -3,15 +3,15 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>HEIMDALL</title>
 <link rel="manifest" href="./manifest.webmanifest">
-<meta name="theme-color" content="#1B1F26">
+<meta name="theme-color" content="#12161C">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="HEIMDALL">
 <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
-<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20400%20400%22%3E%3Crect%20width%3D%22400%22%20height%3D%22400%22%20rx%3D%2280%22%20fill%3D%22%231B1F26%22%2F%3E%3Cpolygon%20points%3D%2250.0%2C192.3%2071.0%2C192.3%2071.4%2C206.5%20227.9%2C206.5%20261.9%2C168.5%20349.6%2C147.4%20349.6%2C238.8%20278.4%2C221.8%20185.0%2C253.0%2072.6%2C223.0%2071.4%2C223.0%2070.6%2C236.4%2050.0%2C236.0%22%20fill%3D%22%23fff%22%2F%3E%3C%2Fsvg%3E">
+<link rel="icon" type="image/png" href="./icons/icon-192.png">
 <style>
 *{box-sizing:border-box}
-body{margin:0;background:#F5F6F8;color:#1B1F26;line-height:1.7;-webkit-text-size-adjust:100%;word-break:keep-all;overflow-wrap:break-word;
+body{margin:0;background:#F5F6F8;color:#12161C;line-height:1.7;-webkit-text-size-adjust:100%;word-break:keep-all;overflow-wrap:break-word;
  font-family:-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif}
 a{color:inherit;text-decoration:none}
 button{font-family:inherit}
@@ -20,8 +20,7 @@ button{font-family:inherit}
  border-right:1px solid #E6EAF0;display:flex;flex-direction:column;overflow-y:auto}
 .main{margin-left:238px;min-height:100vh}
 .mtop{display:none}
-.brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:17px;
- letter-spacing:.03em;padding:20px 20px 16px}
+.brand{display:flex;align-items:center;padding:18px 18px 14px}
 .sgroup{padding:6px 12px 2px}
 .sgt{font-size:11px;font-weight:700;letter-spacing:.06em;color:#A8B0BC;
  padding:10px 10px 5px;text-transform:uppercase}
@@ -32,68 +31,69 @@ button{font-family:inherit}
 .sfoot .btn{padding:6px 11px;font-size:12.5px}
 .scrim{display:none}
 .bolt{height:.55em;width:auto;display:block;flex:none}
-.login .mark{display:flex;align-items:center;gap:11px;margin-bottom:18px}
-.login .mark .bolt{height:24px}
-.login .mark span{font-weight:800;font-size:23px;letter-spacing:.03em}
+/* 로고 — 가이드라인 최소 크기: 인물형 웹 40px, 심볼 24px */
+.lgh{height:42px;width:auto;display:block}
+.lgv{height:132px;width:auto;display:block;margin:0 auto}
+.login .mark{display:flex;justify-content:center;margin-bottom:22px}
 .login h2{margin:0 0 6px;font-size:21px}
 .opts{display:flex;gap:18px;margin:2px 0 14px;font-size:13.5px;color:#5B6472}
 .opts label{display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none}
-.opts input{width:17px;height:17px;margin:0;accent-color:#0B65D8}
+.opts input{width:17px;height:17px;margin:0;accent-color:#2B6CB0}
 .nav{appearance:none;border:0;background:none;font-size:14.5px;font-weight:600;color:#4A5464;
  padding:9px 10px;cursor:pointer;border-radius:9px;width:100%;text-align:left;
  display:flex;align-items:center;gap:10px;line-height:1.4}
 .nav svg{width:17px;height:17px;flex:none;color:#98A0AC}
 .nav:hover{background:#F2F5F9}
-.nav[aria-current=true]{background:#EAF2FD;color:#0B65D8}
-.nav[aria-current=true] svg{color:#0B65D8}
-.me{font-size:13px;color:#8A93A1;display:flex;align-items:center;gap:8px;
+.nav[aria-current=true]{background:#EAF2FD;color:#2B6CB0}
+.nav[aria-current=true] svg{color:#2B6CB0}
+.me{font-size:13px;color:#5C6672;display:flex;align-items:center;gap:8px;
  flex:none;white-space:nowrap}
 .me .who{max-width:180px;overflow:hidden;text-overflow:ellipsis}
 .role{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:#EEF2F7;color:#4A5464}
 .wrap{max-width:1040px;margin:0 auto;padding:28px 30px 90px}
 .page{display:none}.page.on{display:block}
 h1{font-size:23px;margin:0 0 4px;letter-spacing:-.01em}
-.sub{color:#8A93A1;font-size:13.5px;margin-bottom:22px}
+.sub{color:#5C6672;font-size:13.5px;margin-bottom:22px}
 .card{display:block;background:#fff;border:1px solid #E6EAF0;border-radius:12px;padding:16px 20px;
  margin-bottom:10px;cursor:pointer;transition:.12s}
-.card:hover{border-color:#0B65D8;box-shadow:0 3px 14px rgba(11,101,216,.08)}
+.card:hover{border-color:#2B6CB0;box-shadow:0 3px 14px rgba(43,108,176,.08)}
 .ct{font-size:16.5px;font-weight:700;margin-bottom:4px}
 .card.locked{cursor:default;background:#FAFBFD;border-style:dashed}
 .box.locked{background:#FAFBFD;border-style:dashed;user-select:none}
 .card.locked:hover{border-color:#DDE2E9;box-shadow:none}
 .card.locked .ct{color:#B6BEC9;letter-spacing:.12em}
-.cm{font-size:13px;color:#8A93A1;display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.cm{font-size:13px;color:#5C6672;display:flex;gap:14px;flex-wrap:wrap;align-items:center}
 .tag{font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px}
 .t-draft{background:#EEF1F5;color:#5B6472}.t-review{background:#FFF3D6;color:#8A6100}
 .t-reported{background:#E3F5E9;color:#1B6B36}.t-archived{background:#EDE9F5;color:#5A3699}
 .btn{appearance:none;border:1px solid #DDE2E9;background:#fff;border-radius:9px;padding:9px 16px;
  font-size:14px;font-weight:600;cursor:pointer;color:#3A424F}
-.btn.p{background:#0B65D8;border-color:#0B65D8;color:#fff}
+.btn.p{background:#2B6CB0;border-color:#2B6CB0;color:#fff}
 .btn.g{background:#12833F;border-color:#12833F;color:#fff}
 .btn:disabled{opacity:.5;cursor:default}
 .row{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
 input,select,textarea{font-family:inherit;font-size:14.5px;padding:10px 13px;border:1px solid #DDE2E9;
  border-radius:9px;background:#fff}
-input:focus,textarea:focus,select:focus{outline:none;border-color:#0B65D8}
+input:focus,textarea:focus,select:focus{outline:none;border-color:#2B6CB0}
 .full{width:100%}
 .box{background:#fff;border:1px solid #E6EAF0;border-radius:12px;padding:22px 24px;margin-bottom:14px}
 .tabs{display:flex;gap:3px;border-bottom:1px solid #E6EAF0;margin:18px 0 20px}
-.tab{appearance:none;border:0;background:none;font-size:15px;font-weight:600;color:#8A93A1;
+.tab{appearance:none;border:0;background:none;font-size:15px;font-weight:600;color:#5C6672;
  padding:11px 15px;cursor:pointer;border-bottom:2.5px solid transparent}
-.tab[aria-selected=true]{color:#0B65D8;border-bottom-color:#0B65D8}
+.tab[aria-selected=true]{color:#2B6CB0;border-bottom-color:#2B6CB0}
 .pane{display:none}.pane.on{display:block}
 .seg{display:grid;grid-template-columns:70px 1fr;gap:14px;padding:7px 0}
 .seg:hover{background:#FAFBFD}
 .ts{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:#98A0AC;padding-top:3px;
  word-break:normal}
 .spk{display:inline-block;font-size:12px;font-weight:700;padding:2px 9px;border-radius:20px;margin-bottom:3px}
-.s0{background:#E4EEFC;color:#144E9C}.s1{background:#E7F4E8;color:#1F6B33}
+.s0{background:#E4EEFC;color:#1F5286}.s1{background:#E7F4E8;color:#1F6B33}
 .s2{background:#FBEBE2;color:#9B4A15}.s3{background:#F0E9FA;color:#5A3699}
 .s4{background:#FCE9EF;color:#95214A}.s5{background:#E6F2F4;color:#14615F}
 .seg p{margin:0}
 [contenteditable=true]{outline:1px dashed #C7D3E4;border-radius:6px;padding:3px 7px;background:#FCFDFF}
-[contenteditable=true]:focus{outline:2px solid #0B65D8;background:#fff}
-.hl{border-left:3px solid #0B65D8;padding:2px 0 2px 18px;margin-bottom:24px}
+[contenteditable=true]:focus{outline:2px solid #2B6CB0;background:#fff}
+.hl{border-left:3px solid #2B6CB0;padding:2px 0 2px 18px;margin-bottom:24px}
 .hl .ts{margin-bottom:4px}
 .hl h3{font-size:17.5px;margin:0 0 8px;line-height:1.5}
 .hl ul{margin:0;padding-left:18px;color:#3A424F}.hl li{margin:5px 0;font-size:15px}
@@ -108,16 +108,16 @@ th{background:#F5F7FA;font-weight:600}
 .act .meta{font-size:12.5px;color:#98A0AC;margin-top:2px}
 .act.done .task{text-decoration:line-through;color:#A8B0BA}
 .hit{background:#fff;border:1px solid #E6EAF0;border-radius:10px;padding:13px 16px;margin-bottom:8px;cursor:pointer}
-.hit:hover{border-color:#0B65D8}
-.hit .h{font-size:12.5px;color:#8A93A1;margin-bottom:3px}
+.hit:hover{border-color:#2B6CB0}
+.hit .h{font-size:12.5px;color:#5C6672;margin-bottom:3px}
 mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
 .empty{padding:52px;text-align:center;color:#98A0AC;background:#fff;border:1px dashed #DDE2E9;border-radius:12px}
 .login{max-width:400px;margin:14vh auto;background:#fff;border:1px solid #E6EAF0;border-radius:14px;padding:34px}
 .login h2{margin:0 0 6px;font-size:21px}
 .opts{display:flex;gap:18px;margin:2px 0 14px;font-size:13.5px;color:#5B6472}
 .opts label{display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none}
-.opts input{width:17px;height:17px;margin:0;accent-color:#0B65D8}.login p{margin:0 0 20px;color:#8A93A1;font-size:14px}
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:26px;background:#1B1F26;color:#fff;
+.opts input{width:17px;height:17px;margin:0;accent-color:#2B6CB0}.login p{margin:0 0 20px;color:#5C6672;font-size:14px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:26px;background:#12161C;color:#fff;
  padding:13px 20px;border-radius:10px;font-size:14px;z-index:80;box-shadow:0 6px 22px rgba(0,0,0,.25)}
 .bar{position:fixed;right:22px;bottom:22px;display:flex;gap:9px;z-index:50}
 .bar .btn{box-shadow:0 4px 16px rgba(0,0,0,.16);padding:12px 20px;border-radius:24px}
@@ -130,62 +130,62 @@ mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
 .room{display:flex;align-items:center;gap:6px;padding:9px 10px;border-radius:8px;cursor:pointer;
  font-size:13.5px;color:#3A424F}
 .room:hover{background:#F5F7FA}
-.room.on{background:#EAF2FE;color:#0B65D8;font-weight:600}
+.room.on{background:#EAF2FE;color:#2B6CB0;font-weight:600}
 .room .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .room .ic{appearance:none;border:0;background:none;cursor:pointer;font-size:13px;
  color:#B6BEC9;padding:2px 3px;flex:none}
-.room .ic:hover{color:#0B65D8}
+.room .ic:hover{color:#2B6CB0}
 .room .ic.pin.on{color:#E0A800}
 .chatmain{flex:1;min-width:0}
 .chat{display:flex;flex-direction:column;gap:14px;margin-bottom:20px}
 .msg{max-width:88%;padding:13px 16px;border-radius:14px;font-size:15px;line-height:1.72}
-.msg.q{align-self:flex-end;background:#0B65D8;color:#fff;border-bottom-right-radius:5px}
+.msg.q{align-self:flex-end;background:#2B6CB0;color:#fff;border-bottom-right-radius:5px}
 .msg.a{align-self:flex-start;background:#fff;border:1px solid #E6EAF0;border-bottom-left-radius:5px}
 .msg.a .md h1{font-size:17px}.msg.a .md h2{font-size:15.5px;margin:14px 0 6px;border:0;padding:0}
 .msg.a .md p{margin:6px 0}.msg.a .md ul{padding-left:18px;margin:6px 0}
 .msg .src{margin-top:9px;padding-top:8px;border-top:1px solid #EEF1F5;
  font-size:12px;color:#98A0AC}
-.msg.wait{color:#8A93A1;background:#F2F4F7;border:0}
+.msg.wait{color:#5C6672;background:#F2F4F7;border:0}
 .ask{display:flex;gap:8px;position:sticky;bottom:0;background:#F5F6F8;padding:10px 0 4px}
 .ask textarea{flex:1;resize:none;min-height:46px;max-height:120px;font-size:15px}
 .chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
 .chip{appearance:none;border:1px solid #DDE2E9;background:#fff;border-radius:20px;
  padding:7px 13px;font-size:13px;color:#3A424F;cursor:pointer;font-family:inherit}
-.chip:hover{border-color:#0B65D8;color:#0B65D8}
+.chip:hover{border-color:#2B6CB0;color:#2B6CB0}
 .pj{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:11px}
 .pjc{background:#fff;border:1px solid #E6EAF0;border-radius:12px;padding:16px 18px;cursor:pointer}
 .pjop{border:none;background:none;color:#98A0AC;font-size:15px;cursor:pointer;padding:2px 5px;border-radius:6px}
 .delx{border:none;background:none;color:#C0C6CF;font-size:16px;cursor:pointer;padding:2px 7px;border-radius:6px}
 .delx:hover{background:#FDECEC;color:#C0392B}
-.pjop:hover{background:#EEF2F7;color:#1B1F26}
-.pjc:hover{border-color:#0B65D8}
+.pjop:hover{background:#EEF2F7;color:#12161C}
+.pjc:hover{border-color:#2B6CB0}
 .pjc .n{font-size:16px;font-weight:700;margin-bottom:3px}
 .pjc .d{font-size:12.5px;color:#98A0AC}
-.pjbar{width:34px;height:4px;border-radius:4px;margin-bottom:10px;background:#0B65D8}
+.pjbar{width:34px;height:4px;border-radius:4px;margin-bottom:10px;background:#2B6CB0}
 .pjbtn{appearance:none;border:1px solid #DDE2E9;background:#fff;border-radius:9px;
  padding:8px 12px;font-size:13.5px;font-family:inherit;cursor:pointer;color:#3A424F;
  max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:none}
-.pjbtn:hover{border-color:#0B65D8;color:#0B65D8}
+.pjbtn:hover{border-color:#2B6CB0;color:#2B6CB0}
 /* ── 프로젝트 폴더 나무 */
 .tree{background:#fff;border:1px solid #E6EAF0;border-radius:12px;padding:8px 8px}
 .tb{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:9px;
  cursor:pointer;font-size:14.5px;color:#3A424F}
 .tb:hover{background:#F2F5F9}
-.tb.sel{background:#EAF2FD;color:#0B65D8;font-weight:700}
-.tb .fi{width:17px;height:17px;flex:none;color:#0B65D8}
-.tb.sel .fi{color:#0B65D8}
+.tb.sel{background:#EAF2FD;color:#2B6CB0;font-weight:700}
+.tb .fi{width:17px;height:17px;flex:none;color:#2B6CB0}
+.tb.sel .fi{color:#2B6CB0}
 .tb .tt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tb .tc{font-size:12px;color:#98A0AC;background:#F2F5F9;border-radius:20px;
  padding:1px 9px;flex:none;font-weight:600}
-.tb.sel .tc{background:#D9E8FB;color:#0B65D8}
+.tb.sel .tc{background:#D9E8FB;color:#2B6CB0}
 .tw{width:18px;height:18px;flex:none;display:flex;align-items:center;justify-content:center;
  border-radius:5px;color:#A8B0BC;cursor:pointer}
 .tw:hover{background:#E4E9F0;color:#3A424F}
 .cr{width:14px;height:14px;transition:transform .15s}
 .cr.o{transform:rotate(90deg)}
-.pdot{width:9px;height:9px;border-radius:9px;flex:none;margin:0 4px;background:#0B65D8}
+.pdot{width:9px;height:9px;border-radius:9px;flex:none;margin:0 4px;background:#2B6CB0}
 .tk{margin-left:19px;border-left:1px solid #EDF0F4;padding-left:6px}
-.pdot.c-blue{background:#0B65D8}
+.pdot.c-blue{background:#2B6CB0}
 .pdot.c-green{background:#12833F}
 .pdot.c-orange{background:#D97706}
 .pdot.c-purple{background:#6D3FD1}
@@ -207,17 +207,17 @@ mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
 .pick .it .dot{width:9px;height:9px;border-radius:9px;flex:none}
 .pick .it .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pick .it .cnt{font-size:12px;color:#98A0AC;flex:none}
-.pick .it.cur{font-weight:700;color:#0B65D8}
+.pick .it.cur{font-weight:700;color:#2B6CB0}
 .pick .ft{padding:12px 20px;border-top:1px solid #EEF1F5;display:flex;gap:8px}
 .pick .none{color:#98A0AC;padding:26px 20px;text-align:center;font-size:14px}
 .pick .sec{padding:9px 20px 4px;font-size:11.5px;font-weight:700;color:#A8B0BA;letter-spacing:.03em}
-.c-blue{background:#0B65D8}.c-green{background:#12833F}.c-orange{background:#C2620F}
+.c-blue{background:#2B6CB0}.c-green{background:#12833F}.c-orange{background:#C2620F}
 .c-purple{background:#6B3FB5}.c-red{background:#B32E4B}.c-teal{background:#0E6E6B}
 .install{appearance:none;border:1px solid #DDE2E9;background:#fff;border-radius:8px;
- padding:5px 11px;font-size:12.5px;font-weight:600;color:#0B65D8;cursor:pointer}
-.upd{position:fixed;left:50%;transform:translateX(-50%);bottom:26px;background:#0B65D8;color:#fff;
+ padding:5px 11px;font-size:12.5px;font-weight:600;color:#2B6CB0;cursor:pointer}
+.upd{position:fixed;left:50%;transform:translateX(-50%);bottom:26px;background:#2B6CB0;color:#fff;
  padding:11px 18px;border-radius:10px;font-size:14px;z-index:90;cursor:pointer;
- box-shadow:0 6px 22px rgba(11,101,216,.35)}
+ box-shadow:0 6px 22px rgba(43,108,176,.35)}
 
 /* ── 좁은 화면 ─────────────────────────────────────── */
 @media(max-width:900px){
@@ -229,8 +229,8 @@ mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
   .main{margin-left:0}
   .mtop{display:flex;position:sticky;top:0;z-index:20;background:#fff;
    border-bottom:1px solid #E6EAF0;align-items:center;gap:10px;padding:0 14px}
-  .mtop .brand{padding:11px 0;font-size:15.5px;margin-right:auto}
-  .mtop .brand .bolt{height:.5em}
+  .mtop .brand{padding:9px 0;margin-right:auto}
+  .mtop .brand .lgh{height:34px}
   .burger{appearance:none;border:1px solid #DDE2E9;background:#fff;border-radius:9px;
    width:36px;height:36px;display:flex;align-items:center;justify-content:center;
    cursor:pointer;color:#3A424F;flex:none}
@@ -292,7 +292,7 @@ mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
 }
 </style></head><body>
 
-<div id="app"><div class="login"><div class="mark"><svg class="bolt" viewBox="0 0 742 262" fill="currentColor" aria-hidden="true"><polygon points="0,112 52,112 53,147 440,147 524,53 741,1 741,227 565,185 334,262 56,188 53,188 51,221 0,220"/></svg><span>HEIMDALL</span></div>
+<div id="app"><div class="login"><div class="mark"><img src="./assets/logo-vertical.svg" alt="HEIMDALL" class="lgv"></div>
 <p>불러오는 중…</p></div></div>
 
 <script type="module">
@@ -328,7 +328,7 @@ const authErr = m => AUTH_MSG[m] || m;
 function loginPage(mode='in', msg=''){
   const isUp = mode==='up';
   $('#app').innerHTML = `<div class="login">
-    <div class="mark"><svg class="bolt" viewBox="0 0 742 262" fill="currentColor" aria-hidden="true"><polygon points="0,112 52,112 53,147 440,147 524,53 741,1 741,227 565,185 334,262 56,188 53,188 51,221 0,220"/></svg><span>HEIMDALL</span></div>
+    <div class="mark"><img src="./assets/logo-vertical.svg" alt="HEIMDALL" class="lgv"></div>
     <div class="tabs" style="margin:4px 0 20px">
       <button class="tab" data-m="in" ${!isUp?'aria-selected="true"':''}>로그인</button>
       <button class="tab" data-m="up" ${isUp?'aria-selected="true"':''}>가입</button>
@@ -349,7 +349,7 @@ function loginPage(mode='in', msg=''){
       <label><input type="checkbox" id="auto" ${localStorage.getItem('hd_auto')==='1'?'checked':''}> 자동 로그인</label>
     </div>`:''}
     <button class="btn p full" id="go">${isUp?'가입하고 시작하기':'로그인'}</button>
-    ${!isUp?'<button class="btn full" id="reset" style="margin-top:9px;border:0;color:#8A93A1;font-size:13px">비밀번호를 잊으셨나요?</button>':''}
+    ${!isUp?'<button class="btn full" id="reset" style="margin-top:9px;border:0;color:#5C6672;font-size:13px">비밀번호를 잊으셨나요?</button>':''}
     <p style="margin-top:14px;font-size:13px;color:${msg.startsWith('!')?'#C0392B':'#98A0AC'}">${esc(msg.replace(/^!/,''))}</p>
     ${isUp?'<p style="font-size:12.5px;color:#98A0AC;margin:0">가입 신청 후 관리자 승인이 있어야 이용하실 수 있습니다.</p>':''}
   </div>`;
@@ -399,18 +399,18 @@ const ADMIN_MAILS = ['seokinho@gmail.com','Kdamian2025@gmail.com',
   'zeus@thealmighty.co.kr','khw@jhhds.co.kr','route82biz@gmail.com'];
 function pendingPage(row){
   $('#app').innerHTML = `<div class="login">
-    <div class="mark"><svg class="bolt" viewBox="0 0 742 262" fill="currentColor" aria-hidden="true"><polygon points="0,112 52,112 53,147 440,147 524,53 741,1 741,227 565,185 334,262 56,188 53,188 51,221 0,220"/></svg><span>HEIMDALL</span></div>
+    <div class="mark"><img src="./assets/logo-vertical.svg" alt="HEIMDALL" class="lgv"></div>
     <h2>가입 승인 대기</h2>
     <p><b>${esc(row.name)}</b> 님, 가입 신청이 접수되었습니다.<br>
        관리자가 승인해야 회의를 보실 수 있습니다.</p>
     <div class="box" style="margin:0 0 16px;padding:14px 16px;font-size:13.5px;color:#5B6472">
       ${esc(row.company||'')} ${esc(row.dept||'')}<br>${esc(row.email)}
     </div>
-    <p style="font-size:13px;color:#8A93A1;margin-bottom:16px">
+    <p style="font-size:13px;color:#5C6672;margin-bottom:16px">
       승인 권한이 있는 분<br>${ADMIN_MAILS.map(m=>esc(m)).join('<br>')}
     </p>
     <button class="btn p full" id="again">승인됐는지 확인</button>
-    <button class="btn full" id="out3" style="margin-top:8px;border:0;color:#8A93A1;font-size:13px">로그아웃</button>
+    <button class="btn full" id="out3" style="margin-top:8px;border:0;color:#5C6672;font-size:13px">로그아웃</button>
   </div>`;
   $('#again').onclick=()=>boot();
   $('#out3').onclick=async()=>{await SB.auth.signOut(); loginPage();};
@@ -419,7 +419,7 @@ function pendingPage(row){
 // 가입 정보가 비어 있으면 채우게 합니다 (예전 계정 대응)
 function profilePage(row, msg=''){
   $('#app').innerHTML = `<div class="login">
-    <div class="mark"><svg class="bolt" viewBox="0 0 742 262" fill="currentColor" aria-hidden="true"><polygon points="0,112 52,112 53,147 440,147 524,53 741,1 741,227 565,185 334,262 56,188 53,188 51,221 0,220"/></svg><span>HEIMDALL</span></div>
+    <div class="mark"><img src="./assets/logo-vertical.svg" alt="HEIMDALL" class="lgv"></div>
     <h2>프로필 확인</h2>
     <p>직함은 넣지 마세요. 이름만 적으시면 됩니다.</p>
     <input class="full" id="nm" placeholder="이름 (예: 김현우)" value="${esc(row.name||'')}" style="margin-bottom:10px">
@@ -430,7 +430,7 @@ function profilePage(row, msg=''){
     <input class="full" id="dp" placeholder="부서" value="${esc(row.dept||'')}" style="margin-bottom:12px">
     <button class="btn p full" id="save">저장하고 시작하기</button>
     <p style="margin-top:12px;font-size:13px;color:#C0392B">${esc(msg)}</p>
-    <button class="btn full" id="out2" style="margin-top:6px;border:0;color:#8A93A1;font-size:13px">다른 계정으로 로그인</button>
+    <button class="btn full" id="out2" style="margin-top:6px;border:0;color:#5C6672;font-size:13px">다른 계정으로 로그인</button>
   </div>`;
   $('#save').onclick = async () => {
     const nm=$('#nm').value.trim(), co=$('#co').value, dp=$('#dp').value.trim();
@@ -474,7 +474,7 @@ function shell(){
   if(admin.length) groups.push(['관리', admin]);
   groups.push(['도움말', [['guide','사용 가이드']]]);
 
-  const brand = `<div class="brand"><svg class="bolt" viewBox="0 0 742 262" fill="currentColor" aria-hidden="true"><polygon points="0,112 52,112 53,147 440,147 524,53 741,1 741,227 565,185 334,262 56,188 53,188 51,221 0,220"/></svg><span class="bname">HEIMDALL</span></div>`;
+  const brand = `<div class="brand"><img src="./assets/logo-horizontal.svg" alt="HEIMDALL" class="lgh"></div>`;
 
   $('#app').innerHTML = `
    <div class="scrim" id="scrim"></div>
@@ -613,7 +613,7 @@ function drawMeeting(){
   <div class="sub">${m.source?`<span class="tag" style="background:#FFF0E0;color:#B36B00;margin-right:6px">${esc(m.source)} 사용 회의</span>`:''}${m.held_on} · ${hms(m.duration_sec)} · ${att.length?esc(att.join(', ')):'참석자 미기재'}
     ${(m.company||m.dept)?` · ${esc(m.company||'')} ${esc(m.dept||'')}`:''}</div>
   <div class="row" style="margin-bottom:6px">
-    <span style="font-size:13px;color:#8A93A1">프로젝트</span>
+    <span style="font-size:13px;color:#5C6672">프로젝트</span>
     <button class="pjbtn none" id="pjsel">분류 안 됨</button>
   </div>
   <div class="tabs">
@@ -1353,7 +1353,7 @@ async function renderProjects(){
         <button class="btn p" id="pj-add">만들기</button>
       </div>
       <div class="row" style="margin-top:10px;flex-wrap:wrap;gap:6px 14px">
-        <span style="font-size:13px;color:#8A93A1">함께하는 회사</span>
+        <span style="font-size:13px;color:#5C6672">함께하는 회사</span>
         ${GROUP_COMPANIES.map(c=>`<label style="display:flex;align-items:center;gap:5px;font-size:13.5px">
           <input type="checkbox" class="pj-cos" value="${c}"
             ${c===sc?'checked':''}
@@ -1705,6 +1705,23 @@ function recStop(){
   toast('올리는 중입니다…');
 }
 
+// 올리기 실패 원인을 사람 말로 바꿔줍니다.
+// 「row-level security」 는 권한 문제인데, 그대로 보여주면 아무도 못 알아봅니다.
+function upErr(step, e){
+  const raw = (e && (e.message||e.error_description||e.error)) || String(e);
+  if(/row-level security|violates row-level/i.test(raw)){
+    if(step==='file')
+      return '파일을 저장소에 올릴 권한이 없습니다.<br>'
+        + '계정 승인이 끝났는지 관리자에게 확인해 주세요.';
+    return '기록을 남길 권한이 없습니다.<br>'
+      + `내 소속: ${esc(me.company||'(없음)')} ${esc(me.dept||'')}<br>`
+      + '소속이 비어 있으면 올릴 수 없습니다. 관리자에게 소속 지정을 요청해 주세요.';
+  }
+  if(/exceeded|too large|413/i.test(raw)) return '파일이 너무 큽니다 (1GB 제한).';
+  if(/Failed to fetch|NetworkError/i.test(raw)) return '인터넷 연결이 끊겼습니다. 다시 시도해 주세요.';
+  return (step==='file'?'파일 올리기 실패: ':'기록 남기기 실패: ') + esc(raw);
+}
+
 async function recDone(){
   const type = REC.mr.mimeType || 'audio/webm';
   const ext = type.includes('mp4')? 'mp4' : type.includes('ogg')? 'ogg' : 'webm';
@@ -1714,7 +1731,7 @@ async function recDone(){
   try{
     const name=`jobs/${Date.now()}_web.${ext}`;   // 이름은 영문·숫자만 (한글 불가)
     const {error:e1}=await SB.storage.from('hd-audio').upload(name, blob, {upsert:true, contentType:type});
-    if(e1) throw e1;
+    if(e1){ toast(upErr('file', e1), 9000); renderRec(); return; }
     const priv = REC.type && REC.type!=='meeting';
     const sc=(me.role==='admin' && !priv && REC.scope==='exec')
       ? {company:'그룹', dept:'전사 경영진'} : {company:me.company||'', dept:me.dept||''};
@@ -1725,7 +1742,7 @@ async function recDone(){
       title:REC.title, participants:REC.parts||'',
       audio_path:name, kind:'audio', orig_name:`${REC.title}.${ext}`,
       device:'웹 녹음', created_by:me.id, created_name:me.name, ...sc, ...extra});
-    if(e2) throw e2;
+    if(e2){ toast(upErr('row', e2), 9000); renderRec(); return; }
     toast(`<b>${esc(REC.title)}</b> (${recFmt(REC.dur||0)}) 올렸습니다.<br>처리가 끝나면 회의 목록에 나타납니다.`);
   }catch(e){
     toast('올리지 못했습니다: '+esc(e.message||e), 8000);
@@ -1825,7 +1842,7 @@ async function doUpload(){
     const base=f.name.replace(/\.[^.]+$/,'').replace(/[^0-9A-Za-z_-]/g,'').slice(0,40);
     const name=`jobs/${Date.now()}_${base||'file'}.${ext}`;
     const {error:e1}=await SB.storage.from('hd-audio').upload(name, f, {upsert:true});
-    if(e1) throw e1;
+    if(e1){ toast(upErr('file', e1), 9000); btn.disabled=false; btn.textContent='올리기'; return; }
     const title=$('#up-title').value.trim()
       || f.name.replace(/\.[^.]+$/,'');
     const usc=(me.role==='admin' && ($('#up-scope')||{value:'mine'}).value==='exec')
@@ -1834,7 +1851,7 @@ async function doUpload(){
       title, participants:$('#up-parts').value.trim(),
       audio_path:name, kind:isAudio?'audio':'doc', orig_name:f.name,
       device:'웹 업로드', created_by:me.id, created_name:me.name, ...usc});
-    if(e2) throw e2;
+    if(e2){ toast(upErr('row', e2), 9000); btn.disabled=false; btn.textContent='올리기'; return; }
     toast(`<b>${esc(title)}</b> 올렸습니다.<br>처리가 끝나면 회의 목록에 나타납니다.`);
     $('#up-file').value=''; $('#up-title').value='';
     loadUploads();
@@ -1939,7 +1956,7 @@ async function renderUsage(){
       return `<div class="box">
         <div class="row" style="align-items:baseline;gap:10px;margin-bottom:10px">
           <b style="font-size:17px">${ym}</b>
-          <span style="font-size:19px;font-weight:800;color:#0B65D8">$${tot.toFixed(2)}</span>
+          <span style="font-size:19px;font-weight:800;color:#2B6CB0">$${tot.toFixed(2)}</span>
           <span class="sub" style="margin:0">${won(tot)} · 호출 ${calls.toLocaleString()}회</span>
         </div>
         <table><tr><th>회사</th><th>부서</th><th style="text-align:right">호출</th>
@@ -2060,11 +2077,11 @@ async function sendCmd(kind, args, btn){
 function exportDoc(){
   if(!cur) return;
   const {m,segs,hls,acts,att}=cur;
-  const S=`body{font-family:'맑은 고딕',sans-serif;font-size:10.5pt;line-height:1.7;color:#1B1F26}
-    h1{font-size:18pt;margin:0 0 6pt} h2{font-size:13pt;color:#0B65D8;border-bottom:1.5pt solid #0B65D8;
+  const S=`body{font-family:'맑은 고딕',sans-serif;font-size:10.5pt;line-height:1.7;color:#12161C}
+    h1{font-size:18pt;margin:0 0 6pt} h2{font-size:13pt;color:#2B6CB0;border-bottom:1.5pt solid #2B6CB0;
     padding-bottom:3pt;margin:18pt 0 8pt} table{border-collapse:collapse;width:100%;font-size:9.5pt}
     td,th{border:1pt solid #C9D1DC;padding:4pt 7pt;vertical-align:top} th{background:#EEF2F7}
-    .ts{color:#8A93A1;font-size:8.5pt} .spk{font-weight:bold;color:#0B65D8}
+    .ts{color:#5C6672;font-size:8.5pt} .spk{font-weight:bold;color:#2B6CB0}
     .hl{margin:0 0 10pt} .hl h3{font-size:11pt;margin:0 0 3pt} .hl ul{margin:2pt 0 0 14pt}
     .meta{color:#5A6472;font-size:9.5pt;margin-bottom:14pt}`;
   const esc2=t=>String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');

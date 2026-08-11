@@ -1,9 +1,10 @@
 // HEIMDALL 서비스 워커
 // 앱 껍데기만 캐시합니다. 회의 내용은 절대 캐시하지 않습니다 —
 // 오래된 회의록이 남거나, 기기에 회사 자료가 저장되면 안 되기 때문입니다.
-const V = 'heimdall-v1';
+const V = 'heimdall-v2';
 const SHELL = ['./', './index.html', './manifest.webmanifest',
-               './icons/icon-192.png', './icons/icon-512.png'];
+               './icons/icon-192.png', './icons/icon-512.png',
+               './assets/logo-horizontal.svg', './assets/logo-vertical.svg'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(V).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
