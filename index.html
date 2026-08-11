@@ -58,6 +58,9 @@ h1{font-size:23px;margin:0 0 4px;letter-spacing:-.01em}
  margin-bottom:10px;cursor:pointer;transition:.12s}
 .card:hover{border-color:#0B65D8;box-shadow:0 3px 14px rgba(11,101,216,.08)}
 .ct{font-size:16.5px;font-weight:700;margin-bottom:4px}
+.card.locked{cursor:default;background:#FAFBFD;border-style:dashed}
+.card.locked:hover{border-color:#DDE2E9;box-shadow:none}
+.card.locked .ct{color:#B6BEC9;letter-spacing:.12em}
 .cm{font-size:13px;color:#8A93A1;display:flex;gap:14px;flex-wrap:wrap;align-items:center}
 .tag{font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px}
 .t-draft{background:#EEF1F5;color:#5B6472}.t-review{background:#FFF3D6;color:#8A6100}
@@ -298,9 +301,14 @@ const $ = (s,r=document)=>r.querySelector(s);
 const esc = s => (s??'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const hms = s => { s=+s||0; return `${Math.floor(s/3600)}:${String(Math.floor(s%3600/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; };
 const STATUS = {draft:'전사만', review:'검토 중', reported:'경영진 보고됨', archived:'보관'};
-const ROLE = {member:'구성원', manager:'부서 관리자', exec:'경영진', admin:'관리자'};
+const ROLE = {member:'구성원', manager:'부서 관리자', exec:'경영진',
+              dev:'개발자', admin:'관리자'};
 const ROLE_HELP = {member:'본인이 참석한 회의만', manager:'전체 회의 · 경영진 보고',
-  exec:'보고된 회의 · 사람 관리', admin:'전부 · 사람 관리'};
+  exec:'보고된 회의 · 사람 관리',
+  dev:'전사 경영진 회의·브리핑 빼고 전부 · 처리서버 조작',
+  admin:'전부 · 사람 관리'};
+// 관리자와 같은 권한을 갖는 역할 묶음 (전사 경영진 회의·브리핑만 개발자에게 가려집니다)
+const isAdminish = r => ['admin','dev'].includes(r);
 let me=null, view='list', cur=null, editing=false;
 
 function toast(html,ms=3600){const t=document.createElement('div');t.className='toast';t.innerHTML=html;
@@ -458,8 +466,10 @@ function shell(){
     ['정리', [['projects','프로젝트'],['upload','업로드'],['search','검색'],['actions','액션아이템']]],
   ];
   const admin = [];
-  if(['admin','exec'].includes(me.role)) admin.push(['brief','브리핑'],['usage','사용료'],['members','구성원']);
-  if(me.role==='admin') admin.push(['server','처리서버']);
+  if(['admin','exec'].includes(me.role)) admin.push(['brief','브리핑']);
+  if(['admin','exec','dev'].includes(me.role)) admin.push(['usage','사용료']);
+  if(['admin','exec'].includes(me.role)) admin.push(['members','구성원']);
+  if(isAdminish(me.role)) admin.push(['server','처리서버']);
   if(admin.length) groups.push(['관리', admin]);
   groups.push(['도움말', [['guide','사용 가이드']]]);
 
@@ -540,9 +550,18 @@ async function renderList(){
   if(error) return el.innerHTML=`<div class="empty">${esc(error.message)}</div>`;
   const PJ = Object.fromEntries((pres.data||[]).map(p=>[p.id,p]));
   const canArch = ['admin','exec'].includes(me.role);
+  let locked = 0;
+  if(me.role==='dev'){
+    const {data:lc} = await SB.rpc('hd_locked_count');
+    locked = lc||0;
+  }
   el.innerHTML = `<h1>회의</h1><div class="sub">${data.length}건 · ${ROLE[me.role]} 권한으로 보이는 것만 표시됩니다
     ${canArch?`<label style="margin-left:12px;cursor:pointer"><input type="checkbox" id="sharch"
       ${showArch?'checked':''} style="width:14px;height:14px;vertical-align:-2px"> 보관된 회의 보기</label>`:''}</div>`
+   + (locked?`<div class="card locked"><div class="ct">■■■■■■■■■■</div>
+        <div class="cm"><span class="tag" style="background:#EEF1F5;color:#5B6472">열람 권한 없음</span>
+          <span>그룹 · 전사 경영진 회의 ${locked}건</span>
+          <span>개발자 권한으로는 열 수 없습니다</span></div></div>`:'')
    + (data.length? data.map(m=>`<div class="card" data-id="${m.id}">
         <div class="ct">${esc(m.title)}</div>
         <div class="cm"><span class="tag t-${m.status}">${STATUS[m.status]}</span>
@@ -552,7 +571,10 @@ async function renderList(){
           ${m.company?`<span>${esc(m.company)}${m.dept?' '+esc(m.dept):''}</span>`:''}
           ${m.summary_md?'':'<span>요약 없음</span>'}</div></div>`).join('')
      : '<div class="empty">아직 올라온 회의가 없습니다.<br><br>대표님 맥에서 <b>./heimdall push</b> 를 실행하세요.</div>');
-  el.querySelectorAll('.card').forEach(c=>c.onclick=()=>openMeeting(c.dataset.id));
+  el.querySelectorAll('.card').forEach(c=>c.onclick=()=>{
+    if(c.classList.contains('locked'))
+      return toast('전사 경영진 회의는 개발자 권한으로 열 수 없습니다.');
+    openMeeting(c.dataset.id);});
   const sa=$('#sharch');
   if(sa) sa.onchange=()=>{sessionStorage.setItem('hd_show_arch', sa.checked?'1':'0'); renderList();};
 }
@@ -580,7 +602,7 @@ function drawMeeting(){
   const {m,segs,hls,acts,edits,att} = cur;
   const names=[...new Set(segs.map(s=>s.speaker).filter(Boolean))];
   const si=n=>'s'+(names.indexOf(n)%6);
-  const canReport = ['manager','admin'].includes(me.role);
+  const canReport = ['manager','admin','dev'].includes(me.role);
   const el=$('#p-meeting');
   el.innerHTML = `
   <div class="row" style="margin-bottom:12px"><button class="btn" id="back">← 목록</button>
@@ -619,7 +641,7 @@ function drawMeeting(){
         ${a.done_at?' · 완료 '+a.done_at.slice(0,10):''}</div></div>
       <div class="row" style="gap:4px;align-items:center">
         <span class="tag ${a.state==='done'?'t-reported':'t-review'}">${a.state==='done'?'완료':'진행'}</span>
-        ${['admin','exec','manager'].includes(me.role)?`<button class="delx" data-adel="${a.id}" title="잘못 만들어진 항목 지우기">×</button>`:''}
+        ${['admin','exec','manager','dev'].includes(me.role)?`<button class="delx" data-adel="${a.id}" title="잘못 만들어진 항목 지우기">×</button>`:''}
       </div>
     </div>`).join('') : '<div class="empty">액션아이템이 없습니다.</div>'}</div>
   ${edits.length?`<div class="hist"><b>편집 이력</b>${edits.map(e=>
@@ -709,9 +731,9 @@ function startEdit(){
   const el=$('#p-meeting');
   const nm = s => (s||'').replace(/\s/g,'');
   const same = (a,b) => nm(a).length>1 && nm(b).length>1 && (nm(a).includes(nm(b)) || nm(b).includes(nm(a)));
-  const allowed = ['manager','admin'].includes(me.role) || cur.att.some(a=>same(a, me.name));
+  const allowed = ['manager','admin','dev'].includes(me.role) || cur.att.some(a=>same(a, me.name));
   if(!allowed) return toast('이 회의 참석자만 수정할 수 있습니다.<br>참석자: '+esc(cur.att.join(', ')||'미기재'),5000);
-  if(cur.m.status==='reported' && !['manager','admin'].includes(me.role))
+  if(cur.m.status==='reported' && !['manager','admin','dev'].includes(me.role))
     return toast('경영진께 보고된 회의는 부서 관리자만 수정할 수 있습니다.',5000);
   editing=true;
   el.querySelectorAll('#segs p, .hl h3, .hl li').forEach(e=>{e.contentEditable='true';e.spellcheck=false;});
@@ -810,7 +832,7 @@ async function renderActions(){
     .order('held_on',{ascending:false});
   if(error) return el.innerHTML=`<div class="empty">${esc(error.message)}</div>`;
   const open=data.filter(a=>a.state==='open'), done=data.filter(a=>a.state!=='open');
-  const canDel=['admin','exec','manager'].includes(me.role);
+  const canDel=['admin','exec','manager','dev'].includes(me.role);
   const card=a=>`<div class="act ${a.state!=='open'?'done':''}" data-id="${a.id}">
      <input type="checkbox" ${a.state==='done'?'checked':''}>
      <div><div class="task">${esc(a.task)}</div>
@@ -1141,7 +1163,7 @@ const pushRecent = id => { if(!id) return;
 
 function pickProject(projects, curId, title='프로젝트 고르기'){
   return new Promise(resolve=>{
-    const canMake=['admin','manager'].includes(me.role);
+    const canMake=['admin','manager','dev'].includes(me.role);
     const mask=document.createElement('div'); mask.className='mask';
     mask.innerHTML=`<div class="pick">
       <div class="hd"><h3>${esc(title)}</h3>
@@ -1235,7 +1257,7 @@ async function renderProjects(){
       .order('held_on',{ascending:false})]);
   if(pj.error) return el.innerHTML=`<div class="empty">${esc(pj.error.message)}</div>`;
   const projects=pj.data||[], meetings=ms.data||[];
-  const canMake=['admin','manager'].includes(me.role);
+  const canMake=['admin','manager','dev'].includes(me.role);
 
   const pcos=p=>(p.companies&&p.companies.length)?p.companies:(p.company?[p.company]:[PJ_NOCO]);
   const pdp=p=>p.dept||PJ_NODEPT;
@@ -1424,7 +1446,7 @@ function drawPjList(list, projects, here, picked){
 
   box.innerHTML=`<h1 style="font-size:18px">${esc(here)} · 회의 ${list.length}건</h1>
     <div class="sub">오른쪽 이름을 누르면 그 회의를 다른 프로젝트로 옮깁니다
-      ${['admin','manager'].includes(me.role)?'':'<br>참석하신 회의만 옮기실 수 있습니다'}</div>
+      ${['admin','manager','dev'].includes(me.role)?'':'<br>참석하신 회의만 옮기실 수 있습니다'}</div>
     ${list.length?`<div class="box" style="padding:14px 16px;margin-bottom:12px">
       <div class="row">
         <label style="display:flex;align-items:center;gap:8px;font-size:14px">
