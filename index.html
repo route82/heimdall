@@ -59,6 +59,7 @@ h1{font-size:23px;margin:0 0 4px;letter-spacing:-.01em}
 .card:hover{border-color:#0B65D8;box-shadow:0 3px 14px rgba(11,101,216,.08)}
 .ct{font-size:16.5px;font-weight:700;margin-bottom:4px}
 .card.locked{cursor:default;background:#FAFBFD;border-style:dashed}
+.box.locked{background:#FAFBFD;border-style:dashed;user-select:none}
 .card.locked:hover{border-color:#DDE2E9;box-shadow:none}
 .card.locked .ct{color:#B6BEC9;letter-spacing:.12em}
 .cm{font-size:13px;color:#8A93A1;display:flex;gap:14px;flex-wrap:wrap;align-items:center}
@@ -466,7 +467,7 @@ function shell(){
     ['정리', [['projects','프로젝트'],['upload','업로드'],['search','검색'],['actions','액션아이템']]],
   ];
   const admin = [];
-  if(['admin','exec'].includes(me.role)) admin.push(['brief','브리핑']);
+  if(['admin','exec','dev'].includes(me.role)) admin.push(['brief','브리핑']);
   if(['admin','exec','dev'].includes(me.role)) admin.push(['usage','사용료']);
   if(['admin','exec'].includes(me.role)) admin.push(['members','구성원']);
   if(isAdminish(me.role)) admin.push(['server','처리서버']);
@@ -865,6 +866,22 @@ async function delAction(id, after){
 // ─────────────────────────── 브리핑
 async function renderBrief(){
   const el=$('#p-brief'); el.innerHTML='<div class="sub">불러오는 중…</div>';
+  if(me.role==='dev'){
+    // 개발자에게는 서버가 브리핑을 아예 내려주지 않습니다. 가려진 모양만 보여줍니다.
+    const bar = n => '■'.repeat(n);
+    el.innerHTML=`<h1>일일 브리핑</h1>
+      <div class="sub">전날 회의를 한 장으로 정리합니다</div>
+      <div class="box locked">
+        <div class="sub" style="margin:0 0 10px">${bar(10)}</div>
+        <div class="md" style="color:#C0C6CF;letter-spacing:.1em;line-height:2.2">
+          ${bar(6)}<br>${bar(22)}<br>${bar(17)}<br>${bar(25)}<br><br>
+          ${bar(8)}<br>${bar(20)}<br>${bar(14)}</div>
+      </div>
+      <div class="empty">브리핑에는 전사 경영진 회의 내용이 섞여 있어
+        <b>개발자 권한으로는 열람할 수 없습니다.</b><br><br>
+        내용이 필요하시면 관리자에게 요청해 주세요.</div>`;
+    return;
+  }
   const {data}=await SB.from('hd_brief').select('*').order('on_date',{ascending:false}).limit(14);
   el.innerHTML=`<h1>일일 브리핑</h1><div class="sub">전날 회의를 한 장으로 정리합니다</div>`
    + ((data&&data.length)? data.map(b=>`<div class="box"><div class="sub" style="margin:0 0 10px">${b.on_date}</div>
