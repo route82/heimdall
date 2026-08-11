@@ -162,15 +162,33 @@ mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
  padding:8px 12px;font-size:13.5px;font-family:inherit;cursor:pointer;color:#3A424F;
  max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:none}
 .pjbtn:hover{border-color:#0B65D8;color:#0B65D8}
-.pjc.fld{background:#F7F9FC}
-.pjc.fld:hover{background:#fff}
-.fico{color:#0B65D8;height:22px;margin-bottom:6px}
-.fico.gray{color:#B4BCC7}
-.crumb{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:0 0 14px;font-size:14px}
-.crumb a{color:#0B65D8;cursor:pointer}
-.crumb a:hover{text-decoration:underline}
-.crumb b{color:#1B1F26}
-.crumb .sep{color:#C2C9D4}
+/* ── 프로젝트 폴더 나무 */
+.tree{background:#fff;border:1px solid #E6EAF0;border-radius:12px;padding:8px 8px}
+.tb{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:9px;
+ cursor:pointer;font-size:14.5px;color:#3A424F}
+.tb:hover{background:#F2F5F9}
+.tb.sel{background:#EAF2FD;color:#0B65D8;font-weight:700}
+.tb .fi{width:17px;height:17px;flex:none;color:#0B65D8}
+.tb.sel .fi{color:#0B65D8}
+.tb .tt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tb .tc{font-size:12px;color:#98A0AC;background:#F2F5F9;border-radius:20px;
+ padding:1px 9px;flex:none;font-weight:600}
+.tb.sel .tc{background:#D9E8FB;color:#0B65D8}
+.tw{width:18px;height:18px;flex:none;display:flex;align-items:center;justify-content:center;
+ border-radius:5px;color:#A8B0BC;cursor:pointer}
+.tw:hover{background:#E4E9F0;color:#3A424F}
+.cr{width:14px;height:14px;transition:transform .15s}
+.cr.o{transform:rotate(90deg)}
+.pdot{width:9px;height:9px;border-radius:9px;flex:none;margin:0 4px;background:#0B65D8}
+.tk{margin-left:19px;border-left:1px solid #EDF0F4;padding-left:6px}
+.pdot.c-blue{background:#0B65D8}
+.pdot.c-green{background:#12833F}
+.pdot.c-orange{background:#D97706}
+.pdot.c-purple{background:#6D3FD1}
+.pdot.c-red{background:#C0392B}
+.pdot.c-teal{background:#0E8A8A}
+.tops{opacity:0;flex:none;white-space:nowrap}
+.tb:hover .tops{opacity:1}
 .pjbtn.none{color:#98A0AC}
 .mask{position:fixed;inset:0;background:rgba(20,26,35,.45);z-index:100;
  display:flex;align-items:flex-start;justify-content:center;padding:8vh 16px}
@@ -1190,19 +1208,23 @@ function pickProject(projects, curId, title='프로젝트 고르기'){
 const COLORS=['blue','green','orange','purple','red','teal'];
 // 슈퍼홀릭 그룹사 — 프로젝트 소속 선택지
 const GROUP_COMPANIES=['더올마이티','라피스인터내셔널','슈퍼홀릭','슈퍼홀릭인베스트먼트','루트82'];
-// ─────────────────────────── 프로젝트 (팀 폴더식)
-// 회사 폴더 → 부서 폴더 → 프로젝트 폴더 순으로 열고 들어갑니다.
-//   회사를 누르면   그 회사 회의 전체
-//   부서를 누르면   그 부서 회의 전체
-//   프로젝트를 누르면 그 프로젝트 회의만
+// ─────────────────────────── 프로젝트 (펼쳐지는 폴더 나무)
+// 회사 ▸ 부서 ▸ 프로젝트 순으로 그 자리에서 펼쳐집니다.
+//   회사를 고르면     그 회사 회의 전체
+//   부서를 고르면     그 부서 회의 전체
+//   프로젝트를 고르면 그 프로젝트 회의만   아래 목록에 나옵니다.
 // 보이는 범위는 서버(RLS)가 정합니다. 부서 관리자·부서원에게는
 // 본인 회사·부서 것만 내려오므로, 남의 회사 폴더는 애초에 생기지 않습니다.
-let PJNAV = {co:'', dept:'', pid:''};
+let PJOPEN = new Set();                 // 펼쳐놓은 폴더 (회사 / 회사+부서)
+let PJSEL  = {co:'', dept:'', pid:''};  // 지금 고른 위치
 const PJ_NOCO = '⚠ 소속 없음';
 const PJ_NODEPT = '회사 공용';
-const FOLDER_ICO = '<svg class="fi" width="17" height="17" viewBox="0 0 24 24" fill="none" '
-  + 'stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">'
-  + '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
+const PJ_KEY = (co, dept) => dept ? co + ' ▸ ' + dept : co;
+
+const CARET = o => `<svg class="cr${o?' o':''}" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+  stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>`;
+const FOLDER_ICO = `<svg class="fi" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+  stroke-width="1.8" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>`;
 
 async function renderProjects(){
   const el=$('#p-projects'); el.innerHTML='<div class="sub">불러오는 중…</div>';
@@ -1218,70 +1240,71 @@ async function renderProjects(){
   const pcos=p=>(p.companies&&p.companies.length)?p.companies:(p.company?[p.company]:[PJ_NOCO]);
   const pdp=p=>p.dept||PJ_NODEPT;
   const mco=m=>m.company||PJ_NOCO, mdp=m=>m.dept||PJ_NODEPT;
-  const {co,dept,pid}=PJNAV;
-  const curPj=projects.find(x=>x.id===pid);
-  if(pid && !curPj){ PJNAV.pid=''; return renderProjects(); }
 
-  // ── 지금 위치에서 보여줄 회의
-  let list=[];
-  if(pid)        list=meetings.filter(m=>m.project_id===pid);
-  else if(dept)  list=meetings.filter(m=>mco(m)===co && mdp(m)===dept);
-  else if(co)    list=meetings.filter(m=>mco(m)===co);
-
-  // ── 지금 위치에서 보여줄 폴더
-  let folders=[];
-  if(!co){
-    const cos=[...new Set([...meetings.map(mco), ...projects.flatMap(pcos)])].sort();
-    folders=cos.map(c=>{
-      const mine=meetings.filter(m=>mco(m)===c);
-      const nd=new Set(mine.map(mdp)); projects.filter(p=>pcos(p).includes(c)).forEach(p=>nd.add(pdp(p)));
-      return {kind:'co', key:c, name:c, n:mine.length, sub:`부서 ${nd.size}개`};
-    });
-  }else if(!dept){
+  // ── 나무 만들기: 회사 → 부서 → 프로젝트
+  const cos=[...new Set([...meetings.map(mco), ...projects.flatMap(pcos)])].sort();
+  const tree=cos.map(co=>{
     const dps=new Set(meetings.filter(m=>mco(m)===co).map(mdp));
     projects.filter(p=>pcos(p).includes(co)).forEach(p=>dps.add(pdp(p)));
-    folders=[...dps].sort().map(d=>({kind:'dept', key:d, name:d,
-      n:meetings.filter(m=>mco(m)===co && mdp(m)===d).length,
-      sub:`프로젝트 ${projects.filter(p=>pcos(p).includes(co)&&pdp(p)===d).length}개`}));
-  }else if(!pid){
-    folders=projects.filter(p=>pcos(p).includes(co)&&pdp(p)===dept).map(p=>({
-      kind:'pj', key:p.id, name:p.name, color:p.color||'blue', p,
-      n:meetings.filter(m=>m.project_id===p.id).length,
-      sub:p.description||(p.last_held_on?'최근 '+p.last_held_on:'')}));
-    const un=list.filter(m=>!m.project_id).length;
-    folders.push({kind:'none', key:'', name:'분류 안 됨', n:un,
-      sub:un?'눌러서 프로젝트로 옮기세요':''});
-  }
+    return {co, n:meetings.filter(m=>mco(m)===co).length,
+      depts:[...dps].sort().map(d=>({dept:d,
+        n:meetings.filter(m=>mco(m)===co&&mdp(m)===d).length,
+        pjs:projects.filter(p=>pcos(p).includes(co)&&pdp(p)===d)
+          .map(p=>({p, n:meetings.filter(m=>m.project_id===p.id).length}))}))};
+  });
 
-  const crumbs=[['root','전체']];
-  if(co)   crumbs.push(['co', co]);
-  if(dept) crumbs.push(['dept', dept]);
-  if(pid)  crumbs.push(['pj', curPj?curPj.name:'프로젝트']);
-  const here = pid ? (curPj?curPj.name:'프로젝트') : (dept || co || '전체');
+  // 회사가 하나뿐이면 (부서원·부서 관리자) 알아서 펼쳐두고 골라둡니다
+  if(tree.length===1 && !PJOPEN.size) PJOPEN.add(PJ_KEY(tree[0].co));
+  if(tree.length===1 && !PJSEL.co) PJSEL={co:tree[0].co, dept:'', pid:''};
+
+  // ── 고른 위치의 회의
+  const {co:sc, dept:sd, pid:sp}=PJSEL;
+  const curPj=projects.find(x=>x.id===sp);
+  let list=[], here='전체';
+  if(sp && curPj){ list=meetings.filter(m=>m.project_id===sp); here=curPj.name; }
+  else if(sd){ list=meetings.filter(m=>mco(m)===sc&&mdp(m)===sd); here=`${sc} · ${sd}`; }
+  else if(sc){ list=meetings.filter(m=>mco(m)===sc); here=sc; }
+
+  const at=(c,d,p)=>`data-co="${esc(c)}" data-dept="${esc(d||'')}" data-pid="${p||''}"`;
+  const on=(c,d,p)=>((sc===c)&&((sd||'')===(d||''))&&((sp||'')===(p||'')))?' sel':'';
 
   el.innerHTML=`<h1>프로젝트</h1>
-    <div class="sub">회사 → 부서 → 프로젝트 순으로 폴더를 열어보세요.
-      폴더를 누르면 그 범위의 회의가 아래에 모두 나옵니다</div>
+    <div class="sub">회사 ▸ 부서 ▸ 프로젝트 순으로 폴더를 펼쳐보세요.
+      고른 폴더 범위의 회의가 아래에 모두 나옵니다</div>
 
-    <div class="crumb">${crumbs.map((c,i)=>
-      (i?'<span class="sep">›</span>':'')+
-      (i===crumbs.length-1?`<b>${esc(c[1])}</b>`
-        :`<a data-crumb="${c[0]}">${esc(c[1])}</a>`)).join('')}</div>
+    <div class="tree">
+      ${tree.length?tree.map(c=>{
+        const openC=PJOPEN.has(PJ_KEY(c.co));
+        return `<div class="tn">
+          <div class="tb${on(c.co,'','')}" ${at(c.co,'','')} data-lv="co">
+            <span class="tw" data-tog="${esc(PJ_KEY(c.co))}">${c.depts.length?CARET(openC):''}</span>
+            ${FOLDER_ICO}<span class="tt">${esc(c.co)}</span><span class="tc">${c.n}</span>
+          </div>
+          ${openC?`<div class="tk">${c.depts.map(d=>{
+            const k=PJ_KEY(c.co,d.dept), openD=PJOPEN.has(k);
+            return `<div class="tn">
+              <div class="tb${on(c.co,d.dept,'')}" ${at(c.co,d.dept,'')} data-lv="dept">
+                <span class="tw" data-tog="${esc(k)}">${d.pjs.length?CARET(openD):''}</span>
+                ${FOLDER_ICO}<span class="tt">${esc(d.dept)}</span><span class="tc">${d.n}</span>
+              </div>
+              ${openD&&d.pjs.length?`<div class="tk">${d.pjs.map(x=>`
+                <div class="tn">
+                  <div class="tb${on(c.co,d.dept,x.p.id)}" ${at(c.co,d.dept,x.p.id)} data-lv="pj">
+                    <span class="tw"></span>
+                    <span class="pdot c-${x.p.color||'blue'}"></span>
+                    <span class="tt">${esc(x.p.name)}</span><span class="tc">${x.n}</span>
+                    ${canMake?`<span class="tops">
+                      <button class="pjop" data-ed="${x.p.id}" title="이름·설명 수정">✎</button>
+                      <button class="pjop" data-del="${x.p.id}" title="삭제">×</button></span>`:''}
+                  </div></div>`).join('')}</div>`:''}
+            </div>`;
+          }).join('')}</div>`:''}
+        </div>`;
+      }).join(''):'<div class="empty">아직 보이는 회의·프로젝트가 없습니다.</div>'}
+    </div>
 
-    ${folders.length?`<div class="pj">${folders.map(f=>{
-      const isPj=f.kind==='pj';
-      return `<div class="pjc ${isPj?'':'fld'}" data-kind="${f.kind}" data-key="${esc(String(f.key))}">
-        ${isPj?`<div class="pjbar c-${f.color}"></div>`
-              :`<div class="fico ${f.kind==='none'?'gray':''}">${FOLDER_ICO}</div>`}
-        <div class="n">${esc(f.name)}
-          ${isPj&&canMake?`<span style="float:right;white-space:nowrap">
-            <button class="pjop" data-ed="${f.key}" title="이름·설명 수정">✎</button>
-            <button class="pjop" data-del="${f.key}" title="삭제">×</button></span>`:''}</div>
-        <div class="d">회의 ${f.n}건${f.sub?' · '+esc(f.sub):''}</div></div>`;
-    }).join('')}</div>`:''}
-
-    ${canMake&&co?`<div class="box" style="margin-top:16px">
-      <h1 style="font-size:16px;margin-bottom:12px">여기에 프로젝트 만들기</h1>
+    ${canMake&&sc?`<div class="box" style="margin-top:18px">
+      <h1 style="font-size:16px;margin-bottom:12px">「${esc(sc)}${sd&&sd!==PJ_NODEPT?' · '+esc(sd):''}」 에 프로젝트 만들기</h1>
       <div class="row">
         <input id="pj-name" placeholder="프로젝트 이름 (예: 에스토니아 법인 설립)" style="flex:2;min-width:220px">
         <input id="pj-desc" placeholder="한 줄 설명 (선택)" style="flex:2;min-width:180px">
@@ -1294,36 +1317,33 @@ async function renderProjects(){
         <span style="font-size:13px;color:#8A93A1">함께하는 회사</span>
         ${GROUP_COMPANIES.map(c=>`<label style="display:flex;align-items:center;gap:5px;font-size:13.5px">
           <input type="checkbox" class="pj-cos" value="${c}"
-            ${c===co?'checked':''}
-            ${c===co&&me.role!=='admin'?'disabled':''}> ${c}</label>`).join('')}
+            ${c===sc?'checked':''}
+            ${c===sc&&me.role!=='admin'?'disabled':''}> ${c}</label>`).join('')}
       </div>
       ${me.role==='admin'?`<div class="row" style="margin-top:8px">
         <input id="pj-dp" placeholder="부서 (비우면 회사 전체 공개)"
-          value="${esc(dept===PJ_NODEPT?'':(dept||''))}" style="flex:1;min-width:140px;max-width:260px">
+          value="${esc(sd===PJ_NODEPT?'':(sd||''))}" style="flex:1;min-width:140px;max-width:260px">
       </div>`:''}
       <div class="sub" style="margin:8px 0 0">체크한 회사의 구성원에게 보입니다. 여러 회사가 함께하면 모두 체크하세요</div>
     </div>`:''}
 
     <div id="pjlist" style="margin-top:22px"></div>`;
 
-  // ── 폴더 열기
-  el.querySelectorAll('.pjc').forEach(c=>c.onclick=e=>{
-    if(e.target.closest('.pjop')) return;
-    const k=c.dataset.kind, v=c.dataset.key;
-    if(k==='co')        PJNAV={co:v, dept:'', pid:''};
-    else if(k==='dept') PJNAV={co, dept:v, pid:''};
-    else if(k==='pj')   PJNAV={co, dept, pid:v};
-    else if(k==='none'){ PJNAV={co, dept, pid:''}; renderProjects(); 
-      return setTimeout(()=>{const b=$('#pjlist'); if(b) b.scrollIntoView({behavior:'smooth'});},60); }
+  // ── ▸ 를 누르면 펼치기·접기
+  el.querySelectorAll('[data-tog]').forEach(w=>w.onclick=e=>{
+    e.stopPropagation();
+    const k=w.dataset.tog;
+    PJOPEN.has(k)?PJOPEN.delete(k):PJOPEN.add(k);
     renderProjects();
   });
 
-  // ── 위로 가기
-  el.querySelectorAll('[data-crumb]').forEach(a=>a.onclick=()=>{
-    const to=a.dataset.crumb;
-    if(to==='root')      PJNAV={co:'', dept:'', pid:''};
-    else if(to==='co')   PJNAV={co, dept:'', pid:''};
-    else if(to==='dept') PJNAV={co, dept, pid:''};
+  // ── 이름을 누르면 그 범위를 고릅니다 (그리고 아래로 펼쳐줍니다)
+  el.querySelectorAll('.tb').forEach(b=>b.onclick=e=>{
+    if(e.target.closest('.pjop') || e.target.closest('[data-tog]')) return;
+    const co=b.dataset.co, dept=b.dataset.dept, pid=b.dataset.pid;
+    PJSEL={co, dept, pid};
+    if(b.dataset.lv==='co')   PJOPEN.add(PJ_KEY(co));
+    if(b.dataset.lv==='dept'){PJOPEN.add(PJ_KEY(co)); PJOPEN.add(PJ_KEY(co,dept));}
     renderProjects();
   });
 
@@ -1332,23 +1352,27 @@ async function renderProjects(){
   if(add) add.onclick=async()=>{
     const name=$('#pj-name').value.trim();
     if(!name) return toast('이름을 입력해주세요');
-    let cos=[...el.querySelectorAll('.pj-cos:checked')].map(x=>x.value);
-    if(me.role!=='admin' && me.company && !cos.includes(me.company)) cos.unshift(me.company);
-    if(!cos.length) return toast('함께하는 회사를 하나 이상 체크해주세요.');
+    let cosSel=[...el.querySelectorAll('.pj-cos:checked')].map(x=>x.value);
+    if(me.role!=='admin' && me.company && !cosSel.includes(me.company)) cosSel.unshift(me.company);
+    if(!cosSel.length) return toast('함께하는 회사를 하나 이상 체크해주세요.');
     const dp = me.role==='admin'
       ? ((($('#pj-dp')||{value:''}).value)||'').trim()
       : (me.dept||'');
     add.disabled=true;
     const {error}=await SB.from('hd_project').insert({
       name, description:$('#pj-desc').value.trim(), color:$('#pj-color').value,
-      company:cos[0], companies:cos, dept:dp, created_by:me.id, created_name:me.name});
+      company:cosSel[0], companies:cosSel, dept:dp, created_by:me.id, created_name:me.name});
     add.disabled=false;
     if(error) return toast('만들지 못했습니다: '+esc(error.message));
-    toast(`<b>${esc(name)}</b> 만들었습니다`); renderProjects();
+    toast(`<b>${esc(name)}</b> 만들었습니다`);
+    PJOPEN.add(PJ_KEY(cosSel[0]));
+    PJOPEN.add(PJ_KEY(cosSel[0], dp||PJ_NODEPT));
+    renderProjects();
   };
 
   // ── 이름·설명·소속 수정
-  el.querySelectorAll('[data-ed]').forEach(b=>b.onclick=async()=>{
+  el.querySelectorAll('[data-ed]').forEach(b=>b.onclick=async e=>{
+    e.stopPropagation();
     const p=projects.find(x=>x.id===b.dataset.ed); if(!p) return;
     const name=prompt('프로젝트 이름', p.name);
     if(name===null) return;
@@ -1359,11 +1383,11 @@ async function renderProjects(){
     const cur=(p.companies&&p.companies.length)?p.companies.join(', '):(p.company||'');
     const cotxt=prompt('함께하는 회사 (쉼표로 구분)\n가능: '+GROUP_COMPANIES.join(', '), cur);
     if(cotxt===null) return;
-    const cos=cotxt.split(',').map(x=>x.trim()).filter(Boolean);
-    if(!cos.length) return toast('회사는 하나 이상 있어야 합니다.');
-    const bad=cos.filter(c=>!GROUP_COMPANIES.includes(c));
+    const cosE=cotxt.split(',').map(x=>x.trim()).filter(Boolean);
+    if(!cosE.length) return toast('회사는 하나 이상 있어야 합니다.');
+    const bad=cosE.filter(c=>!GROUP_COMPANIES.includes(c));
     if(bad.length) return toast('없는 회사입니다: '+esc(bad.join(', '))+'<br>가능: '+GROUP_COMPANIES.join(', '), 7000);
-    upd.company=cos[0]; upd.companies=cos;
+    upd.company=cosE[0]; upd.companies=cosE;
     if(me.role==='admin'){
       const dp=prompt('부서 (비우면 회사 전체 공개)', p.dept||'');
       if(dp===null) return;
@@ -1375,24 +1399,25 @@ async function renderProjects(){
   });
 
   // ── 삭제 — 회의는 지워지지 않고 「분류 안 됨」으로 돌아갑니다
-  el.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{
+  el.querySelectorAll('[data-del]').forEach(b=>b.onclick=async e=>{
+    e.stopPropagation();
     const p=projects.find(x=>x.id===b.dataset.del); if(!p) return;
     if(!confirm(`「${p.name}」 프로젝트를 삭제합니다.\n\n묶여 있던 회의 ${p.meeting_count}건은 지워지지 않고\n「분류 안 됨」으로 돌아갑니다.`)) return;
     const {error}=await SB.from('hd_project').delete().eq('id',p.id);
     if(error) return toast('삭제하지 못했습니다: '+esc(error.message));
     toast(`<b>${esc(p.name)}</b> 삭제했습니다`);
-    if(PJNAV.pid===p.id) PJNAV.pid='';
+    if(PJSEL.pid===p.id) PJSEL={co:PJSEL.co, dept:PJSEL.dept, pid:''};
     renderProjects();
   });
 
-  drawPjList(list, projects, meetings, here, !!co);
+  drawPjList(list, projects, here, !!sc);
 }
 
-// 지금 위치의 회의 목록 — 체크해서 한꺼번에 프로젝트로 옮길 수 있습니다
-function drawPjList(list, projects, meetings, here, opened){
+// 고른 폴더의 회의 목록 — 체크해서 한꺼번에 프로젝트로 옮길 수 있습니다
+function drawPjList(list, projects, here, picked){
   const box=$('#pjlist'); if(!box) return;
-  if(!opened){
-    box.innerHTML='<div class="empty">위에서 회사 폴더를 눌러 들어가세요.</div>';
+  if(!picked){
+    box.innerHTML='<div class="empty">위에서 폴더를 눌러보세요.</div>';
     return;
   }
   const pjName=id=>{const p=projects.find(x=>x.id===id); return p?p.name:'분류 안 됨';};
@@ -1450,7 +1475,7 @@ function drawPjList(list, projects, meetings, here, opened){
   if(mv) mv.onclick=async()=>{
     const ids=[...box.querySelectorAll('.pjchk')].filter(c=>c.checked).map(c=>c.dataset.id);
     if(!ids.length) return toast('옮길 회의를 골라주세요');
-    const to=await pickProject(projects, PJNAV.pid, `${ids.length}건을 어디로 옮길까요?`);
+    const to=await pickProject(projects, PJSEL.pid, `${ids.length}건을 어디로 옮길까요?`);
     if(to===undefined) return;
     move(ids, to);
   };
