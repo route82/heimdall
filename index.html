@@ -191,6 +191,12 @@ mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
 .cr{width:14px;height:14px;transition:transform .15s}
 .cr.o{transform:rotate(90deg)}
 .pdot{width:9px;height:9px;border-radius:9px;flex:none;margin:0 4px;background:#2B6CB0}
+/* 프로젝트 색 고르기 — 색 이름 대신 색 네모를 직접 누릅니다 */
+.swatch{display:flex;gap:6px;align-items:center}
+.sw{width:30px;height:30px;border-radius:8px;border:2px solid transparent;
+ cursor:pointer;padding:0;appearance:none;box-shadow:inset 0 0 0 1px rgba(0,0,0,.06)}
+.sw:hover{transform:scale(1.08)}
+.sw.on{border-color:#12161C;box-shadow:0 0 0 2px #fff inset}
 .tk{margin-left:19px;border-left:1px solid #EDF0F4;padding-left:6px}
 .pdot.c-blue{background:#2B6CB0}
 .pdot.c-green{background:#12833F}
@@ -1404,9 +1410,11 @@ async function renderProjects(){
       <div class="row">
         <input id="pj-name" placeholder="프로젝트 이름 (예: 에스토니아 법인 설립)" style="flex:2;min-width:220px">
         <input id="pj-desc" placeholder="한 줄 설명 (선택)" style="flex:2;min-width:180px">
-        <select id="pj-color" style="min-width:110px">
-          ${COLORS.map(c=>`<option value="${c}">${({blue:'파랑',green:'초록',orange:'주황',purple:'보라',red:'빨강',teal:'청록'})[c]}</option>`).join('')}
-        </select>
+        <div class="swatch" id="pj-color" data-c="blue">
+          ${COLORS.map((c,i)=>`<button type="button" class="sw c-${c}${i?'':' on'}" data-c="${c}"
+            title="${({blue:'파랑',green:'초록',orange:'주황',purple:'보라',red:'빨강',teal:'청록'})[c]}"
+            aria-label="${({blue:'파랑',green:'초록',orange:'주황',purple:'보라',red:'빨강',teal:'청록'})[c]}"></button>`).join('')}
+        </div>
         <button class="btn p" id="pj-add">만들기</button>
       </div>
       <div class="row" style="margin-top:10px;flex-wrap:wrap;gap:6px 14px">
@@ -1443,6 +1451,13 @@ async function renderProjects(){
     renderProjects();
   });
 
+  // ── 색 고르기 (네모를 누르면 그 색으로)
+  el.querySelectorAll('.sw').forEach(b=>b.onclick=()=>{
+    const box=$('#pj-color');
+    box.querySelectorAll('.sw').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); box.dataset.c=b.dataset.c;
+  });
+
   // ── 만들기
   const add=$('#pj-add');
   if(add) add.onclick=async()=>{
@@ -1456,7 +1471,8 @@ async function renderProjects(){
       : (me.dept||'');
     add.disabled=true;
     const {error}=await SB.from('hd_project').insert({
-      name, description:$('#pj-desc').value.trim(), color:$('#pj-color').value,
+      name, description:$('#pj-desc').value.trim(),
+      color:($('#pj-color')||{dataset:{c:'blue'}}).dataset.c || 'blue',
       company:cosSel[0], companies:cosSel, dept:dp, created_by:me.id, created_name:me.name});
     add.disabled=false;
     if(error) return toast('만들지 못했습니다: '+esc(error.message));
