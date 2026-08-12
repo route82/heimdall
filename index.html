@@ -306,21 +306,46 @@ const $ = (s,r=document)=>r.querySelector(s);
 const esc = s => (s??'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const hms = s => { s=+s||0; return `${Math.floor(s/3600)}:${String(Math.floor(s%3600/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; };
 const STATUS = {draft:'전사만', review:'검토 중', reported:'경영진 보고됨', archived:'보관'};
-const ROLE = {member:'구성원', manager:'부서 관리자', exec:'경영진',
-              dev:'개발자', admin:'관리자'};
-const ROLE_HELP = {member:'본인이 참석한 회의만', manager:'전체 회의 · 경영진 보고',
-  exec:'보고된 회의 · 사람 관리',
+const ROLE = {member:'구성원', manager:'부서 관리자', exec:'임원',
+              ceo:'공동대표', dev:'개발자', admin:'관리자'};
+const ROLE_HELP = {member:'본인이 참석한 회의만', manager:'본인 부서 회의 · 경영진 보고',
+  exec:'본인 회사의 모든 부서',
+  ceo:'전 회사 전부 · 사람 관리',
   dev:'전사 경영진 회의·브리핑 빼고 전부 · 처리서버 조작',
   admin:'전부 · 사람 관리'};
 // 관리자와 같은 권한을 갖는 역할 묶음 (전사 경영진 회의·브리핑만 개발자에게 가려집니다)
 const isAdminish = r => ['admin','dev'].includes(r);
+// 사람·브리핑까지 보는 최고 권한 (관리자 · 공동대표)
+const isTop = r => ['admin','ceo'].includes(r);
 let me=null, view='list', cur=null, editing=false;
 
 function toast(html,ms=3600){const t=document.createElement('div');t.className='toast';t.innerHTML=html;
   document.body.appendChild(t);setTimeout(()=>t.remove(),ms);}
 
 // ─────────────────────────── 로그인 · 가입
-const COMPANIES = ['더올마이티','루트82','슈퍼홀릭','라피스인터내셔널'];
+// 회사·부서 명부는 서버(hd_org)에서 받아옵니다. 화면 곳곳에서 이 목록만 고를 수 있습니다.
+let ORG = [];                                   // [{company,dept,pickable}]
+let COMPANIES = [];                             // 가입 화면에 보이는 회사
+async function loadOrg(){
+  if(ORG.length) return ORG;
+  const {data} = await SB.from('hd_org').select('company,dept,sort,pickable').order('sort');
+  ORG = data || [];
+  COMPANIES = [...new Set(ORG.filter(o=>o.pickable).map(o=>o.company))];
+  return ORG;
+}
+const deptsOf = co => ORG.filter(o=>o.company===co && o.pickable).map(o=>o.dept);
+// 회사를 고르면 부서 목록이 따라 바뀝니다
+function bindOrgSelects(coId, dpId, curDept){
+  const co=document.getElementById(coId), dp=document.getElementById(dpId);
+  if(!co||!dp) return;
+  const fill=()=>{
+    const ds=deptsOf(co.value);
+    dp.innerHTML = '<option value="">부서 선택</option>'
+      + ds.map(d=>`<option ${d===curDept?'selected':''}>${d}</option>`).join('');
+    dp.disabled = !ds.length;
+  };
+  co.onchange=fill; fill();
+}
 const AUTH_MSG = {
   'Invalid login credentials':'이메일 또는 비밀번호가 맞지 않습니다.',
   'User already registered':'이미 가입된 이메일입니다. 로그인해주세요.',
@@ -347,7 +372,9 @@ function loginPage(mode='in', msg=''){
         <option value="">소속 회사 선택</option>
         ${COMPANIES.map(c=>`<option>${c}</option>`).join('')}
       </select>
-      <input class="full" id="dp" placeholder="부서 (예: 글로벌커머스팀)" style="margin-bottom:10px">`:''}
+      <select class="full" id="dp" style="margin-bottom:10px">
+        <option value="">부서 선택</option>
+      </select>`:''}
     ${!isUp?`<div class="opts">
       <label><input type="checkbox" id="rem" ${localStorage.getItem('hd_email')?'checked':''}> 아이디 저장</label>
       <label><input type="checkbox" id="auto" ${localStorage.getItem('hd_auto')==='1'?'checked':''}> 자동 로그인</label>
@@ -359,6 +386,7 @@ function loginPage(mode='in', msg=''){
   </div>`;
 
   document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>loginPage(t.dataset.m));
+  if(isUp) bindOrgSelects('co','dp','');
 
   const email=()=>$('#em').value.trim(), pw=()=>$('#pw').value;
   $('#go').onclick = async () => {
@@ -366,7 +394,7 @@ function loginPage(mode='in', msg=''){
     $('#go').disabled=true; $('#go').textContent='잠시만요…';
     if(isUp){
       const nm=$('#nm').value.trim(), co=$('#co').value, dp=$('#dp').value.trim();
-      if(!nm||!co) { return loginPage('up','!이름과 소속 회사는 반드시 입력해주세요.'); }
+      if(!nm||!co||!dp) { return loginPage('up','!이름·회사·부서를 모두 선택해주세요.'); }
       const {data,error} = await SB.auth.signUp({email:email(), password:pw(),
         options:{data:{name:nm, company:co, dept:dp}}});
       if(error) return loginPage('up','!'+authErr(error.message));
@@ -431,14 +459,17 @@ function profilePage(row, msg=''){
       <option value="">소속 회사 선택</option>
       ${COMPANIES.map(c=>`<option ${row.company===c?'selected':''}>${c}</option>`).join('')}
     </select>
-    <input class="full" id="dp" placeholder="부서" value="${esc(row.dept||'')}" style="margin-bottom:12px">
+    <select class="full" id="dp" style="margin-bottom:12px">
+      <option value="">부서 선택</option>
+    </select>
     <button class="btn p full" id="save">저장하고 시작하기</button>
     <p style="margin-top:12px;font-size:13px;color:#C0392B">${esc(msg)}</p>
     <button class="btn full" id="out2" style="margin-top:6px;border:0;color:#5C6672;font-size:13px">다른 계정으로 로그인</button>
   </div>`;
+  bindOrgSelects('co','dp', row.dept||'');
   $('#save').onclick = async () => {
-    const nm=$('#nm').value.trim(), co=$('#co').value, dp=$('#dp').value.trim();
-    if(!nm||!co) return profilePage(row,'이름과 소속 회사는 반드시 입력해주세요.');
+    const nm=$('#nm').value.trim(), co=$('#co').value, dp=$('#dp').value;
+    if(!nm||!co||!dp) return profilePage(row,'이름·회사·부서를 모두 선택해주세요.');
     const {error} = await SB.from('hd_member').update({name:nm, company:co, dept:dp}).eq('id',row.id);
     if(error) return profilePage(row, error.message);
     boot();
@@ -471,9 +502,9 @@ function shell(){
     ['정리', [['projects','프로젝트'],['upload','업로드'],['search','검색'],['actions','액션아이템']]],
   ];
   const admin = [];
-  if(['admin','exec','dev'].includes(me.role)) admin.push(['brief','브리핑']);
-  if(['admin','exec','dev'].includes(me.role)) admin.push(['usage','사용료']);
-  if(['admin','exec'].includes(me.role)) admin.push(['members','구성원']);
+  if(['admin','ceo','dev'].includes(me.role)) admin.push(['brief','브리핑']);
+  if(['admin','ceo','exec','dev'].includes(me.role)) admin.push(['usage','사용료']);
+  if(isTop(me.role)) admin.push(['members','구성원']);
   if(isAdminish(me.role)) admin.push(['server','처리서버']);
   if(admin.length) groups.push(['관리', admin]);
   groups.push(['도움말', [['guide','사용 가이드']]]);
@@ -554,7 +585,7 @@ async function renderList(){
   const {data,error} = mres;
   if(error) return el.innerHTML=`<div class="empty">${esc(error.message)}</div>`;
   const PJ = Object.fromEntries((pres.data||[]).map(p=>[p.id,p]));
-  const canArch = ['admin','exec'].includes(me.role);
+  const canArch = ['admin','ceo','exec'].includes(me.role);
   let locked = 0;
   if(me.role==='dev'){
     const {data:lc} = await SB.rpc('hd_locked_count');
@@ -607,7 +638,7 @@ function drawMeeting(){
   const {m,segs,hls,acts,edits,att} = cur;
   const names=[...new Set(segs.map(s=>s.speaker).filter(Boolean))];
   const si=n=>'s'+(names.indexOf(n)%6);
-  const canReport = ['manager','admin','dev'].includes(me.role);
+  const canReport = ['manager','admin','ceo','dev'].includes(me.role);
   const el=$('#p-meeting');
   el.innerHTML = `
   <div class="row" style="margin-bottom:12px"><button class="btn" id="back">← 목록</button>
@@ -646,13 +677,13 @@ function drawMeeting(){
         ${a.done_at?' · 완료 '+a.done_at.slice(0,10):''}</div></div>
       <div class="row" style="gap:4px;align-items:center">
         <span class="tag ${a.state==='done'?'t-reported':'t-review'}">${a.state==='done'?'완료':'진행'}</span>
-        ${['admin','exec','manager','dev'].includes(me.role)?`<button class="delx" data-adel="${a.id}" title="잘못 만들어진 항목 지우기">×</button>`:''}
+        ${['admin','ceo','exec','manager','dev'].includes(me.role)?`<button class="delx" data-adel="${a.id}" title="잘못 만들어진 항목 지우기">×</button>`:''}
       </div>
     </div>`).join('') : '<div class="empty">액션아이템이 없습니다.</div>'}</div>
   ${edits.length?`<div class="hist"><b>편집 이력</b>${edits.map(e=>
      `<div>${e.at.slice(0,16).replace('T',' ')} · ${esc(e.editor)} · ${e.kind}</div>`).join('')}</div>`:''}
   <div class="bar">
-    ${['admin','exec'].includes(me.role) ? (m.status==='archived'
+    ${['admin','ceo','exec'].includes(me.role) ? (m.status==='archived'
        ? '<button class="btn" id="arch">보관 해제</button>'
        : '<button class="btn" id="arch">보관</button>') : ''}
     ${canReport && m.status!=='reported' ? '<button class="btn g" id="rep">경영진 보고</button>':''}
@@ -736,9 +767,9 @@ function startEdit(){
   const el=$('#p-meeting');
   const nm = s => (s||'').replace(/\s/g,'');
   const same = (a,b) => nm(a).length>1 && nm(b).length>1 && (nm(a).includes(nm(b)) || nm(b).includes(nm(a)));
-  const allowed = ['manager','admin','dev'].includes(me.role) || cur.att.some(a=>same(a, me.name));
+  const allowed = ['manager','admin','ceo','dev'].includes(me.role) || cur.att.some(a=>same(a, me.name));
   if(!allowed) return toast('이 회의 참석자만 수정할 수 있습니다.<br>참석자: '+esc(cur.att.join(', ')||'미기재'),5000);
-  if(cur.m.status==='reported' && !['manager','admin','dev'].includes(me.role))
+  if(cur.m.status==='reported' && !['manager','admin','ceo','dev'].includes(me.role))
     return toast('경영진께 보고된 회의는 부서 관리자만 수정할 수 있습니다.',5000);
   editing=true;
   el.querySelectorAll('#segs p, .hl h3, .hl li').forEach(e=>{e.contentEditable='true';e.spellcheck=false;});
@@ -837,7 +868,7 @@ async function renderActions(){
     .order('held_on',{ascending:false});
   if(error) return el.innerHTML=`<div class="empty">${esc(error.message)}</div>`;
   const open=data.filter(a=>a.state==='open'), done=data.filter(a=>a.state!=='open');
-  const canDel=['admin','exec','manager','dev'].includes(me.role);
+  const canDel=['admin','ceo','exec','manager','dev'].includes(me.role);
   const card=a=>`<div class="act ${a.state!=='open'?'done':''}" data-id="${a.id}">
      <input type="checkbox" ${a.state==='done'?'checked':''}>
      <div><div class="task">${esc(a.task)}</div>
@@ -924,7 +955,7 @@ async function renderMembers(){
         <select id="iv-co" style="flex:1;min-width:150px">
           <option value="">소속 회사</option>${COMPANIES.map(c=>`<option>${c}</option>`).join('')}
         </select>
-        <input id="iv-dept" placeholder="부서" style="flex:1;min-width:120px">
+        <select id="iv-dept" style="flex:1;min-width:120px"><option value="">부서 선택</option></select>
         <select id="iv-role" style="min-width:190px">
           ${Object.entries(ROLE).map(([k,v])=>`<option value="${k}">${v} — ${ROLE_HELP[k]}</option>`).join('')}
         </select>
@@ -951,19 +982,37 @@ async function renderMembers(){
     <h1 style="font-size:16px;margin-top:26px">사용 중</h1>
     <div class="box">${ok.map(m=>`<div class="act" data-id="${m.id}" style="grid-template-columns:1fr auto">
         <div><div class="task">${esc(m.name)}${m.id===me.id?' (나)':''}</div>
-          <div class="meta">${esc(m.email)} · ${esc(m.company||'')} ${esc(m.dept||'')}</div>
+          <div class="meta">${esc(m.email)} ·
+            <select class="mco" data-id="${m.id}" style="font-size:12px;padding:2px 6px">
+              ${COMPANIES.map(c=>`<option ${m.company===c?'selected':''}>${c}</option>`).join('')}
+            </select>
+            <select class="mdp" data-id="${m.id}" style="font-size:12px;padding:2px 6px">
+              ${deptsOf(m.company).map(d=>`<option ${m.dept===d?'selected':''}>${d}</option>`).join('')}
+            </select></div>
           <label class="meta" style="display:flex;align-items:center;gap:7px;margin-top:6px;cursor:pointer">
             <input type="checkbox" class="alld" data-id="${m.id}" ${m.all_dept?'checked':''}
               style="width:16px;height:16px;margin:0"> 회사 전체 회의 열람 (부서 무관)</label></div>
         <div class="row">${sel(m)}<button class="btn sv" data-id="${m.id}">저장</button></div></div>`).join('')}</div>`;
 
+  bindOrgSelects('iv-co','iv-dept','');
+  el.querySelectorAll('.mco').forEach(x=>x.onchange=()=>{
+    const dp=el.querySelector(`.mdp[data-id="${x.dataset.id}"]`);
+    if(dp) dp.innerHTML = deptsOf(x.value).map(d=>`<option>${d}</option>`).join('');
+  });
+  el.querySelectorAll('.mco,.mdp').forEach(x=>x.addEventListener('change', async()=>{
+    const id=x.dataset.id;
+    const co=el.querySelector(`.mco[data-id="${id}"]`).value;
+    const dp=(el.querySelector(`.mdp[data-id="${id}"]`)||{value:''}).value;
+    const {error}=await SB.from('hd_member').update({company:co, dept:dp}).eq('id',id);
+    toast(error ? '소속을 바꾸지 못했습니다: '+esc(error.message) : '소속을 바꿨습니다');
+  }));
   $('#iv-add').onclick=async()=>{
     const email=$('#iv-email').value.trim();
     if(!email) return toast('이메일을 입력해주세요');
     const b=$('#iv-add'); b.disabled=true;
     const {error}=await SB.rpc('hd_invite_add',{
       p_email:email, p_name:$('#iv-name').value.trim(),
-      p_company:$('#iv-co').value, p_dept:$('#iv-dept').value.trim(),
+      p_company:$('#iv-co').value, p_dept:$('#iv-dept').value,
       p_role:$('#iv-role').value});
     b.disabled=false;
     if(error) return toast('추가 실패: '+esc(error.message));
@@ -999,7 +1048,7 @@ async function renderMembers(){
 
 // 승인 대기 알림 배지
 async function checkPending(){
-  if(!['admin','exec'].includes(me.role)) return;
+  if(!isTop(me.role)) return;
   const {data}=await SB.rpc('hd_pending');
   if(data&&data.length){
     const b=document.querySelector('.nav[data-v=members]');
@@ -1184,7 +1233,7 @@ const pushRecent = id => { if(!id) return;
 
 function pickProject(projects, curId, title='프로젝트 고르기'){
   return new Promise(resolve=>{
-    const canMake=['admin','manager','dev'].includes(me.role);
+    const canMake=['admin','ceo','manager','dev'].includes(me.role);
     const mask=document.createElement('div'); mask.className='mask';
     mask.innerHTML=`<div class="pick">
       <div class="hd"><h3>${esc(title)}</h3>
@@ -1250,7 +1299,8 @@ function pickProject(projects, curId, title='프로젝트 고르기'){
 // ─────────────────────────── 프로젝트
 const COLORS=['blue','green','orange','purple','red','teal'];
 // 슈퍼홀릭 그룹사 — 프로젝트 소속 선택지
-const GROUP_COMPANIES=['더올마이티','라피스인터내셔널','슈퍼홀릭','슈퍼홀릭인베스트먼트','루트82'];
+// 프로젝트를 함께할 수 있는 회사 — 명부에서 가져옵니다
+const groupCompanies = () => COMPANIES;
 // ─────────────────────────── 프로젝트 (펼쳐지는 폴더 나무)
 // 회사 ▸ 부서 ▸ 프로젝트 순으로 그 자리에서 펼쳐집니다.
 //   회사를 고르면     그 회사 회의 전체
@@ -1278,7 +1328,7 @@ async function renderProjects(){
       .order('held_on',{ascending:false})]);
   if(pj.error) return el.innerHTML=`<div class="empty">${esc(pj.error.message)}</div>`;
   const projects=pj.data||[], meetings=ms.data||[];
-  const canMake=['admin','manager','dev'].includes(me.role);
+  const canMake=['admin','ceo','manager','dev'].includes(me.role);
 
   const pcos=p=>(p.companies&&p.companies.length)?p.companies:(p.company?[p.company]:[PJ_NOCO]);
   const pdp=p=>p.dept||PJ_NODEPT;
@@ -1358,7 +1408,7 @@ async function renderProjects(){
       </div>
       <div class="row" style="margin-top:10px;flex-wrap:wrap;gap:6px 14px">
         <span style="font-size:13px;color:#5C6672">함께하는 회사</span>
-        ${GROUP_COMPANIES.map(c=>`<label style="display:flex;align-items:center;gap:5px;font-size:13.5px">
+        ${groupCompanies().map(c=>`<label style="display:flex;align-items:center;gap:5px;font-size:13.5px">
           <input type="checkbox" class="pj-cos" value="${c}"
             ${c===sc?'checked':''}
             ${c===sc&&me.role!=='admin'?'disabled':''}> ${c}</label>`).join('')}
@@ -1428,8 +1478,8 @@ async function renderProjects(){
     if(cotxt===null) return;
     const cosE=cotxt.split(',').map(x=>x.trim()).filter(Boolean);
     if(!cosE.length) return toast('회사는 하나 이상 있어야 합니다.');
-    const bad=cosE.filter(c=>!GROUP_COMPANIES.includes(c));
-    if(bad.length) return toast('없는 회사입니다: '+esc(bad.join(', '))+'<br>가능: '+GROUP_COMPANIES.join(', '), 7000);
+    const bad=cosE.filter(c=>!groupCompanies().includes(c));
+    if(bad.length) return toast('없는 회사입니다: '+esc(bad.join(', '))+'<br>가능: '+groupCompanies().join(', '), 7000);
     upd.company=cosE[0]; upd.companies=cosE;
     if(me.role==='admin'){
       const dp=prompt('부서 (비우면 회사 전체 공개)', p.dept||'');
@@ -1467,7 +1517,7 @@ function drawPjList(list, projects, here, picked){
 
   box.innerHTML=`<h1 style="font-size:18px">${esc(here)} · 회의 ${list.length}건</h1>
     <div class="sub">오른쪽 이름을 누르면 그 회의를 다른 프로젝트로 옮깁니다
-      ${['admin','manager','dev'].includes(me.role)?'':'<br>참석하신 회의만 옮기실 수 있습니다'}</div>
+      ${['admin','ceo','manager','dev'].includes(me.role)?'':'<br>참석하신 회의만 옮기실 수 있습니다'}</div>
     ${list.length?`<div class="box" style="padding:14px 16px;margin-bottom:12px">
       <div class="row">
         <label style="display:flex;align-items:center;gap:8px;font-size:14px">
@@ -2264,6 +2314,7 @@ if('serviceWorker' in navigator){
 
 // ─────────────────────────── 시작
 async function boot(){
+  await loadOrg();                       // 회사·부서 명부 먼저
   const {data:{session}} = await SB.auth.getSession();
   if(!session) return loginPage();
   // 자동 로그인을 끄셨으면, 브라우저를 닫았다 연 경우 다시 로그인하게 합니다.
