@@ -58,6 +58,10 @@ h1{font-size:23px;margin:0 0 4px;letter-spacing:-.01em}
  margin-bottom:10px;cursor:pointer;transition:.12s}
 .card:hover{border-color:#2B6CB0;box-shadow:0 3px 14px rgba(43,108,176,.08)}
 .ct{font-size:16.5px;font-weight:700;margin-bottom:4px}
+.shsec{font-size:11.5px;font-weight:700;letter-spacing:.04em;color:#5C6672;
+ margin:12px 0 6px;padding-top:8px;border-top:1px solid #F0F2F5}
+.shsec:first-of-type{margin-top:0;padding-top:0;border-top:0}
+.shlb{display:flex;align-items:center;gap:5px;font-size:13.5px}
 .card.locked{cursor:default;background:#FAFBFD;border-style:dashed}
 .box.locked{background:#FAFBFD;border-style:dashed;user-select:none}
 .card.locked:hover{border-color:#DDE2E9;box-shadow:none}
@@ -1568,14 +1572,19 @@ async function renderRec(){
       <div class="row" style="margin-bottom:9px">
         <select id="rc-type" style="min-width:230px" ${on?'disabled':''}>
           <option value="meeting">회의 녹음 — 소속 규칙대로 공개</option>
-          <option value="idea">아이디어 노트 — 나만 보기</option>
+          <option value="idea">아이디어 노트 — 나만 보기 (공유 선택 가능)</option>
           <option value="order">지시사항 — 나만 보기 (공유 선택 가능)</option>
         </select>
-        <button class="btn" id="rc-share-btn" style="display:none" ${on?'disabled':''}>공유 대상 선택 (<span id="rc-share-n">0</span>명)</button>
+        <button class="btn" id="rc-share-btn" style="display:none" ${on?'disabled':''}>공유 대상 선택 (<span id="rc-share-n">0</span>)</button>
       </div>
-      <div class="box" id="rc-share-box" style="display:none;margin-bottom:9px;max-height:220px;overflow:auto">
-        <div class="sub" style="margin:0 0 8px">체크한 사람도 이 녹음을 볼 수 있습니다</div>
+      <div class="box" id="rc-share-box" style="display:none;margin-bottom:9px;max-height:320px;overflow:auto">
+        <div class="sub" style="margin:0 0 8px">아무것도 체크하지 않으면 <b>나만</b> 볼 수 있습니다</div>
+        <div class="shsec">사람</div>
         <div id="rc-share-list" class="row" style="flex-wrap:wrap;gap:6px 16px">불러오는 중…</div>
+        <div class="shsec">회사 전체</div>
+        <div id="rc-share-co" class="row" style="flex-wrap:wrap;gap:6px 16px"></div>
+        <div class="shsec">부서</div>
+        <div id="rc-share-dp" class="row" style="flex-wrap:wrap;gap:6px 16px"></div>
       </div>
       ${me.role==='admin'?`<div class="row" style="margin-bottom:9px" id="rc-scope-row">
         <select id="rc-scope" style="min-width:230px" ${on?'disabled':''}>
@@ -1612,18 +1621,36 @@ async function renderRec(){
       if(!list.dataset.loaded){
         const {data}=await SB.from('hd_member').select('id,name,company,dept')
           .eq('approved',true).neq('id',me.id).order('name');
-        list.innerHTML=(data||[]).map(m=>`<label style="display:flex;align-items:center;gap:5px;font-size:13.5px">
+        const mem=data||[];
+        list.innerHTML=mem.map(m=>`<label class="shlb">
           <input type="checkbox" class="rc-share" value="${m.id}"> ${esc(m.name)}
           <span class="sub" style="margin:0;font-size:11.5px">${esc(m.company||'')}</span></label>`).join('')
           || '구성원이 없습니다';
+        // 회사 — 구성원이 실제로 속해 있는 회사만
+        const cos=[...new Set(mem.map(m=>m.company).concat([me.company]).filter(Boolean))].sort();
+        $('#rc-share-co').innerHTML = cos.map(c=>`<label class="shlb">
+          <input type="checkbox" class="rc-shco" value="${esc(c)}"> ${esc(c)} 전체</label>`).join('')
+          || '회사가 없습니다';
+        // 부서 — 회사|부서 로 묶어 보관합니다 (다른 회사의 같은 이름 부서와 안 섞이게)
+        const dps=[...new Set(mem.concat([me]).filter(m=>m.company&&m.dept)
+                    .map(m=>m.company+'|'+m.dept))].sort();
+        $('#rc-share-dp').innerHTML = dps.map(k=>{
+          const [c,d]=k.split('|');
+          return `<label class="shlb"><input type="checkbox" class="rc-shdp" value="${esc(k)}">
+            ${esc(d)} <span class="sub" style="margin:0;font-size:11.5px">${esc(c)}</span></label>`;
+        }).join('') || '부서가 없습니다';
         list.dataset.loaded='1';
       }
     } else box.style.display='none';
   };
   document.addEventListener('change', e=>{
-    if(e.target.classList&&e.target.classList.contains('rc-share')){
-      const n=document.querySelectorAll('.rc-share:checked').length;
-      const el2=$('#rc-share-n'); if(el2) el2.textContent=n;
+    const cl=e.target.classList;
+    if(cl && (cl.contains('rc-share')||cl.contains('rc-shco')||cl.contains('rc-shdp'))){
+      const p1=document.querySelectorAll('.rc-share:checked').length;
+      const p2=document.querySelectorAll('.rc-shco:checked').length;
+      const p3=document.querySelectorAll('.rc-shdp:checked').length;
+      const t=[p1?p1+'명':'', p2?p2+'개 회사':'', p3?p3+'개 부서':''].filter(Boolean).join(' · ');
+      const el2=$('#rc-share-n'); if(el2) el2.textContent = t || '0';
     }
   });
   if(on) recTick();
@@ -1662,6 +1689,8 @@ async function recStart(){
   REC.scope=($('#rc-scope')||{value:'mine'}).value;
   REC.type=($('#rc-type')||{value:'meeting'}).value;
   REC.shares=[...document.querySelectorAll('.rc-share:checked')].map(x=>x.value);
+  REC.shco=[...document.querySelectorAll('.rc-shco:checked')].map(x=>x.value);
+  REC.shdp=[...document.querySelectorAll('.rc-shdp:checked')].map(x=>x.value);
   REC.mr = mime? new MediaRecorder(stream,{mimeType:mime, audioBitsPerSecond:64000})
                 : new MediaRecorder(stream);
   REC.mr.ondataavailable = e=>{ if(e.data && e.data.size) REC.chunks.push(e.data); };
@@ -1737,7 +1766,9 @@ async function recDone(){
       ? {company:'그룹', dept:'전사 경영진'} : {company:me.company||'', dept:me.dept||''};
     const extra = priv ? {visibility:'private',
       note_label: REC.type==='idea' ? '아이디어 노트' : '지시사항',
-      share_ids: REC.shares||[]} : {};
+      share_ids: REC.shares||[],
+      share_companies: REC.shco||[],
+      share_depts: REC.shdp||[]} : {};
     const {error:e2}=await SB.from('hd_job').insert({
       title:REC.title, participants:REC.parts||'',
       audio_path:name, kind:'audio', orig_name:`${REC.title}.${ext}`,
