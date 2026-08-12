@@ -2087,6 +2087,8 @@ const CMDS = [
   ['diarize_setup', '화자 분리 설치', '화자 구분(누가 말했는지) 도구를 설치합니다 — 수 GB, 10분+'],
   ['backup',  '지금 백업',    '회의록·전사를 파일로 내려받아 사무실 컴퓨터에 보관합니다'],
   ['mailtest','알림 메일 시험', '처리 서버가 메일을 보낼 수 있는지 확인합니다'],
+  ['plaud',       '플라우드 가져오기', '플라우드에 올라온 새 녹음을 지금 바로 헤임달로 가져옵니다'],
+  ['plaud_status','플라우드 상태',    '플라우드 로그인·설정이 정상인지 확인합니다'],
 ];
 
 async function renderServer(){
@@ -2109,6 +2111,10 @@ async function renderServer(){
           <option value="DIARIZE">화자 분리 (1=켬 · 0=끔)</option>
           <option value="MAIL_TO">알림 받을 메일 주소</option>
           <option value="BACKUP_DAY">백업 요일 (0=월 … 6=일)</option>
+          <option value="PLAUD">플라우드 자동 가져오기 (1=켬 · 0=끔)</option>
+          <option value="PLAUD_COMPANY">플라우드 회의를 넣을 회사</option>
+          <option value="PLAUD_DEPT">플라우드 회의를 넣을 부서</option>
+          <option value="PLAUD_EVERY_MIN">플라우드 확인 주기 (분)</option>
         </select>
         <input id="sv-val" placeholder="예: large-v3 · claude-sonnet-5 · 7" style="flex:1;min-width:200px">
         <button class="btn p" id="sv-set">바꾸기</button>
