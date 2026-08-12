@@ -655,7 +655,8 @@ function drawMeeting(){
     ${m.reported_at?`<span class="sub" style="margin:0">보고 ${m.reported_at.slice(0,10)}</span>`:''}</div>
   <h1>${esc(m.title)}</h1>
   <div class="sub">${m.source?`<span class="tag" style="background:#FFF0E0;color:#B36B00;margin-right:6px">${esc(m.source)} 사용 회의</span>`:''}${m.held_on} · ${hms(m.duration_sec)} · ${att.length?esc(att.join(', ')):'참석자 미기재'}
-    ${(m.company||m.dept)?` · ${esc(m.company||'')} ${esc(m.dept||'')}`:''}</div>
+    ${(m.company||m.dept)?` · ${esc(m.company||'')} ${esc(m.dept||'')}`:''}
+    ${m.visibility==='private'?' · <b style="color:#C2620F">나만 보기</b>':''}</div>
   <div class="row" style="margin-bottom:6px">
     <span style="font-size:13px;color:#5C6672">프로젝트</span>
     <button class="pjbtn none" id="pjsel">분류 안 됨</button>
@@ -697,6 +698,10 @@ function drawMeeting(){
        : '<button class="btn" id="arch">보관</button>') : ''}
     ${canReport && m.status!=='reported' ? '<button class="btn g" id="rep">경영진 보고</button>':''}
     ${canReport && m.status==='reported' ? '<button class="btn" id="unrep">보고 취소</button>':''}
+    ${(m.visibility==='private' && m.owner_id===me.id)
+        ? '<button class="btn g" id="pub">팀에 공개</button>' : ''}
+    ${(m.visibility!=='private' && m.source==='플라우드' && ['admin','ceo'].includes(me.role))
+        ? '<button class="btn" id="unpub">다시 비공개로</button>' : ''}
     <button class="btn" id="expdoc">워드로 내보내기</button>
     <button class="btn" id="cancel" style="display:none">취소</button>
     <button class="btn p" id="edit">편집</button></div>`;
@@ -706,6 +711,26 @@ function drawMeeting(){
     panes.forEach(p=>p.classList.remove('on'));t.setAttribute('aria-selected','true');panes[i].classList.add('on');
     if(t.textContent.trim()==='마인드맵') drawMindmap(m);});
   $('#back').onclick=()=>go('list');
+
+  // 개인 노트를 팀에 공개 / 되돌리기
+  const pb=$('#pub');
+  if(pb) pb.onclick=async()=>{
+    if(!confirm('이 회의를 팀에 공개합니다.\n\n소속 규칙에 따라 다른 구성원에게 보이게 됩니다.\n계속할까요?')) return;
+    pb.disabled=true;
+    const {error}=await SB.from('hd_meeting')
+      .update({visibility:'team', owner_id:null}).eq('id',m.id);
+    if(error){ pb.disabled=false; return toast('공개하지 못했습니다: '+esc(error.message)); }
+    toast('팀에 공개했습니다'); openMeeting(m.id);
+  };
+  const ub=$('#unpub');
+  if(ub) ub.onclick=async()=>{
+    if(!confirm('다시 비공개로 되돌립니다. 올린 분만 보게 됩니다.')) return;
+    ub.disabled=true;
+    const {error}=await SB.from('hd_meeting')
+      .update({visibility:'private', owner_id:me.id}).eq('id',m.id);
+    if(error){ ub.disabled=false; return toast('바꾸지 못했습니다: '+esc(error.message)); }
+    toast('비공개로 되돌렸습니다'); openMeeting(m.id);
+  };
   $('#expdoc').onclick=()=>exportDoc();
 
   const q=$('#q2'); q.oninput=()=>{const v=q.value.trim().toLowerCase();
@@ -2090,6 +2115,7 @@ const CMDS = [
   ['plaud',       '플라우드 가져오기', '플라우드에 올라온 새 녹음을 지금 바로 헤임달로 가져옵니다'],
   ['plaud_status','플라우드 상태',    '플라우드 로그인·설정이 정상인지 확인합니다'],
   ['plaud_redo',  '플라우드 다시 만들기', '이미 가져온 플라우드 회의의 하이라이트·액션·마인드맵을 다시 만듭니다'],
+  ['plaud_login', '플라우드 계정 추가',  '사람마다 플라우드 로그인을 하는 도우미 파일을 만듭니다'],
 ];
 
 async function renderServer(){
@@ -2116,6 +2142,10 @@ async function renderServer(){
           <option value="PLAUD_COMPANY">플라우드 회의를 넣을 회사</option>
           <option value="PLAUD_DEPT">플라우드 회의를 넣을 부서</option>
           <option value="PLAUD_EVERY_MIN">플라우드 확인 주기 (분)</option>
+          <option value="PLAUD_ACCOUNTS">플라우드 계정 목록 (hong=메일, khw=메일)</option>
+          <option value="PLAUD_OWNER_EMAIL">플라우드 녹음 주인 메일 (계정 하나일 때)</option>
+          <option value="PLAUD_MODE">가져오기 방식 (private · tag · all)</option>
+          <option value="PLAUD_TAG">제목 표시 (tag 방식일 때)</option>
         </select>
         <input id="sv-val" placeholder="예: large-v3 · claude-sonnet-5 · 7" style="flex:1;min-width:200px">
         <button class="btn p" id="sv-set">바꾸기</button>
