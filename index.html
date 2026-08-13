@@ -558,7 +558,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v12.18</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v12.20</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 비밀번호 바꾸기">비밀번호 변경</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -833,7 +833,9 @@ function drawMeeting(){
           + '<button class="btn g" id="pub">팀에 공개</button>' : ''}
     ${(m.visibility!=='private' && m.source==='플라우드' && ['admin','ceo'].includes(me.role))
         ? '<button class="btn" id="unpub">다시 비공개로</button>' : ''}
-    ${(m.visibility==='private'&&m.owner_id===me.id)
+    ${((m.visibility==='private'&&m.owner_id===me.id)
+       ||(m.visibility!=='private'&&(['admin','ceo'].includes(me.role)
+           ||(me.role==='exec'&&m.company===me.company))))
       ?'<button class="btn" id="mdel" style="color:#C0392B">삭제</button>':''}
     <button class="btn" id="expdoc">워드로 내보내기</button>
     <button class="btn" id="cancel" style="display:none">취소</button>
@@ -872,12 +874,13 @@ function drawMeeting(){
   // 내 노트(아이디어 노트·지시사항)는 주인이 직접 지울 수 있습니다
   const md=$('#mdel');
   if(md) md.onclick=async()=>{
-    if(!confirm('이 노트를 완전히 삭제합니다.\n전사·요약·액션아이템이 모두 지워지고 되돌릴 수 없습니다.\n계속할까요?')) return;
+    const what=m.visibility==='private'?'노트':'회의록';
+    if(!confirm(`이 ${what}을(를) 완전히 삭제합니다.\n전사·요약·액션아이템이 모두 지워지고 되돌릴 수 없습니다.\n계속할까요?`)) return;
     md.disabled=true;
     const {error}=await SB.from('hd_meeting').delete().eq('id',m.id);
     md.disabled=false;
     if(error) return toast('삭제하지 못했습니다: '+esc(error.message));
-    toast('노트를 삭제했습니다');
+    toast('삭제했습니다');
     SDATA=null; loadSideTree(true);
     go('list');
   };
