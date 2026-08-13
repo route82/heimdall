@@ -240,7 +240,7 @@ mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
 .pick .bd{overflow-y:auto;padding:8px 0}
 .pick .it{display:flex;align-items:center;gap:10px;padding:11px 20px;cursor:pointer;font-size:15px}
 .pick .it:hover,.pick .it.on{background:#F2F7FE}
-.pick .it .dot{width:9px;height:9px;border-radius:9px;flex:none}
+.pick .it .fi{width:14px;height:14px;color:#98A0AC;flex:none}
 .pick .it .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pick .it .cnt{font-size:12px;color:#98A0AC;flex:none}
 .pick .it.cur{font-weight:700;color:#2B6CB0}
@@ -558,7 +558,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v12.5</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v12.7</span>
        <div class="frow">
          <button class="btn" id="out" title="로그아웃">나가기</button>
          <button class="install" id="inst" style="display:none">앱으로 설치</button>
@@ -1468,7 +1468,7 @@ function pickProject(projects, curId, title='프로젝트 고르기'){
       bd.querySelectorAll('.it').forEach(el=>el.onclick=()=>done(rows[+el.dataset.i]));
     };
     const item=(p,i)=>`<div class="it ${p.id===curId?'cur':''}" data-i="${i}">
-      <span class="dot c-${p.color||'blue'}"></span><span class="nm">${esc(p.name)}</span>
+      ${FOLDER_ICO}<span class="nm">${esc(p.name)}</span>
       ${p.meeting_count!=null?`<span class="cnt">${p.meeting_count}건</span>`:''}</div>`;
     const mark=()=>bd.querySelectorAll('.it').forEach((el,i)=>el.classList.toggle('on',i===sel));
     const done=p=>{ close(); pushRecent(p.id); resolve(p.id); };
@@ -1592,7 +1592,7 @@ function drawSideTree(){
       h+=row(1,co,d,'',`${car(k2,pjs.length>0)}${FOLDER_ICO}<span class="stt">${esc(d)}</span>
           <span class="stc">${meetings.filter(m=>mco(m)===co&&mdp(m)===d).length}</span>`);
       if(open2) pjs.forEach(x=>{
-        h+=row(2,co,d,x.id,`<span class="stw"></span><span class="pdot c-${x.color||'blue'}"></span>
+        h+=row(2,co,d,x.id,`<span class="stw"></span>${FOLDER_ICO}
             <span class="stt">${esc(x.name)}</span>
             <span class="stc">${meetings.filter(m=>m.project_id===x.id).length}</span>`);
       });
@@ -1725,7 +1725,7 @@ async function renderProjects(){
                 <div class="tn">
                   <div class="tb${on(c.co,d.dept,x.p.id)}" ${at(c.co,d.dept,x.p.id)} data-lv="pj">
                     <span class="tw"></span>
-                    <span class="pdot c-${x.p.color||'blue'}"></span>
+                    ${FOLDER_ICO}
                     <span class="tt">${esc(x.p.name)}</span><span class="tc">${x.n}</span>
                     ${canMake?`<span class="tops">
                       <button class="pjop" data-ed="${x.p.id}" title="이름·설명 수정">✎</button>
@@ -1742,11 +1742,6 @@ async function renderProjects(){
       <div class="row">
         <input id="pj-name" placeholder="폴더 이름 (예: 에스토니아 법인 설립)" style="flex:2;min-width:220px">
         <input id="pj-desc" placeholder="한 줄 설명 (선택)" style="flex:2;min-width:180px">
-        <div class="swatch" id="pj-color" data-c="blue">
-          ${COLORS.map((c,i)=>`<button type="button" class="sw c-${c}${i?'':' on'}" data-c="${c}"
-            title="${({blue:'파랑',green:'초록',orange:'주황',purple:'보라',red:'빨강',teal:'청록'})[c]}"
-            aria-label="${({blue:'파랑',green:'초록',orange:'주황',purple:'보라',red:'빨강',teal:'청록'})[c]}"></button>`).join('')}
-        </div>
         <button class="btn p" id="pj-add">만들기</button>
       </div>
       <div class="row" style="margin-top:10px;flex-wrap:wrap;gap:6px 14px">
@@ -1799,13 +1794,6 @@ async function renderProjects(){
   el.querySelectorAll('.pj-cos').forEach(c=>c.onchange=drawPjDepts);
   drawPjDepts();
 
-  // ── 색 고르기 (네모를 누르면 그 색으로)
-  el.querySelectorAll('.sw').forEach(b=>b.onclick=()=>{
-    const box=$('#pj-color');
-    box.querySelectorAll('.sw').forEach(x=>x.classList.remove('on'));
-    b.classList.add('on'); box.dataset.c=b.dataset.c;
-  });
-
   // ── 만들기
   const add=$('#pj-add');
   if(add) add.onclick=async()=>{
@@ -1818,7 +1806,7 @@ async function renderProjects(){
     add.disabled=true;
     const {error}=await SB.from('hd_project').insert({
       name, description:$('#pj-desc').value.trim(),
-      color:($('#pj-color')||{dataset:{c:'blue'}}).dataset.c || 'blue',
+      color:'blue',
       company:cosSel[0], companies:cosSel, dept:'', depts:dpsSel,
       created_by:me.id, created_name:me.name});
     add.disabled=false;
