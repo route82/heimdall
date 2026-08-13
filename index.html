@@ -558,7 +558,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v12.11</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v12.12</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 정보·비밀번호">정보 변경</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -781,7 +781,7 @@ function drawMeeting(){
   <div class="row" style="margin-bottom:12px"><button class="btn" id="back">← 목록</button>
     <span class="tag t-${m.status}">${STATUS[m.status]}</span>
     ${m.reported_at?`<span class="sub" style="margin:0">보고 ${m.reported_at.slice(0,10)}</span>`:''}</div>
-  <h1>${esc(m.title)}</h1>
+  <h1 id="mtitle">${esc(m.title)}</h1>
   <div class="sub">${m.source?`<span class="tag" style="background:#FFF0E0;color:#B36B00;margin-right:6px">${esc(m.source)} 사용 회의</span>`:''}${m.held_on} · ${hms(m.duration_sec)} · ${att.length?esc(att.join(', ')):'참석자 미기재'}
     ${(m.company||m.dept)?` · ${esc(m.company||'')} ${esc(m.dept||'')}`:''}
     ${m.visibility==='private'?' · <b style="color:#C2620F">나만 보기</b>':''}</div>
@@ -832,6 +832,8 @@ function drawMeeting(){
           + '<button class="btn g" id="pub">팀에 공개</button>' : ''}
     ${(m.visibility!=='private' && m.source==='플라우드' && ['admin','ceo'].includes(me.role))
         ? '<button class="btn" id="unpub">다시 비공개로</button>' : ''}
+    ${(m.visibility==='private'&&m.owner_id===me.id)
+      ?'<button class="btn" id="mdel" style="color:#C0392B">삭제</button>':''}
     <button class="btn" id="expdoc">워드로 내보내기</button>
     <button class="btn" id="cancel" style="display:none">취소</button>
     <button class="btn p" id="edit">편집</button></div>`;
@@ -841,6 +843,19 @@ function drawMeeting(){
     panes.forEach(p=>p.classList.remove('on'));t.setAttribute('aria-selected','true');panes[i].classList.add('on');
     if(t.textContent.trim()==='마인드맵') drawMindmap(m);});
   $('#back').onclick=()=>go('list');
+
+  // 내 노트(아이디어 노트·지시사항)는 주인이 직접 지울 수 있습니다
+  const md=$('#mdel');
+  if(md) md.onclick=async()=>{
+    if(!confirm('이 노트를 완전히 삭제합니다.\n전사·요약·액션아이템이 모두 지워지고 되돌릴 수 없습니다.\n계속할까요?')) return;
+    md.disabled=true;
+    const {error}=await SB.from('hd_meeting').delete().eq('id',m.id);
+    md.disabled=false;
+    if(error) return toast('삭제하지 못했습니다: '+esc(error.message));
+    toast('노트를 삭제했습니다');
+    SDATA=null; loadSideTree(true);
+    go('list');
+  };
 
   // 개인 노트의 공유 대상 바꾸기 — 사람 · 회사 전체 · 부서
   const sb2=$('#shr');
@@ -1006,6 +1021,7 @@ function startEdit(){
     return toast('경영진께 보고된 회의는 부서 관리자만 수정할 수 있습니다.',5000);
   editing=true;
   el.querySelectorAll('#segs p, .hl h3, .hl li').forEach(e=>{e.contentEditable='true';e.spellcheck=false;});
+  const mt=$('#mtitle'); if(mt){ mt.contentEditable='true'; mt.spellcheck=false; }
   $('#smview').style.display='none';
   const ta=$('#smedit'); ta.style.display='block'; ta.value=cur.m.summary_md||'';
   // 마인드맵 — 그림 대신 글상자를 보여줍니다. # 은 큰 가지, ## 는 작은 가지입니다
@@ -1051,6 +1067,14 @@ async function saveMeeting(){
     const pts=[...h.querySelectorAll('li')].map(li=>li.innerText.trim()).filter(Boolean);
     if(head!==o.headline || JSON.stringify(pts)!==JSON.stringify(o.points))
       await SB.from('hd_highlight').update({headline:head,points:pts}).eq('id',o.id);
+  }
+  const mt2=$('#mtitle');
+  if(mt2){
+    const t=mt2.innerText.trim();
+    if(t && t!==cur.m.title){
+      await SB.from('hd_meeting').update({title:t.slice(0,300)}).eq('id',id);
+      msg.push('제목 수정');
+    }
   }
   const sm=$('#smedit').value;
   if(sm!==(cur.m.summary_md||'')){
