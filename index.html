@@ -558,7 +558,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v12.7</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v12.8</span>
        <div class="frow">
          <button class="btn" id="out" title="로그아웃">나가기</button>
          <button class="install" id="inst" style="display:none">앱으로 설치</button>
@@ -779,7 +779,8 @@ function drawMeeting(){
     <textarea id="smedit" class="full" style="display:none;min-height:520px;font-family:ui-monospace,Menlo,monospace;font-size:13.5px"></textarea></div>
   <div class="pane" id="mmpane">${(m.mindmap_md||'').trim()
     ? '<div class="sub" style="margin-bottom:8px">가지를 누르면 접었다 폈다 할 수 있습니다 · 마우스 휠로 확대</div><svg id="mmv" style="width:100%;height:600px;background:#fff;border:1px solid #E3E6EB;border-radius:12px"></svg>'
-    : '<div class="empty">마인드맵이 없습니다.<br>이 기능이 생기기 전에 만들어진 회의입니다.</div>'}</div>
+    : '<div class="empty">마인드맵이 없습니다.<br>이 기능이 생기기 전에 만들어진 회의입니다.</div>'}
+    <textarea id="mmedit" class="full" style="display:none;min-height:520px;font-family:ui-monospace,Menlo,monospace;font-size:13.5px"></textarea></div>
   <div class="pane">${acts.length? acts.map(a=>`<div class="act ${a.state!=='open'?'done':''}" data-id="${a.id}">
       <input type="checkbox" ${a.state==='done'?'checked':''}>
       <div><div class="task">${esc(a.task)}</div>
@@ -979,6 +980,16 @@ function startEdit(){
   el.querySelectorAll('#segs p, .hl h3, .hl li').forEach(e=>{e.contentEditable='true';e.spellcheck=false;});
   $('#smview').style.display='none';
   const ta=$('#smedit'); ta.style.display='block'; ta.value=cur.m.summary_md||'';
+  // 마인드맵 — 그림 대신 글상자를 보여줍니다. # 은 큰 가지, ## 는 작은 가지입니다
+  const pane=$('#mmpane');
+  if(pane){
+    pane.querySelectorAll('svg,.sub,.empty,.md').forEach(x=>x.style.display='none');
+    let mmta=$('#mmedit');
+    if(!mmta){ mmta=document.createElement('textarea'); mmta.id='mmedit'; mmta.className='full';
+      mmta.style.cssText='min-height:520px;font-family:ui-monospace,Menlo,monospace;font-size:13.5px';
+      pane.appendChild(mmta); }
+    mmta.style.display='block'; mmta.value=cur.m.mindmap_md||'';
+  }
   $('#edit').textContent='저장'; $('#cancel').style.display='';
   toast('편집 중입니다. 글자를 눌러 바로 고치세요.');
 }
@@ -1017,6 +1028,12 @@ async function saveMeeting(){
   if(sm!==(cur.m.summary_md||'')){
     await SB.from('hd_meeting').update({summary_md:sm}).eq('id',id);
     msg.push('요약 수정');
+  }
+  const mmta=$('#mmedit');
+  if(mmta && mmta.value!==(cur.m.mindmap_md||'')){
+    await SB.from('hd_meeting').update({mindmap_md:mmta.value}).eq('id',id);
+    MM_DRAWN=null;                       // 다시 열 때 새로 그립니다
+    msg.push('마인드맵 수정');
   }
   await SB.from('hd_edit').insert({meeting_id:id, editor:me.name, kind:'web',
     detail:{문장:changed.length}});
