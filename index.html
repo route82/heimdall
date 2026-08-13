@@ -598,8 +598,15 @@ function go(v){
 // ─────────────────────────── 홈
 async function renderHome(){
   const el=$('#p-home');
-  const hour=new Date().getHours();
-  const hi = hour<11?'좋은 아침입니다':hour<17?'안녕하세요':'수고 많으셨습니다';
+  // 한국 시간 기준으로 인사를 고릅니다
+  const hour=+new Intl.DateTimeFormat('en-US',
+    {timeZone:'Asia/Seoul', hour:'numeric', hour12:false}).format(new Date());
+  const hi = hour<5  ? '늦은 밤까지 고생 많으시네요'
+           : hour<11 ? '좋은 아침입니다'
+           : hour<14 ? '점심은 맛있게 드셨나요'
+           : hour<18 ? '좋은 오후예요'
+           : hour<22 ? '오늘 하루도 수고 많으셨습니다'
+           : '늦은 밤까지 고생 많으시네요';
   el.innerHTML=`<h1>${hi}, ${esc(me.name)}님</h1>
     <div class="sub">무엇을 하시겠어요?</div>
     <div class="hcards">
@@ -1502,11 +1509,18 @@ async function renderProjects(){
   const el=$('#p-projects'); el.innerHTML='<div class="sub">불러오는 중…</div>';
   const [pj,ms]=await Promise.all([
     SB.from('hd_project_board').select('*').eq('archived',false).order('created_at'),
-    SB.from('hd_meeting').select('id,title,held_on,project_id,company,dept')
+    SB.from('hd_meeting').select('id,title,held_on,project_id,company,dept,visibility,owner_id,source')
       .neq('status','archived')                       // 보관한 회의는 빼고 봅니다
       .order('held_on',{ascending:false})]);
   if(pj.error) return el.innerHTML=`<div class="empty">${esc(pj.error.message)}</div>`;
-  const projects=pj.data||[], meetings=ms.data||[];
+  const projects=pj.data||[];
+  const all=ms.data||[];
+  // 개인 노트는 회사 폴더가 아니라 「내 노트」 폴더로 갑니다
+  const meetings=all.filter(m=>m.visibility!=='private');
+  const myNotes =all.filter(m=>m.visibility==='private' && m.owner_id===me.id);
+  const shNotes =all.filter(m=>m.visibility==='private' && m.owner_id!==me.id);
+  const nkind=m=>m.source==='아이디어 노트'?'idea':m.source==='지시사항'?'order':'etc';
+  const NOTES='내 노트';
   const canMake=['admin','ceo','manager','dev'].includes(me.role);
 
   const pcos=p=>(p.companies&&p.companies.length)?p.companies:(p.company?[p.company]:[PJ_NOCO]);
@@ -1533,7 +1547,14 @@ async function renderProjects(){
   const {co:sc, dept:sd, pid:sp}=PJSEL;
   const curPj=projects.find(x=>x.id===sp);
   let list=[], here='전체';
-  if(sp && curPj){ list=meetings.filter(m=>m.project_id===sp); here=curPj.name; }
+  if(sc===NOTES){
+    list = sd==='idea'  ? myNotes.filter(m=>nkind(m)==='idea')
+         : sd==='order' ? myNotes.filter(m=>nkind(m)==='order')
+         : sd==='shared'? shNotes : myNotes;
+    here = sd==='idea'?'아이디어 노트':sd==='order'?'지시사항'
+         : sd==='shared'?'나에게 공유된 노트':'내 노트';
+  }
+  else if(sp && curPj){ list=meetings.filter(m=>m.project_id===sp); here=curPj.name; }
   else if(sd){ list=meetings.filter(m=>mco(m)===sc&&mdp(m)===sd); here=`${sc} · ${sd}`; }
   else if(sc){ list=meetings.filter(m=>mco(m)===sc); here=sc; }
 
@@ -1545,6 +1566,26 @@ async function renderProjects(){
       고른 폴더 범위의 회의가 아래에 모두 나옵니다</div>
 
     <div class="tree">
+      <div class="tn">
+        <div class="tb${on(NOTES,'','')}" ${at(NOTES,'','')} data-lv="co">
+          <span class="tw" data-tog="${esc(PJ_KEY(NOTES))}">${CARET(PJOPEN.has(PJ_KEY(NOTES)))}</span>
+          ${FOLDER_ICO}<span class="tt">내 노트 <span class="sub"
+            style="margin:0;font-size:12px">나만 보입니다</span></span>
+          <span class="tc">${myNotes.length}</span>
+        </div>
+        ${PJOPEN.has(PJ_KEY(NOTES))?`<div class="tk">
+          <div class="tn"><div class="tb${on(NOTES,'idea','')}" ${at(NOTES,'idea','')} data-lv="dept">
+            <span class="tw"></span>${FOLDER_ICO}<span class="tt">아이디어 노트</span>
+            <span class="tc">${myNotes.filter(m=>nkind(m)==='idea').length}</span></div></div>
+          <div class="tn"><div class="tb${on(NOTES,'order','')}" ${at(NOTES,'order','')} data-lv="dept">
+            <span class="tw"></span>${FOLDER_ICO}<span class="tt">지시사항</span>
+            <span class="tc">${myNotes.filter(m=>nkind(m)==='order').length}</span></div></div>
+          ${shNotes.length?`<div class="tn">
+            <div class="tb${on(NOTES,'shared','')}" ${at(NOTES,'shared','')} data-lv="dept">
+            <span class="tw"></span>${FOLDER_ICO}<span class="tt">나에게 공유된 노트</span>
+            <span class="tc">${shNotes.length}</span></div></div>`:''}
+        </div>`:''}
+      </div>
       ${tree.length?tree.map(c=>{
         const openC=PJOPEN.has(PJ_KEY(c.co));
         return `<div class="tn">
@@ -1575,7 +1616,7 @@ async function renderProjects(){
       }).join(''):'<div class="empty">아직 보이는 회의·프로젝트가 없습니다.</div>'}
     </div>
 
-    ${canMake&&sc?`<div class="box" style="margin-top:18px">
+    ${canMake&&sc&&sc!==NOTES?`<div class="box" style="margin-top:18px">
       <h1 style="font-size:16px;margin-bottom:12px">「${esc(sc)}${sd&&sd!==PJ_NODEPT?' · '+esc(sd):''}」 에 프로젝트 만들기</h1>
       <div class="row">
         <input id="pj-name" placeholder="프로젝트 이름 (예: 에스토니아 법인 설립)" style="flex:2;min-width:220px">
