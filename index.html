@@ -558,6 +558,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v12.4</span>
        <div class="frow">
          <button class="btn" id="out" title="로그아웃">나가기</button>
          <button class="install" id="inst" style="display:none">앱으로 설치</button>
@@ -1527,7 +1528,11 @@ async function loadSideTree(force){
         .eq('archived',false).order('created_at'),
       SB.from('hd_meeting').select('id,project_id,company,dept,visibility,owner_id,source')
         .neq('status','archived')]);
-    if(pj.error||ms.error) return;
+    if(pj.error||ms.error){
+      el.innerHTML='<div style="font-size:11.5px;color:#C0392B;padding:4px 10px">폴더를 못 읽었습니다: '
+        +esc((pj.error||ms.error).message)+'</div>';
+      return;
+    }
     SDATA={projects:pj.data||[], all:ms.data||[]};
   }
   drawSideTree();
