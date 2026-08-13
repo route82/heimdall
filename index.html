@@ -558,7 +558,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v12.12</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v12.13</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 정보·비밀번호">정보 변경</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -794,6 +794,7 @@ function drawMeeting(){
     <button class="tab">전사</button><button class="tab">요약</button>
     <button class="tab">마인드맵</button>
     <button class="tab">액션아이템 ${acts.length?`(${acts.filter(a=>a.state==='open').length})`:''}</button>
+    <button class="btn" id="cpy" style="margin-left:auto;align-self:center;flex:none">전체 복사</button>
   </div>
   <div class="pane on">${hls.length? hls.map((h,i)=>`<div class="hl" data-i="${i}">
       <div class="ts">${hms(h.start_sec)}</div><h3>${esc(h.headline)}</h3>
@@ -843,6 +844,30 @@ function drawMeeting(){
     panes.forEach(p=>p.classList.remove('on'));t.setAttribute('aria-selected','true');panes[i].classList.add('on');
     if(t.textContent.trim()==='마인드맵') drawMindmap(m);});
   $('#back').onclick=()=>go('list');
+
+  // 지금 보고 있는 탭의 글 전체를 복사합니다
+  const cp=$('#cpy');
+  if(cp) cp.onclick=async()=>{
+    const i=tabs.findIndex(t=>t.getAttribute('aria-selected')==='true');
+    let text='';
+    if(i===0)      text=hls.map(h=>`[${hms(h.start_sec)}] ${h.headline}\n`
+                     +(h.points||[]).map(p=>`  - ${p}`).join('\n')).join('\n\n');
+    else if(i===1) text=segs.map(x=>`[${hms(x.start_sec)}]${x.speaker?' '+x.speaker+':':''} ${x.text}`).join('\n');
+    else if(i===2) text=m.summary_md||'';
+    else if(i===3) text=m.mindmap_md||'';
+    else           text=acts.map(a=>`${a.state==='done'?'[완료]':'[진행]'} ${a.task}`
+                     +(a.owner_name?` — ${a.owner_name}`:'')+(a.due?` (${a.due})`:'')).join('\n');
+    text=(text||'').trim();
+    if(!text) return toast('복사할 내용이 없습니다');
+    const head=`${m.title} (${m.held_on})\n\n`;
+    try{ await navigator.clipboard.writeText(head+text); }
+    catch(e){
+      const ta=document.createElement('textarea');
+      ta.value=head+text; document.body.appendChild(ta);
+      ta.select(); document.execCommand('copy'); ta.remove();
+    }
+    toast('복사했습니다. 붙여넣기 하시면 됩니다');
+  };
 
   // 내 노트(아이디어 노트·지시사항)는 주인이 직접 지울 수 있습니다
   const md=$('#mdel');
