@@ -227,7 +227,7 @@ mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
 .pdot.c-purple{background:#6D3FD1}
 .pdot.c-red{background:#C0392B}
 .pdot.c-teal{background:#0E8A8A}
-.tops{opacity:0;flex:none;white-space:nowrap}
+.tops{opacity:.55;flex:none;white-space:nowrap}
 .tb:hover .tops{opacity:1}
 .pjbtn.none{color:#98A0AC}
 .mask{position:fixed;inset:0;background:rgba(20,26,35,.45);z-index:100;
@@ -558,7 +558,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v12.9</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v12.10</span>
        <div class="frow">
          <button class="btn" id="out" title="로그아웃">나가기</button>
          <button class="install" id="inst" style="display:none">앱으로 설치</button>
@@ -1851,35 +1851,23 @@ async function renderProjects(){
     if(!name.trim()) return toast('이름은 비울 수 없습니다');
     const desc=prompt('한 줄 설명 (비워도 됩니다)', p.description||'');
     if(desc===null) return;
-    const upd={name:name.trim(), description:desc.trim()};
-    const cur=(p.companies&&p.companies.length)?p.companies.join(', '):(p.company||'');
-    const cotxt=prompt('함께하는 회사 (쉼표로 구분)\n가능: '+GROUP_COMPANIES.join(', '), cur);
-    if(cotxt===null) return;
-    const cosE=cotxt.split(',').map(x=>x.trim()).filter(Boolean);
-    if(!cosE.length) return toast('회사는 하나 이상 있어야 합니다.');
-    const bad=cosE.filter(c=>!groupCompanies().includes(c));
-    if(bad.length) return toast('없는 회사입니다: '+esc(bad.join(', '))+'<br>가능: '+groupCompanies().join(', '), 7000);
-    upd.company=cosE[0]; upd.companies=cosE;
-    if(me.role==='admin'){
-      const dp=prompt('부서 (비우면 회사 전체 공개)', p.dept||'');
-      if(dp===null) return;
-      upd.dept=dp.trim();
-    }
-    const {error}=await SB.from('hd_project').update(upd).eq('id',p.id);
+    const {error}=await SB.from('hd_project')
+      .update({name:name.trim(), description:desc.trim()}).eq('id',p.id);
     if(error) return toast('수정하지 못했습니다: '+esc(error.message));
-    toast('수정했습니다'); renderProjects();
+    toast('폴더 이름을 바꿨습니다');
+    SDATA=null; loadSideTree(true); renderProjects();
   });
 
   // ── 삭제 — 회의는 지워지지 않고 「분류 안 됨」으로 돌아갑니다
   el.querySelectorAll('[data-del]').forEach(b=>b.onclick=async e=>{
     e.stopPropagation();
     const p=projects.find(x=>x.id===b.dataset.del); if(!p) return;
-    if(!confirm(`「${p.name}」 프로젝트를 삭제합니다.\n\n묶여 있던 회의 ${p.meeting_count}건은 지워지지 않고\n「분류 안 됨」으로 돌아갑니다.`)) return;
+    if(!confirm(`「${p.name}」 폴더를 삭제합니다.\n\n안에 있던 회의 ${p.meeting_count||0}건은 지워지지 않고\n「분류 안 됨」으로 돌아갑니다.`)) return;
     const {error}=await SB.from('hd_project').delete().eq('id',p.id);
     if(error) return toast('삭제하지 못했습니다: '+esc(error.message));
-    toast(`<b>${esc(p.name)}</b> 삭제했습니다`);
+    toast(`<b>${esc(p.name)}</b> 폴더를 삭제했습니다.<br>안에 있던 회의는 「분류 안 됨」으로 돌아갔습니다`);
     if(PJSEL.pid===p.id) PJSEL={co:PJSEL.co, dept:PJSEL.dept, pid:''};
-    renderProjects();
+    SDATA=null; loadSideTree(true); renderProjects();
   });
 
   drawPjList(list, projects, here, !!sc);
