@@ -558,7 +558,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v12.4</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v12.5</span>
        <div class="frow">
          <button class="btn" id="out" title="로그아웃">나가기</button>
          <button class="install" id="inst" style="display:none">앱으로 설치</button>
@@ -1517,6 +1517,13 @@ let PJSEL  = {co:'', dept:'', pid:''};  // 지금 고른 위치
 const PJ_NOCO = '⚠ 소속 없음';
 const PJ_NODEPT = '회사 공용';
 const PJ_KEY = (co, dept) => dept ? co + ' ▸ ' + dept : co;
+// 폴더(프로젝트)가 그 회사에서 놓일 부서들. depts = ["회사|부서", …]
+const PJ_PLACES=(p,co)=>{
+  const ks=(p.depts||[])
+    .map(k=>{const i=k.indexOf('|');return {co:k.slice(0,i),dept:k.slice(i+1)};})
+    .filter(x=>x.co===co&&x.dept);
+  return ks.length? ks.map(x=>x.dept) : [p.dept||PJ_NODEPT];
+};
 
 // ─────────────────────────── 사이드바 폴더 나무
 let SDATA=null;                          // 한 번 읽어두고 다시 씁니다
@@ -1524,7 +1531,7 @@ async function loadSideTree(force){
   const el=$('#stree'); if(!el) return;
   if(!SDATA || force){
     const [pj,ms]=await Promise.all([
-      SB.from('hd_project_board').select('id,name,color,company,companies,dept')
+      SB.from('hd_project_board').select('id,name,color,company,companies,dept,depts')
         .eq('archived',false).order('created_at'),
       SB.from('hd_meeting').select('id,project_id,company,dept,visibility,owner_id,source')
         .neq('status','archived')]);
@@ -1576,12 +1583,12 @@ function drawSideTree(){
   cos.forEach(co=>{
     const k=PJ_KEY(co), open=PJOPEN.has(k);
     const dps=new Set(meetings.filter(m=>mco(m)===co).map(mdp));
-    projects.filter(p=>pcos(p).includes(co)).forEach(p=>dps.add(pdp(p)));
+    projects.filter(p=>pcos(p).includes(co)).forEach(p=>PJ_PLACES(p,co).forEach(d=>dps.add(d)));
     h+=row(0,co,'','',`${car(k,dps.size>0)}${FOLDER_ICO}<span class="stt">${esc(co)}</span>
         <span class="stc">${meetings.filter(m=>mco(m)===co).length}</span>`);
     if(open) [...dps].sort().forEach(d=>{
       const k2=PJ_KEY(co,d), open2=PJOPEN.has(k2);
-      const pjs=projects.filter(p=>pcos(p).includes(co)&&pdp(p)===d);
+      const pjs=projects.filter(p=>pcos(p).includes(co)&&PJ_PLACES(p,co).includes(d));
       h+=row(1,co,d,'',`${car(k2,pjs.length>0)}${FOLDER_ICO}<span class="stt">${esc(d)}</span>
           <span class="stc">${meetings.filter(m=>mco(m)===co&&mdp(m)===d).length}</span>`);
       if(open2) pjs.forEach(x=>{
@@ -1645,11 +1652,11 @@ async function renderProjects(){
   const cos=[...new Set([...meetings.map(mco), ...projects.flatMap(pcos)])].sort();
   const tree=cos.map(co=>{
     const dps=new Set(meetings.filter(m=>mco(m)===co).map(mdp));
-    projects.filter(p=>pcos(p).includes(co)).forEach(p=>dps.add(pdp(p)));
+    projects.filter(p=>pcos(p).includes(co)).forEach(p=>PJ_PLACES(p,co).forEach(x=>dps.add(x)));
     return {co, n:meetings.filter(m=>mco(m)===co).length,
       depts:[...dps].sort().map(d=>({dept:d,
         n:meetings.filter(m=>mco(m)===co&&mdp(m)===d).length,
-        pjs:projects.filter(p=>pcos(p).includes(co)&&pdp(p)===d)
+        pjs:projects.filter(p=>pcos(p).includes(co)&&PJ_PLACES(p,co).includes(d))
           .map(p=>({p, n:meetings.filter(m=>m.project_id===p.id).length}))}))};
   });
 
@@ -1731,9 +1738,9 @@ async function renderProjects(){
     </div>
 
     ${canMake&&sc&&sc!==NOTES?`<div class="box" style="margin-top:18px">
-      <h1 style="font-size:16px;margin-bottom:12px">「${esc(sc)}${sd&&sd!==PJ_NODEPT?' · '+esc(sd):''}」 에 프로젝트 만들기</h1>
+      <h1 style="font-size:16px;margin-bottom:12px">「${esc(sc)}${sd&&sd!==PJ_NODEPT?' · '+esc(sd):''}」 에 폴더 만들기</h1>
       <div class="row">
-        <input id="pj-name" placeholder="프로젝트 이름 (예: 에스토니아 법인 설립)" style="flex:2;min-width:220px">
+        <input id="pj-name" placeholder="폴더 이름 (예: 에스토니아 법인 설립)" style="flex:2;min-width:220px">
         <input id="pj-desc" placeholder="한 줄 설명 (선택)" style="flex:2;min-width:180px">
         <div class="swatch" id="pj-color" data-c="blue">
           ${COLORS.map((c,i)=>`<button type="button" class="sw c-${c}${i?'':' on'}" data-c="${c}"
@@ -1749,11 +1756,9 @@ async function renderProjects(){
             ${c===sc?'checked':''}
             ${c===sc&&me.role!=='admin'?'disabled':''}> ${c}</label>`).join('')}
       </div>
-      ${me.role==='admin'?`<div class="row" style="margin-top:8px">
-        <input id="pj-dp" placeholder="부서 (비우면 회사 전체 공개)"
-          value="${esc(sd===PJ_NODEPT?'':(sd||''))}" style="flex:1;min-width:140px;max-width:260px">
-      </div>`:''}
-      <div class="sub" style="margin:8px 0 0">체크한 회사의 구성원에게 보입니다. 여러 회사가 함께하면 모두 체크하세요</div>
+      <div id="pj-depts"></div>
+      <div class="sub" style="margin:8px 0 0">체크한 회사의 구성원에게 보입니다. 여러 회사가 함께하면 모두 체크하세요.<br>
+        부서를 체크하면 그 부서 폴더 아래에 놓이고, 체크하지 않으면 「회사 공용」 에 놓입니다</div>
     </div>`:''}
 
     <div id="pjlist" style="margin-top:22px"></div>`;
@@ -1776,6 +1781,24 @@ async function renderProjects(){
     renderProjects();
   });
 
+  // ── 회사를 체크하면 그 회사 부서들이 (어제 확정한 명부에서) 나옵니다
+  function drawPjDepts(){
+    const box=$('#pj-depts'); if(!box) return;
+    const cosSel=[...el.querySelectorAll('.pj-cos:checked')].map(x=>x.value);
+    const keep=new Set([...box.querySelectorAll('.pj-dp:checked')].map(x=>x.value));
+    box.innerHTML = cosSel.map(co=>{
+      const ds=deptsOf(co); if(!ds.length) return '';
+      return `<div class="row" style="margin-top:8px;flex-wrap:wrap;gap:6px 14px">
+        <span style="font-size:13px;color:#5C6672;min-width:96px">${esc(co)} 부서</span>
+        ${ds.map(d=>{const v=co+'|'+d;
+          return `<label style="display:flex;align-items:center;gap:5px;font-size:13.5px">
+            <input type="checkbox" class="pj-dp" value="${esc(v)}"
+              ${keep.has(v)||(co===sc&&d===sd)?'checked':''}> ${esc(d)}</label>`;}).join('')}
+      </div>`;}).join('');
+  }
+  el.querySelectorAll('.pj-cos').forEach(c=>c.onchange=drawPjDepts);
+  drawPjDepts();
+
   // ── 색 고르기 (네모를 누르면 그 색으로)
   el.querySelectorAll('.sw').forEach(b=>b.onclick=()=>{
     const box=$('#pj-color');
@@ -1791,19 +1814,20 @@ async function renderProjects(){
     let cosSel=[...el.querySelectorAll('.pj-cos:checked')].map(x=>x.value);
     if(me.role!=='admin' && me.company && !cosSel.includes(me.company)) cosSel.unshift(me.company);
     if(!cosSel.length) return toast('함께하는 회사를 하나 이상 체크해주세요.');
-    const dp = me.role==='admin'
-      ? ((($('#pj-dp')||{value:''}).value)||'').trim()
-      : (me.dept||'');
+    const dpsSel=[...el.querySelectorAll('.pj-dp:checked')].map(x=>x.value);
     add.disabled=true;
     const {error}=await SB.from('hd_project').insert({
       name, description:$('#pj-desc').value.trim(),
       color:($('#pj-color')||{dataset:{c:'blue'}}).dataset.c || 'blue',
-      company:cosSel[0], companies:cosSel, dept:dp, created_by:me.id, created_name:me.name});
+      company:cosSel[0], companies:cosSel, dept:'', depts:dpsSel,
+      created_by:me.id, created_name:me.name});
     add.disabled=false;
     if(error) return toast('만들지 못했습니다: '+esc(error.message));
     toast(`<b>${esc(name)}</b> 만들었습니다`);
     PJOPEN.add(PJ_KEY(cosSel[0]));
-    PJOPEN.add(PJ_KEY(cosSel[0], dp||PJ_NODEPT));
+    const first=dpsSel.find(v=>v.startsWith(cosSel[0]+'|'));
+    PJOPEN.add(PJ_KEY(cosSel[0], first?first.split('|')[1]:PJ_NODEPT));
+    SDATA=null; loadSideTree(true);
     renderProjects();
   };
 
@@ -1811,7 +1835,7 @@ async function renderProjects(){
   el.querySelectorAll('[data-ed]').forEach(b=>b.onclick=async e=>{
     e.stopPropagation();
     const p=projects.find(x=>x.id===b.dataset.ed); if(!p) return;
-    const name=prompt('프로젝트 이름', p.name);
+    const name=prompt('폴더 이름', p.name);
     if(name===null) return;
     if(!name.trim()) return toast('이름은 비울 수 없습니다');
     const desc=prompt('한 줄 설명 (비워도 됩니다)', p.description||'');
@@ -1861,7 +1885,7 @@ function drawPjList(list, projects, here, picked){
   const pjName=id=>{const p=projects.find(x=>x.id===id); return p?p.name:'분류 안 됨';};
 
   box.innerHTML=`<h1 style="font-size:18px">${esc(here)} · 회의 ${list.length}건</h1>
-    <div class="sub">오른쪽 이름을 누르면 그 회의를 다른 프로젝트로 옮깁니다
+    <div class="sub">오른쪽 이름을 누르면 그 회의를 다른 폴더로 옮깁니다
       ${['admin','ceo','manager','dev'].includes(me.role)?'':'<br>참석하신 회의만 옮기실 수 있습니다'}</div>
     ${list.length?`<div class="box" style="padding:14px 16px;margin-bottom:12px">
       <div class="row">
