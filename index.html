@@ -558,7 +558,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v12.14</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v12.15</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 정보·비밀번호">정보 변경</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -1289,7 +1289,10 @@ async function renderMembers(){
             </select></div>
           <label class="meta" style="display:flex;align-items:center;gap:7px;margin-top:6px;cursor:pointer">
             <input type="checkbox" class="alld" data-id="${m.id}" ${m.all_dept?'checked':''}
-              style="width:16px;height:16px;margin:0"> 회사 전체 회의 열람 (부서 무관)</label></div>
+              style="width:16px;height:16px;margin:0"> 회사 전체 회의 열람 (부서 무관)</label>
+          ${(m.extra_scopes||[]).length?`<div class="meta" style="margin-top:5px">
+            <span class="tag" style="background:#EAF2FD;color:#2B6CB0;margin-right:4px">겸직</span>
+            ${m.extra_scopes.map(x=>esc(x.endsWith('|')?x.slice(0,-1)+' 전체':x.replace('|',' '))).join(' · ')}</div>`:''}</div>
         <div class="row"><button class="btn det" data-id="${m.id}">상세</button>${sel(m)}<button class="btn sv" data-id="${m.id}">저장</button></div></div>`).join('')}</div>`;
 
   bindOrgSelects('iv-co','iv-dept','');
