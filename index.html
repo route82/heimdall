@@ -155,6 +155,19 @@ mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
 .msg.wait{color:#5C6672;background:#F2F4F7;border:0}
 .ask{display:flex;gap:8px;position:sticky;bottom:0;background:#F5F6F8;padding:10px 0 4px}
 .ask textarea{flex:1;resize:none;min-height:46px;max-height:120px;font-size:15px}
+.stree{margin:1px 0 3px}
+.st{display:flex;align-items:center;gap:6px;width:100%;border:0;background:none;text-align:left;
+ font-family:inherit;font-size:13px;color:#4A5464;padding:5px 8px;border-radius:8px;cursor:pointer;line-height:1.4}
+.st:hover{background:#F2F5F9}
+.st.sel{background:#EAF2FD;color:#2B6CB0;font-weight:600}
+.st .fi{width:14px;height:14px;flex:none;color:#98A0AC}
+.st.sel .fi{color:#2B6CB0}
+.st .cr{width:12px;height:12px;flex:none;color:#98A0AC;transition:transform .12s}
+.st .cr.o{transform:rotate(90deg)}
+.st .stw{width:14px;flex:none;display:flex;align-items:center;justify-content:center}
+.st .stt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.st .stc{font-size:11px;color:#98A0AC;flex:none}
+.st .pdot{width:9px;height:9px;border-radius:3px;flex:none}
 .hcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:13px;margin:18px 0 26px}
 .hcard{background:#fff;border:1px solid #E6EAF0;border-radius:14px;padding:22px 20px;cursor:pointer;
  text-align:left;font-family:inherit;transition:box-shadow .15s,border-color .15s}
@@ -570,6 +583,10 @@ function shell(){
        <div class="page" id="p-meeting"></div>
      </div>
    </div>`;
+
+  // 「폴더」 메뉴 밑에 폴더 나무를 바로 보여줍니다 (플라우드처럼)
+  const pnav=document.querySelector('.nav[data-v="projects"]');
+  if(pnav){ pnav.insertAdjacentHTML('afterend','<div class="stree" id="stree"></div>'); loadSideTree(); }
 
   const closeNav=()=>document.body.classList.remove('snav');
   document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>{ go(b.dataset.v); closeNav(); });
@@ -1500,6 +1517,98 @@ const PJ_NOCO = '⚠ 소속 없음';
 const PJ_NODEPT = '회사 공용';
 const PJ_KEY = (co, dept) => dept ? co + ' ▸ ' + dept : co;
 
+// ─────────────────────────── 사이드바 폴더 나무
+let SDATA=null;                          // 한 번 읽어두고 다시 씁니다
+async function loadSideTree(force){
+  const el=$('#stree'); if(!el) return;
+  if(!SDATA || force){
+    const [pj,ms]=await Promise.all([
+      SB.from('hd_project_board').select('id,name,color,company,companies,dept')
+        .eq('archived',false).order('created_at'),
+      SB.from('hd_meeting').select('id,project_id,company,dept,visibility,owner_id,source')
+        .neq('status','archived')]);
+    if(pj.error||ms.error) return;
+    SDATA={projects:pj.data||[], all:ms.data||[]};
+  }
+  drawSideTree();
+}
+
+function drawSideTree(){
+  const el=$('#stree'); if(!el||!SDATA) return;
+  const {projects}=SDATA;
+  const meetings=SDATA.all.filter(m=>m.visibility!=='private');
+  const myNotes =SDATA.all.filter(m=>m.visibility==='private' && m.owner_id===me.id);
+  const shNotes =SDATA.all.filter(m=>m.visibility==='private' && m.owner_id!==me.id);
+  const nkind=m=>m.source==='아이디어 노트'?'idea':m.source==='지시사항'?'order':'etc';
+  const NOTES='내 노트';
+  const pcos=p=>(p.companies&&p.companies.length)?p.companies:(p.company?[p.company]:[PJ_NOCO]);
+  const pdp=p=>p.dept||PJ_NODEPT;
+  const mco=m=>m.company||PJ_NOCO, mdp=m=>m.dept||PJ_NODEPT;
+  const cos=[...new Set([...meetings.map(mco), ...projects.flatMap(pcos)])].sort();
+
+  const {co:sc, dept:sd, pid:sp}=PJSEL;
+  const onSel=(c,d,p)=>((view==='projects')&&(sc===c)&&((sd||'')===(d||''))&&((sp||'')===(p||'')))?' sel':'';
+  const row=(lv,c,d,p,inner)=>`<button class="st${onSel(c,d,p)}" data-lv="${lv}"
+    data-co="${esc(c)}" data-dept="${esc(d||'')}" data-pid="${p||''}"
+    style="padding-left:${8+lv*14}px">${inner}</button>`;
+  const car=(k,kids)=>`<span class="stw" data-tog="${esc(k)}">${kids?CARET(PJOPEN.has(k)):''}</span>`;
+
+  let h='';
+  // 내 노트
+  const nk=PJ_KEY(NOTES), nOpen=PJOPEN.has(nk);
+  h+=row(0,NOTES,'','',`${car(nk,true)}${FOLDER_ICO}<span class="stt">내 노트</span>
+      <span class="stc">${myNotes.length}</span>`);
+  if(nOpen){
+    h+=row(1,NOTES,'idea','',`<span class="stw"></span>${FOLDER_ICO}<span class="stt">아이디어 노트</span>
+        <span class="stc">${myNotes.filter(m=>nkind(m)==='idea').length}</span>`);
+    h+=row(1,NOTES,'order','',`<span class="stw"></span>${FOLDER_ICO}<span class="stt">지시사항</span>
+        <span class="stc">${myNotes.filter(m=>nkind(m)==='order').length}</span>`);
+    if(shNotes.length)
+      h+=row(1,NOTES,'shared','',`<span class="stw"></span>${FOLDER_ICO}<span class="stt">공유받은 노트</span>
+          <span class="stc">${shNotes.length}</span>`);
+  }
+  // 회사 ▸ 부서 ▸ 프로젝트
+  cos.forEach(co=>{
+    const k=PJ_KEY(co), open=PJOPEN.has(k);
+    const dps=new Set(meetings.filter(m=>mco(m)===co).map(mdp));
+    projects.filter(p=>pcos(p).includes(co)).forEach(p=>dps.add(pdp(p)));
+    h+=row(0,co,'','',`${car(k,dps.size>0)}${FOLDER_ICO}<span class="stt">${esc(co)}</span>
+        <span class="stc">${meetings.filter(m=>mco(m)===co).length}</span>`);
+    if(open) [...dps].sort().forEach(d=>{
+      const k2=PJ_KEY(co,d), open2=PJOPEN.has(k2);
+      const pjs=projects.filter(p=>pcos(p).includes(co)&&pdp(p)===d);
+      h+=row(1,co,d,'',`${car(k2,pjs.length>0)}${FOLDER_ICO}<span class="stt">${esc(d)}</span>
+          <span class="stc">${meetings.filter(m=>mco(m)===co&&mdp(m)===d).length}</span>`);
+      if(open2) pjs.forEach(x=>{
+        h+=row(2,co,d,x.id,`<span class="stw"></span><span class="pdot c-${x.color||'blue'}"></span>
+            <span class="stt">${esc(x.name)}</span>
+            <span class="stc">${meetings.filter(m=>m.project_id===x.id).length}</span>`);
+      });
+    });
+  });
+  el.innerHTML=h;
+
+  // ▸ 펼치기·접기
+  el.querySelectorAll('[data-tog]').forEach(w=>w.onclick=e=>{
+    e.stopPropagation();
+    const k=w.dataset.tog;
+    PJOPEN.has(k)?PJOPEN.delete(k):PJOPEN.add(k);
+    drawSideTree();
+    if(view==='projects') renderProjects();
+  });
+  // 이름을 누르면 그 폴더의 회의록을 보여줍니다
+  el.querySelectorAll('.st').forEach(b=>b.onclick=e=>{
+    if(e.target.closest('[data-tog]')) return;
+    const co=b.dataset.co, dept=b.dataset.dept, pid=b.dataset.pid;
+    PJSEL={co, dept, pid};
+    PJOPEN.add(PJ_KEY(co));
+    if(dept && co!=='내 노트') PJOPEN.add(PJ_KEY(co,dept));
+    document.body.classList.remove('snav');
+    go('projects');           // 화면을 먼저 바꾸고
+    drawSideTree();           // 나무의 선택 표시를 맞춥니다
+  });
+}
+
 const CARET = o => `<svg class="cr${o?' o':''}" viewBox="0 0 24 24" fill="none" stroke="currentColor"
   stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>`;
 const FOLDER_ICO = `<svg class="fi" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -1734,6 +1843,7 @@ async function renderProjects(){
   });
 
   drawPjList(list, projects, here, !!sc);
+  drawSideTree();             // 사이드바 나무도 같은 상태로 맞춥니다
 }
 
 // 고른 폴더의 회의 목록 — 체크해서 한꺼번에 프로젝트로 옮길 수 있습니다
