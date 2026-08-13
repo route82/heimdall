@@ -159,6 +159,7 @@ mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
 .chip{appearance:none;border:1px solid #DDE2E9;background:#fff;border-radius:20px;
  padding:7px 13px;font-size:13px;color:#3A424F;cursor:pointer;font-family:inherit}
 .chip:hover{border-color:#2B6CB0;color:#2B6CB0}
+.chip.on{background:#2B6CB0;border-color:#2B6CB0;color:#fff;font-weight:600}
 .pj{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:11px}
 .pjc{background:#fff;border:1px solid #E6EAF0;border-radius:12px;padding:16px 18px;cursor:pointer}
 .pjop{border:none;background:none;color:#98A0AC;font-size:15px;cursor:pointer;padding:2px 5px;border-radius:6px}
@@ -506,9 +507,11 @@ const svgIco = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
 
 function shell(){
   // 사이드바는 묶음으로 보여줍니다 — 자주 쓰는 것 → 정리 → 관리 순
+  // 「쓰기 → 보기 → 물어보기」 순서. 하는 일 기준으로 묶습니다.
   const groups = [
-    ['', [['list','회의'],['rec','녹음'],['chat','물어보기']]],
-    ['정리', [['projects','프로젝트'],['upload','업로드'],['search','검색'],['actions','액션아이템']]],
+    ['쓰기',   [['rec','녹음'],['upload','업로드']]],
+    ['보기',   [['list','회의록'],['projects','폴더'],['actions','액션아이템']]],
+    ['물어보기',[['chat','물어보기'],['search','검색']]],
   ];
   const admin = [];
   if(['admin','ceo','dev'].includes(me.role)) admin.push(['brief','브리핑']);
@@ -586,40 +589,57 @@ async function renderList(){
   const el=$('#p-list'); el.innerHTML='<div class="sub">불러오는 중…</div>';
   const showArch = sessionStorage.getItem('hd_show_arch')==='1';
   let q = SB.from('hd_meeting')
-      .select('id,title,held_on,status,duration_sec,company,dept,summary_md,project_id,source')
+      .select('id,title,held_on,status,duration_sec,company,dept,summary_md,'
+              + 'project_id,source,visibility,owner_id')
       .order('held_on',{ascending:false}).limit(200);
   if(!showArch) q = q.neq('status','archived');
-  const [mres, pres] = await Promise.all([q,
-    SB.from('hd_project').select('id,name,color')]);
+  const [mres, pres, att] = await Promise.all([q,
+    SB.from('hd_project').select('id,name,color'),
+    SB.from('hd_attendee').select('meeting_id').eq('member_id', me.id)]);
   const {data,error} = mres;
   if(error) return el.innerHTML=`<div class="empty">${esc(error.message)}</div>`;
   const PJ = Object.fromEntries((pres.data||[]).map(p=>[p.id,p]));
   const canArch = ['admin','ceo','exec'].includes(me.role);
+  const mfil = sessionStorage.getItem('hd_mfil') || 'all';
   let locked = 0;
   if(me.role==='dev'){
     const {data:lc} = await SB.rpc('hd_locked_count');
     locked = lc||0;
   }
-  el.innerHTML = `<h1>회의</h1><div class="sub">${data.length}건 · ${ROLE[me.role]} 권한으로 보이는 것만 표시됩니다
+  // 보기 범위 — 전체 / 내가 들어간 회의 / 나만 보는 노트
+  const mine = new Set((att.data||[]).map(a=>a.meeting_id));
+  const pick = m => mfil==='note' ? m.visibility==='private'
+              : mfil==='mine' ? (mine.has(m.id) || m.owner_id===me.id)
+              : true;
+  const shown = data.filter(pick);
+  const FILS = [['all','전체'],['mine','내 회의'],['note','내 노트']];
+
+  el.innerHTML = `<h1>회의록</h1><div class="sub">${shown.length}건 · ${ROLE[me.role]} 권한으로 보이는 것만 표시됩니다
     ${canArch?`<label style="margin-left:12px;cursor:pointer"><input type="checkbox" id="sharch"
-      ${showArch?'checked':''} style="width:14px;height:14px;vertical-align:-2px"> 보관된 회의 보기</label>`:''}</div>`
+      ${showArch?'checked':''} style="width:14px;height:14px;vertical-align:-2px"> 보관된 회의 보기</label>`:''}</div>
+    <div class="chips" style="margin:0 0 14px">
+      ${FILS.map(([k,l])=>`<button class="chip${mfil===k?' on':''}" data-fil="${k}">${l}</button>`).join('')}
+    </div>`
    + (locked?`<div class="card locked"><div class="ct">■■■■■■■■■■</div>
         <div class="cm"><span class="tag" style="background:#EEF1F5;color:#5B6472">열람 권한 없음</span>
           <span>그룹 · 전사 경영진 회의 ${locked}건</span>
           <span>개발자 권한으로는 열 수 없습니다</span></div></div>`:'')
-   + (data.length? data.map(m=>`<div class="card" data-id="${m.id}">
+   + (shown.length? shown.map(m=>`<div class="card" data-id="${m.id}">
         <div class="ct">${esc(m.title)}</div>
         <div class="cm"><span class="tag t-${m.status}">${STATUS[m.status]}</span>
           ${m.source?`<span class="tag" style="background:#FFF0E0;color:#B36B00">${esc(m.source)}</span>`:''}
           ${PJ[m.project_id]?`<span class="tag" style="background:#EEF2F7;color:#3A424F">${esc(PJ[m.project_id].name)}</span>`:''}
           <span>${m.held_on}</span>${m.duration_sec?`<span>${hms(m.duration_sec)}</span>`:''}
           ${m.company?`<span>${esc(m.company)}${m.dept?' '+esc(m.dept):''}</span>`:''}
+          ${m.visibility==='private'?'<span style="color:#C2620F">나만 보기</span>':''}
           ${m.summary_md?'':'<span>요약 없음</span>'}</div></div>`).join('')
      : '<div class="empty">아직 올라온 회의가 없습니다.<br><br>대표님 맥에서 <b>./heimdall push</b> 를 실행하세요.</div>');
   el.querySelectorAll('.card').forEach(c=>c.onclick=()=>{
     if(c.classList.contains('locked'))
       return toast('전사 경영진 회의는 개발자 권한으로 열 수 없습니다.');
     openMeeting(c.dataset.id);});
+  el.querySelectorAll('[data-fil]').forEach(b=>b.onclick=()=>{
+    sessionStorage.setItem('hd_mfil', b.dataset.fil); renderList();});
   const sa=$('#sharch');
   if(sa) sa.onchange=()=>{sessionStorage.setItem('hd_show_arch', sa.checked?'1':'0'); renderList();};
 }
@@ -699,7 +719,8 @@ function drawMeeting(){
     ${canReport && m.status!=='reported' ? '<button class="btn g" id="rep">경영진 보고</button>':''}
     ${canReport && m.status==='reported' ? '<button class="btn" id="unrep">보고 취소</button>':''}
     ${(m.visibility==='private' && m.owner_id===me.id)
-        ? '<button class="btn g" id="pub">팀에 공개</button>' : ''}
+        ? '<button class="btn" id="shr">공유 대상 바꾸기</button>'
+          + '<button class="btn g" id="pub">팀에 공개</button>' : ''}
     ${(m.visibility!=='private' && m.source==='플라우드' && ['admin','ceo'].includes(me.role))
         ? '<button class="btn" id="unpub">다시 비공개로</button>' : ''}
     <button class="btn" id="expdoc">워드로 내보내기</button>
@@ -711,6 +732,75 @@ function drawMeeting(){
     panes.forEach(p=>p.classList.remove('on'));t.setAttribute('aria-selected','true');panes[i].classList.add('on');
     if(t.textContent.trim()==='마인드맵') drawMindmap(m);});
   $('#back').onclick=()=>go('list');
+
+  // 개인 노트의 공유 대상 바꾸기 — 사람 · 회사 전체 · 부서
+  const sb2=$('#shr');
+  if(sb2) sb2.onclick=async()=>{
+    let box=$('#shrbox');
+    if(box){ box.remove(); return; }
+    box=document.createElement('div');
+    box.id='shrbox'; box.className='box';
+    box.style.cssText='margin:14px 0;max-height:340px;overflow:auto';
+    box.innerHTML='<div class="sub" style="margin:0">불러오는 중…</div>';
+    $('#p-meeting').querySelector('.tabs').before(box);
+
+    const [mem, shr] = await Promise.all([
+      SB.from('hd_member').select('id,name,company,dept')
+        .eq('approved',true).neq('id',me.id).order('name'),
+      SB.from('hd_meeting_share').select('member_id').eq('meeting_id', m.id)]);
+    const people=mem.data||[];
+    const has=new Set((shr.data||[]).map(x=>x.member_id));
+    const cos=[...new Set(people.map(x=>x.company).concat([me.company]).filter(Boolean))].sort();
+    const dps=[...new Set(people.concat([me]).filter(x=>x.company&&x.dept)
+                .map(x=>x.company+'|'+x.dept))].sort();
+    const hc=new Set(m.share_companies||[]), hd=new Set(m.share_depts||[]);
+
+    box.innerHTML=`
+      <div class="sub" style="margin:0 0 8px">아무것도 체크하지 않으면 <b>나만</b> 볼 수 있습니다</div>
+      <div class="shsec">사람</div>
+      <div class="row" style="flex-wrap:wrap;gap:6px 16px">
+        ${people.map(x=>`<label class="shlb"><input type="checkbox" class="sp" value="${x.id}"
+          ${has.has(x.id)?'checked':''}> ${esc(x.name)}
+          <span class="sub" style="margin:0;font-size:11.5px">${esc(x.company||'')}</span></label>`).join('')
+          || '구성원이 없습니다'}
+      </div>
+      <div class="shsec">회사 전체</div>
+      <div class="row" style="flex-wrap:wrap;gap:6px 16px">
+        ${cos.map(c=>`<label class="shlb"><input type="checkbox" class="sc" value="${esc(c)}"
+          ${hc.has(c)?'checked':''}> ${esc(c)} 전체</label>`).join('')}
+      </div>
+      <div class="shsec">부서</div>
+      <div class="row" style="flex-wrap:wrap;gap:6px 16px">
+        ${dps.map(k=>{const [c,d]=k.split('|');
+          return `<label class="shlb"><input type="checkbox" class="sd" value="${esc(k)}"
+            ${hd.has(k)?'checked':''}> ${esc(d)}
+            <span class="sub" style="margin:0;font-size:11.5px">${esc(c)}</span></label>`;}).join('')}
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn p" id="shrsave">저장</button>
+        <button class="btn" id="shrclose">닫기</button>
+        <span class="sub" style="margin:0">저장하면 체크한 대상에게만 보입니다</span>
+      </div>`;
+
+    $('#shrclose').onclick=()=>box.remove();
+    $('#shrsave').onclick=async()=>{
+      const ids=[...box.querySelectorAll('.sp:checked')].map(x=>x.value);
+      const co =[...box.querySelectorAll('.sc:checked')].map(x=>x.value);
+      const dp =[...box.querySelectorAll('.sd:checked')].map(x=>x.value);
+      const btn=$('#shrsave'); btn.disabled=true;
+      const up=await SB.from('hd_meeting')
+        .update({share_companies:co, share_depts:dp}).eq('id',m.id);
+      if(up.error){ btn.disabled=false; return toast('저장하지 못했습니다: '+esc(up.error.message)); }
+      await SB.from('hd_meeting_share').delete().eq('meeting_id', m.id);
+      if(ids.length)
+        await SB.from('hd_meeting_share')
+          .insert(ids.map(i=>({meeting_id:m.id, member_id:i})));
+      const n=ids.length+co.length+dp.length;
+      toast(n? `${ids.length}명 · ${co.length}개 회사 · ${dp.length}개 부서에 공유했습니다`
+             : '공유를 모두 해제했습니다 (나만 보기)');
+      openMeeting(m.id);
+    };
+  };
 
   // 개인 노트를 팀에 공개 / 되돌리기
   const pb=$('#pub');
@@ -1395,8 +1485,8 @@ async function renderProjects(){
   const at=(c,d,p)=>`data-co="${esc(c)}" data-dept="${esc(d||'')}" data-pid="${p||''}"`;
   const on=(c,d,p)=>((sc===c)&&((sd||'')===(d||''))&&((sp||'')===(p||'')))?' sel':'';
 
-  el.innerHTML=`<h1>프로젝트</h1>
-    <div class="sub">회사 ▸ 부서 ▸ 프로젝트 순으로 폴더를 펼쳐보세요.
+  el.innerHTML=`<h1>폴더</h1>
+    <div class="sub">회사 ▸ 부서 ▸ 프로젝트 순으로 펼쳐보세요.
       고른 폴더 범위의 회의가 아래에 모두 나옵니다</div>
 
     <div class="tree">
@@ -1993,12 +2083,21 @@ function renderGuide(){
   <div class="sub">헤임달을 처음 쓰시는 분을 위한 한 장 안내입니다</div>
 
   <div class="box">
+    <h1 style="font-size:17px;margin-bottom:10px">0. 왼쪽 메뉴 보는 법</h1>
+    <div class="md"><ul>
+      <li><b>쓰기</b> — 녹음, 업로드. 자료를 넣는 곳입니다</li>
+      <li><b>보기</b> — 회의록, 폴더, 액션아이템. 들어온 것을 보는 곳입니다</li>
+      <li><b>물어보기</b> — 챗봇에게 묻거나, 단어로 검색합니다</li>
+    </ul></div>
+  </div>
+
+  <div class="box">
     <h1 style="font-size:17px;margin-bottom:10px">1. 회의를 녹음하려면</h1>
     <div class="md"><ol>
       <li><b>녹음</b> 탭 → 회의명을 적습니다 (참석자는 선택)</li>
       <li><b>● 회의 녹음 시작</b> → 마이크 허용 창이 뜨면 <b>허용</b></li>
       <li>회의가 끝나면 <b>■ 녹음 종료</b> — 자동으로 올라갑니다</li>
-      <li>몇 분 뒤 <b>회의</b> 탭에 회의록이 나타납니다</li>
+      <li>몇 분 뒤 <b>회의록</b> 탭에 나타납니다</li>
     </ol>
     <p>녹음 중에는 화면이 꺼지지 않게 잡아둡니다. 휴대폰으로 녹음하실 때는
        다른 앱으로 나가지 마세요 — 녹음이 멈출 수 있습니다.</p></div>
@@ -2009,6 +2108,10 @@ function renderGuide(){
     <div class="md">
       <p>녹음 탭에서 종류를 <b>아이디어 노트</b> 또는 <b>지시사항</b>으로 고르면
          나만 볼 수 있습니다. 관리자도 볼 수 없습니다.</p>
+      <p>나중에 마음이 바뀌면, 그 회의록을 열어 <b>공유 대상 바꾸기</b>로
+         사람·회사·부서를 골라 공유할 수 있습니다. 팀 전체에 열려면
+         <b>팀에 공개</b>를 누르시면 됩니다.</p>
+      <p>회의록 탭 위의 <b>내 노트</b>를 누르면 내 노트만 모아 볼 수 있습니다.</p>
       <p>특정 사람에게만 보여주고 싶으면 <b>공유 대상 선택</b>에서 체크하세요.</p>
     </div>
   </div>
