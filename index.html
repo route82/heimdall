@@ -558,7 +558,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v12.13</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v12.14</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 정보·비밀번호">정보 변경</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -1346,10 +1346,26 @@ async function renderMembers(){
     box.innerHTML=`
       <div class="sub" style="margin:0 0 10px">
         로그인 아이디 <b>${esc(m.email)}</b> · 권한 <b>${ROLE[m.role]||m.role}</b>
-        · 소속 ${esc(m.company||'')} ${esc(m.dept||'')}</div>
+        · 본 소속 ${esc(m.company||'')} ${esc(m.dept||'')}
+        ${(m.extra_scopes||[]).length?` · 겸직 ${(m.extra_scopes||[]).map(x=>esc(x.replace('|',' ').trim())).join(', ')}`:''}</div>
       <div class="row" style="margin-bottom:14px;flex-wrap:wrap">
         <button class="btn" id="mdet-pw">비밀번호 재설정 (임시 비밀번호 발급)</button>
         <span class="sub" style="margin:0;white-space:pre-line" id="mdet-out"></span></div>
+      <div class="shsec">겸직 소속 — 본 소속(급여 회사)은 위에서, 겸직은 여기서 관리합니다</div>
+      <div style="margin-top:8px">
+        ${COMPANIES.filter(c=>c!==m.company).map(co=>`
+          <div class="row" style="flex-wrap:wrap;gap:6px 14px;margin-top:6px">
+            <span style="font-size:13px;color:#5C6672;min-width:96px">${esc(co)}</span>
+            <label class="shlb"><input type="checkbox" class="mxs" value="${esc(co)}|"
+              ${(m.extra_scopes||[]).includes(co+'|')?'checked':''}> <b>회사 전체</b></label>
+            ${deptsOf(co).map(d=>{const v=co+'|'+d;
+              return `<label class="shlb"><input type="checkbox" class="mxs" value="${esc(v)}"
+                ${(m.extra_scopes||[]).includes(v)?'checked':''}> ${esc(d)}</label>`;}).join('')}
+          </div>`).join('')}
+        <div class="row" style="margin-top:10px">
+          <button class="btn p" id="mdet-xs">겸직 저장</button>
+          <span class="sub" style="margin:0">체크한 회사·부서의 회의가 이 사람에게 보입니다</span></div>
+      </div>
       <div class="shsec">볼 수 있는 폴더</div>
       ${['admin','ceo'].includes(m.role)
         ?'<div class="sub" style="margin:6px 0 0">관리자·공동대표는 항상 모든 폴더를 봅니다</div>'
@@ -1380,6 +1396,18 @@ async function renderMembers(){
       }
       out.textContent='응답이 없습니다. 처리 서버가 켜져 있는지 확인해주세요.';
       btn.disabled=false;
+    };
+
+    const xs=$('#mdet-xs');
+    if(xs) xs.onclick=async()=>{
+      xs.disabled=true;
+      const vals=[...box.querySelectorAll('.mxs:checked')].map(x=>x.value);
+      const {error}=await SB.from('hd_member').update({extra_scopes:vals}).eq('id',id);
+      xs.disabled=false;
+      if(error) return toast('저장하지 못했습니다: '+esc(error.message)
+        +'<br>겸직_소속.sql 을 아직 실행하지 않으셨다면 먼저 실행해주세요.', 7000);
+      m.extra_scopes=vals;
+      toast(vals.length?`겸직 ${vals.length}곳을 저장했습니다`:'겸직을 모두 해제했습니다');
     };
 
     const sv2=$('#mdet-save');
