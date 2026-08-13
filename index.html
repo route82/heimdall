@@ -558,7 +558,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v12.15</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v12.16</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 정보·비밀번호">정보 변경</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -1233,7 +1233,9 @@ async function renderMembers(){
     SB.from('hd_invite').select('*').order('created_at')]);
   if(mem.error) return el.innerHTML=`<div class="empty">${esc(mem.error.message)}</div>`;
   const data=mem.data, invites=(inv.data||[]).filter(i=>!i.used_at);
-  const wait=data.filter(m=>!m.approved), ok=data.filter(m=>m.approved);
+  const wait=data.filter(m=>!m.approved && m.status!=='left');
+  const ok=data.filter(m=>m.approved && m.status!=='left');
+  const left=data.filter(m=>m.status==='left');
   const sel=(m)=>`<select data-id="${m.id}" class="rsel">
      ${Object.entries(ROLE).map(([k,v])=>`<option value="${k}" ${m.role===k?'selected':''}>${v}</option>`).join('')}
    </select>`;
@@ -1293,7 +1295,16 @@ async function renderMembers(){
           ${(m.extra_scopes||[]).length?`<div class="meta" style="margin-top:5px">
             <span class="tag" style="background:#EAF2FD;color:#2B6CB0;margin-right:4px">겸직</span>
             ${m.extra_scopes.map(x=>esc(x.endsWith('|')?x.slice(0,-1)+' 전체':x.replace('|',' '))).join(' · ')}</div>`:''}</div>
-        <div class="row"><button class="btn det" data-id="${m.id}">상세</button>${sel(m)}<button class="btn sv" data-id="${m.id}">저장</button></div></div>`).join('')}</div>`;
+        <div class="row"><button class="btn det" data-id="${m.id}">상세</button>${sel(m)}<button class="btn sv" data-id="${m.id}">저장</button>
+          ${m.id!==me.id?`<button class="btn lv" data-id="${m.id}" title="모든 권한을 한 번에 없앱니다">퇴사</button>`:''}</div></div>`).join('')}</div>
+
+    ${left.length?`<h1 style="font-size:16px;margin-top:26px">퇴사</h1>
+    <div class="box">${left.map(m=>`<div class="act" data-id="${m.id}" style="grid-template-columns:1fr auto;opacity:.75">
+        <div><div class="task">${esc(m.name)}</div>
+          <div class="meta">${esc(m.email)} · ${esc(m.company||'')} ${esc(m.dept||'')} · 모든 권한 없음 · 남긴 자료는 보존됩니다</div></div>
+        <div class="row">
+          <button class="btn bk" data-id="${m.id}">복직</button>
+          <button class="btn del2" data-id="${m.id}" style="color:#C0392B">삭제</button></div></div>`).join('')}</div>`:''}`;
 
   bindOrgSelects('iv-co','iv-dept','');
   el.querySelectorAll('.mco').forEach(x=>x.onchange=()=>{
@@ -1434,6 +1445,29 @@ async function renderMembers(){
       if(err) return toast('저장하지 못했습니다: '+esc(err.message));
       toast('폴더 권한을 저장했습니다');
     };
+  });
+
+  // ── 퇴사 · 복직 · 삭제
+  el.querySelectorAll('.lv').forEach(b=>b.onclick=async()=>{
+    const m=data.find(x=>x.id===b.dataset.id); if(!m) return;
+    if(!confirm(`${m.name} 님을 퇴사 처리합니다.\n\n모든 권한이 한 번에 사라지고 더 이상 로그인해도 아무것도 볼 수 없습니다.\n남긴 회의록·자료는 전부 그대로 남습니다.\n(나중에 「복직」으로 되돌릴 수 있습니다)`)) return;
+    const {error}=await SB.from('hd_member').update({status:'left'}).eq('id',m.id);
+    if(error) return toast('처리하지 못했습니다: '+esc(error.message)
+      +'<br>퇴사_처리.sql 을 아직 실행하지 않으셨다면 먼저 실행해주세요.', 7000);
+    toast(`${esc(m.name)} 님을 퇴사 처리했습니다`); renderMembers();
+  });
+  el.querySelectorAll('.bk').forEach(b=>b.onclick=async()=>{
+    const m=data.find(x=>x.id===b.dataset.id); if(!m) return;
+    const {error}=await SB.from('hd_member').update({status:'active'}).eq('id',m.id);
+    if(error) return toast('처리하지 못했습니다: '+esc(error.message));
+    toast(`${esc(m.name)} 님을 복직 처리했습니다`); renderMembers();
+  });
+  el.querySelectorAll('.del2').forEach(b=>b.onclick=async()=>{
+    const m=data.find(x=>x.id===b.dataset.id); if(!m) return;
+    if(!confirm(`${m.name} 님의 계정을 완전히 삭제합니다.\n\n남긴 회의록·전사·요약은 전부 그대로 남습니다.\n다만 본인만 보던 개인 노트는 주인이 없어져 아무도 열 수 없게 됩니다.\n계속할까요?`)) return;
+    const {error}=await SB.from('hd_member').delete().eq('id',m.id);
+    if(error) return toast('삭제하지 못했습니다: '+esc(error.message), 7000);
+    toast(`${esc(m.name)} 님의 계정을 삭제했습니다`); renderMembers();
   });
 
   const roleOf=id=>el.querySelector(`.rsel[data-id="${id}"]`).value;
@@ -2928,6 +2962,15 @@ async function boot(){
     data = ins.data;
   }
   if(!data.name || !data.company) return profilePage(data);
+  if(data.status==='left'){
+    $('#app').innerHTML=`<div class="auth"><div class="box" style="text-align:center">
+      <h1 style="font-size:17px">퇴사 처리된 계정입니다</h1>
+      <p class="sub">이 계정으로는 더 이상 헤임달을 쓸 수 없습니다.<br>
+        잘못 처리된 것이라면 관리자에게 문의해주세요.</p>
+      <button class="btn full" onclick="localStorage.setItem('hd_auto','0');window.SBOUT()">나가기</button></div></div>`;
+    window.SBOUT=async()=>{await SB.auth.signOut();location.reload();};
+    return;
+  }
   if(!data.approved) return pendingPage(data);
   me=data; shell(); go('home'); checkPending();
 }
