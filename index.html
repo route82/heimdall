@@ -337,6 +337,8 @@ const SB = createClient('https://dwoiobqucmikbtikfjwk.supabase.co', 'sb_publisha
 const $ = (s,r=document)=>r.querySelector(s);
 const esc = s => (s??'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const hms = s => { s=+s||0; return `${Math.floor(s/3600)}:${String(Math.floor(s%3600/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; };
+// 슬랙 워크스페이스와 연결된 회사 (이 회사 회의에만 「슬랙에 공유」 가 보입니다)
+const SLACK_COS = ['슈퍼홀릭', '그룹 AX'];
 const STATUS = {draft:'전사만', review:'검토 중', reported:'경영진 보고됨', archived:'보관'};
 const ROLE = {member:'구성원', manager:'부서 관리자', exec:'임원',
               ceo:'공동대표', dev:'개발자', admin:'관리자'};
@@ -558,7 +560,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v12.33</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v12.34</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 비밀번호 바꾸기">비밀번호 변경</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -833,6 +835,8 @@ function drawMeeting(){
           + '<button class="btn g" id="pub">팀에 공개</button>' : ''}
     ${(m.visibility!=='private' && m.source==='플라우드' && ['admin','ceo'].includes(me.role))
         ? '<button class="btn" id="unpub">다시 비공개로</button>' : ''}
+    ${(m.visibility!=='private' && SLACK_COS.includes(m.company||''))
+      ?`<button class="btn" id="mslack">슬랙에 공유${m.slack_at?' (보냄)':''}</button>`:''}
     ${((m.visibility==='private'&&m.owner_id===me.id)
        ||(m.visibility!=='private'&&(['admin','ceo'].includes(me.role)
            ||(me.role==='exec'&&m.company===me.company))))
@@ -869,6 +873,27 @@ function drawMeeting(){
       ta.select(); document.execCommand('copy'); ta.remove();
     }
     toast('복사했습니다. 붙여넣기 하시면 됩니다');
+  };
+
+  // 슬랙에 공유 — 회사에 맞는 채널로 보냅니다 (처리 서버가 실제 발송)
+  const ms=$('#mslack');
+  if(ms) ms.onclick=async()=>{
+    if(m.slack_at && !confirm('이 회의는 이미 슬랙에 보냈습니다.\n한 번 더 보낼까요?')) return;
+    ms.disabled=true; ms.textContent='보내는 중…';
+    const {data:d,error}=await SB.from('hd_cmd').insert({kind:'slack_share',
+      args:{meeting:m.id}, asked_by:me.id, asked_name:me.name}).select('id').single();
+    if(error){ ms.disabled=false; ms.textContent='슬랙에 공유';
+      return toast('보내지 못했습니다: '+esc(error.message), 6000); }
+    for(let i=0;i<40;i++){
+      await new Promise(r=>setTimeout(r,2000));
+      const {data:x}=await SB.from('hd_cmd').select('status,result').eq('id',d.id).maybeSingle();
+      if(x&&(x.status==='done'||x.status==='failed')){
+        ms.disabled=false; ms.textContent='슬랙에 공유';
+        return toast((x.status==='failed'?'실패: ':'')+esc(x.result||'보냈습니다'), 6000);
+      }
+    }
+    ms.disabled=false; ms.textContent='슬랙에 공유';
+    toast('처리 서버가 응답하지 않습니다. 잠시 뒤 다시 시도해주세요', 6000);
   };
 
   // 내 노트(아이디어 노트·지시사항)는 주인이 직접 지울 수 있습니다
@@ -2602,6 +2627,8 @@ function renderGuide(){
     <li>오른쪽 위 <b>전체 복사</b> — 지금 보는 탭의 글 전체가 복사됩니다 (카톡·메일에 붙여넣기)</li>
     <li><b>편집</b> — 제목·전사·하이라이트·요약·마인드맵을 바로 고칠 수 있습니다 (참석자만)</li>
     <li><b>워드로 내보내기</b> — 한 파일로 내려받습니다</li>
+    <li><b>슬랙에 공유</b> — 슬랙과 연결된 회사 회의에만 보입니다.
+        누르면 그 회사 채널에 요약이 올라가고, 액션아이템은 담당자에게 개인 DM 으로 갑니다</li>
     <li><b>폴더</b> — 왼쪽 나무에서 회사 ▸ 부서 ▸ 폴더를 펼쳐 그 폴더의 회의만 봅니다</li>
   </ul>`)}
   ${box('5. 회의 내용을 찾으려면',`<ul>
@@ -2658,7 +2685,8 @@ function renderGuide(){
     <li><b>메일 시험</b> — 서버가 죽었을 때 오는 알림 메일을 시험 발송합니다</li>
     <li><b>플라우드</b> — 가져오기 실행 · 상태 확인 · 계정 로그인 파일 만들기</li>
     <li><b>슬랙</b> — 상태 확인 · 시험 메시지 · 지금 보내기.
-        「경영진에 보고」 된 회의는 3분 안에 슬랙 채널에 요약이 올라가고,
+        회의록 화면의 <b>「슬랙에 공유」</b> 를 눌렀을 때만 슬랙으로 나갑니다
+        (경영진 보고와는 별개입니다). 회사에 맞는 채널로 가고,
         액션아이템은 담당자 개인 DM 으로 갑니다</li>
     <li>슬랙 가입 이메일이 헤임달과 다른 사람은 구성원 상세의 「슬랙 계정」 에 넣어주세요</li>
     <li>서버가 30분 넘게 조용하면 관리자 메일로 자동 경고가 옵니다</li>
