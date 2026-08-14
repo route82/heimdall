@@ -339,6 +339,15 @@ const esc = s => (s??'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;
 const hms = s => { s=+s||0; return `${Math.floor(s/3600)}:${String(Math.floor(s%3600/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; };
 // 슬랙 워크스페이스와 연결된 회사 (이 회사 회의에만 「슬랙에 공유」 가 보입니다)
 const SLACK_COS = ['슈퍼홀릭', '그룹 AX'];
+// 서버 시각은 세계 표준시(UTC)라, 화면에는 한국 시간으로 바꿔 보여줍니다
+const kst = t => {
+  if(!t) return '';
+  const d = new Date(/[Zz]|[+\-]\d{2}:?\d{2}$/.test(t) ? t : t + 'Z');
+  if(isNaN(d)) return String(t).slice(0,16).replace('T',' ');
+  return new Intl.DateTimeFormat('sv-SE', {timeZone:'Asia/Seoul',
+    year:'numeric', month:'2-digit', day:'2-digit',
+    hour:'2-digit', minute:'2-digit', hour12:false}).format(d).replace('T',' ');
+};
 const STATUS = {draft:'전사만', review:'검토 중', reported:'경영진 보고됨', archived:'보관'};
 const ROLE = {member:'구성원', manager:'부서 관리자', exec:'임원',
               ceo:'공동대표', dev:'개발자', admin:'관리자'};
@@ -560,7 +569,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v12.34</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v12.35</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 비밀번호 바꾸기">비밀번호 변경</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -823,7 +832,7 @@ function drawMeeting(){
       </div>
     </div>`).join('') : '<div class="empty">액션아이템이 없습니다.</div>'}</div>
   ${edits.length?`<div class="hist"><b>편집 이력</b>${edits.map(e=>
-     `<div>${e.at.slice(0,16).replace('T',' ')} · ${esc(e.editor)} · ${e.kind}</div>`).join('')}</div>`:''}
+     `<div>${kst(e.at)} · ${esc(e.editor)} · ${e.kind}</div>`).join('')}</div>`:''}
   <div class="bar">
     ${['admin','ceo','exec'].includes(me.role) ? (m.status==='archived'
        ? '<button class="btn" id="arch">보관 해제</button>'
@@ -2528,7 +2537,7 @@ async function loadUploads(){
   box.innerHTML=(data&&data.length)? data.map(j=>`
     <div class="act" style="grid-template-columns:1fr auto">
       <div><div class="task">${esc(j.title||j.orig_name||'?')}</div>
-        <div class="meta">${j.created_at.slice(0,16).replace('T',' ')}
+        <div class="meta">${kst(j.created_at)}
           ${j.kind==='doc'?' · 문서':''}${j.status==='failed'?' · '+esc((j.error||'').slice(0,90)):''}</div></div>
       <div class="row" style="gap:6px;align-items:center">
         ${j.status==='failed'?`<button class="btn" data-retry="${j.id}">다시 시도</button>`:''}
