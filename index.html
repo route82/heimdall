@@ -558,7 +558,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v12.20</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v12.21</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 비밀번호 바꾸기">비밀번호 변경</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -1368,6 +1368,12 @@ async function renderMembers(){
       <div class="row" style="margin-bottom:14px;flex-wrap:wrap">
         <button class="btn" id="mdet-pw">비밀번호 재설정 (임시 비밀번호 발급)</button>
         <span class="sub" style="margin:0;white-space:pre-line" id="mdet-out"></span></div>
+      <div class="shsec">슬랙 계정</div>
+      <div class="row" style="margin-top:8px;flex-wrap:wrap">
+        <input id="mdet-sl" type="email" placeholder="${esc(m.email)} (헤임달과 같으면 비워두세요)"
+          value="${esc(m.slack_email||'')}" style="flex:1;min-width:240px;max-width:340px">
+        <button class="btn p" id="mdet-slsave">저장</button>
+        <span class="sub" style="margin:0">슬랙 가입 이메일이 다를 때만 넣으시면 됩니다</span></div>
       <div class="shsec">겸직 소속 — 본 소속(급여 회사)은 위에서, 겸직은 여기서 관리합니다</div>
       <div style="margin-top:8px">
         ${COMPANIES.filter(c=>c!==m.company).map(co=>`
@@ -1413,6 +1419,18 @@ async function renderMembers(){
       }
       out.textContent='응답이 없습니다. 처리 서버가 켜져 있는지 확인해주세요.';
       btn.disabled=false;
+    };
+
+    const sl=$('#mdet-slsave');
+    if(sl) sl.onclick=async()=>{
+      sl.disabled=true;
+      const v=($('#mdet-sl').value||'').trim().toLowerCase();
+      const {error}=await SB.from('hd_member').update({slack_email:v}).eq('id',id);
+      sl.disabled=false;
+      if(error) return toast('저장하지 못했습니다: '+esc(error.message)
+        +'<br>슬랙_연동.sql 을 아직 실행하지 않으셨다면 먼저 실행해주세요.', 7000);
+      m.slack_email=v;
+      toast(v?'슬랙 이메일을 저장했습니다':'슬랙 이메일을 지웠습니다 (헤임달 이메일로 찾습니다)');
     };
 
     const xs=$('#mdet-xs');
@@ -2630,6 +2648,10 @@ function renderGuide(){
     <li><b>지금 백업</b> — 회의록 전체를 PC에 저장합니다 (평소엔 매주 자동)</li>
     <li><b>메일 시험</b> — 서버가 죽었을 때 오는 알림 메일을 시험 발송합니다</li>
     <li><b>플라우드</b> — 가져오기 실행 · 상태 확인 · 계정 로그인 파일 만들기</li>
+    <li><b>슬랙</b> — 상태 확인 · 시험 메시지 · 지금 보내기.
+        「경영진에 보고」 된 회의는 3분 안에 슬랙 채널에 요약이 올라가고,
+        액션아이템은 담당자 개인 DM 으로 갑니다</li>
+    <li>슬랙 가입 이메일이 헤임달과 다른 사람은 구성원 상세의 「슬랙 계정」 에 넣어주세요</li>
     <li>서버가 30분 넘게 조용하면 관리자 메일로 자동 경고가 옵니다</li>
   </ul>`)}
   ${box('관리자 안내 — 계정·권한',`<ul>
@@ -2707,6 +2729,9 @@ const CMDS = [
   ['plaud_status','플라우드 상태',    '플라우드 로그인·설정이 정상인지 확인합니다'],
   ['plaud_redo',  '플라우드 다시 만들기', '이미 가져온 플라우드 회의의 하이라이트·액션·마인드맵을 다시 만듭니다'],
   ['plaud_login', '플라우드 계정 추가',  '사람마다 플라우드 로그인을 하는 도우미 파일을 만듭니다'],
+  ['slack_status','슬랙 상태',      '슬랙 연결과 구성원 계정 연결 상태를 확인합니다'],
+  ['slack_test',  '슬랙 시험 메시지', '알림 채널로 시험 메시지를 보냅니다'],
+  ['slack',       '슬랙 지금 보내기', '경영진에 보고된 회의를 지금 바로 슬랙으로 보냅니다'],
 ];
 
 async function renderServer(){
