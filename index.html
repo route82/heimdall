@@ -558,7 +558,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v12.21</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v12.33</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 비밀번호 바꾸기">비밀번호 변경</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -2250,12 +2250,16 @@ async function renderRec(){
         <div class="shsec">부서</div>
         <div id="rc-share-dp" class="row" style="flex-wrap:wrap;gap:6px 16px"></div>
       </div>
-      ${me.role==='admin'?`<div class="row" style="margin-bottom:9px" id="rc-scope-row">
+      ${(me.role==='admin' || (me.extra_scopes||[]).length)?`<div class="row" style="margin-bottom:9px" id="rc-scope-row">
         <select id="rc-scope" style="min-width:230px" ${on?'disabled':''}>
           <option value="mine">내 소속 (${esc(me.company||'')} ${esc(me.dept||'')})</option>
-          <option value="exec">그룹 · 전사 경영진 — 관리자·경영진만 열람</option>
+          ${(me.extra_scopes||[]).map(v=>{const [c,d]=v.split('|');
+            return `<option value="x:${esc(v)}">겸직 · ${esc(c)}${d?' '+esc(d):' 전체'}</option>`;}).join('')}
+          ${me.role==='admin'?'<option value="exec">그룹 · 전사 경영진 — 관리자·경영진만 열람</option>':''}
         </select>
-        <span class="sub" style="margin:0">민감한 회의는 「전사 경영진」으로 — 일반 직원에게 보이지 않습니다</span>
+        <span class="sub" style="margin:0">${me.role==='admin'
+          ?'민감한 회의는 「전사 경영진」으로 — 일반 직원에게 보이지 않습니다'
+          :'회의가 어느 회사 것인지 골라주세요'}</span>
       </div>`:''}
       <div class="row" style="align-items:center">
         <button class="btn p" id="rc-go" style="min-width:150px">${on?'■ 녹음 종료':'● 회의 녹음 시작'}</button>
@@ -2426,8 +2430,13 @@ async function recDone(){
     const {error:e1}=await SB.storage.from('hd-audio').upload(name, blob, {upsert:true, contentType:type});
     if(e1){ toast(upErr('file', e1), 9000); renderRec(); return; }
     const priv = REC.type && REC.type!=='meeting';
-    const sc=(me.role==='admin' && !priv && REC.scope==='exec')
-      ? {company:'그룹', dept:'전사 경영진'} : {company:me.company||'', dept:me.dept||''};
+    let sc={company:me.company||'', dept:me.dept||''};
+    if(!priv && me.role==='admin' && REC.scope==='exec')
+      sc={company:'그룹', dept:'전사 경영진'};
+    else if(!priv && (REC.scope||'').startsWith('x:')){
+      const [c,d]=REC.scope.slice(2).split('|');
+      sc={company:c||sc.company, dept:d||''};      // 부서가 비면 회사 공용
+    }
     const extra = priv ? {visibility:'private',
       note_label: REC.type==='idea' ? '아이디어 노트' : '지시사항',
       share_ids: REC.shares||[],
