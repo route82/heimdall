@@ -168,6 +168,19 @@ mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
 .st .stt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .st .stc{font-size:11px;color:#98A0AC;flex:none}
 .st .pdot{width:9px;height:9px;border-radius:3px;flex:none}
+.cgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:#E6EAF0;
+ border:1px solid #E6EAF0;border-radius:12px;overflow:hidden}
+.cgh{background:#F7F9FC;padding:8px 6px;text-align:center;font-size:12.5px;color:#5C6672;font-weight:600}
+.cday{background:#fff;min-height:104px;padding:6px 6px 8px}
+.cday.out{background:#FAFBFC}
+.cday .dn{font-size:12px;color:#98A0AC;margin-bottom:4px}
+.cday.today .dn{color:#2B6CB0;font-weight:700}
+.cev{display:block;width:100%;text-align:left;border:0;background:#EAF2FD;color:#2B6CB0;
+ border-radius:6px;padding:3px 6px;font-size:11.5px;margin-bottom:3px;cursor:pointer;
+ white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:inherit}
+.cev.done{background:#E9F6EE;color:#1E7A46}
+.cev.miss{background:#FDECEA;color:#C0392B}
+.clist .card{margin-bottom:9px}
 .hcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:13px;margin:18px 0 26px}
 .hcard{background:#fff;border:1px solid #E6EAF0;border-radius:14px;padding:22px 20px;cursor:pointer;
  text-align:left;font-family:inherit;transition:box-shadow .15s,border-color .15s}
@@ -562,6 +575,7 @@ function profilePage(row, msg=''){
 
 // ─────────────────────────── 뼈대 (왼쪽 사이드바)
 const ICO = {
+  cal:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
   home:'<path d="M3 11l9-8 9 8"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/>',
   list:'<path d="M4 5h16M4 12h16M4 19h10"/>',
   rec:'<path d="M12 4a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0V7a3 3 0 0 1 3-3z"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/>',
@@ -585,7 +599,7 @@ function shell(){
   const groups = [
     ['',      [['home','홈']]],
     ['쓰기',   [['rec','녹음'],['upload','업로드']]],
-    ['보기',   [['list','회의록'],['projects','폴더'],['actions','액션아이템']]],
+    ['보기',   [['cal','일정'],['list','회의록'],['projects','폴더'],['actions','액션아이템']]],
     ['물어보기',[['chat','물어보기'],['search','검색']]],
   ];
   const admin = [];
@@ -609,7 +623,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v12.40</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v12.44</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 비밀번호 바꾸기">비밀번호 변경</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -627,7 +641,7 @@ function shell(){
          <button class="btn" id="out-m" title="로그아웃">나가기</button></div>
      </div>
      <div class="wrap">
-       <div class="page" id="p-home"></div><div class="page" id="p-list"></div><div class="page" id="p-search"></div>
+       <div class="page" id="p-home"></div><div class="page" id="p-cal"></div><div class="page" id="p-list"></div><div class="page" id="p-search"></div>
        <div class="page" id="p-actions"></div><div class="page" id="p-brief"></div>
        <div class="page" id="p-chat"></div><div class="page" id="p-projects"></div>
        <div class="page" id="p-upload"></div><div class="page" id="p-rec"></div>
@@ -704,7 +718,7 @@ function go(v){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.nav').forEach(b=>b.setAttribute('aria-current', b.dataset.v===v));
   const el=$('#p-'+v); if(el) el.classList.add('on');
-  ({home:renderHome, list:renderList, search:renderSearch, actions:renderActions, brief:renderBrief,
+  ({home:renderHome, cal:renderCal, list:renderList, search:renderSearch, actions:renderActions, brief:renderBrief,
     members:renderMembers, chat:renderChat, projects:renderProjects,
     upload:renderUpload, rec:renderRec, server:renderServer,
     guide:renderGuide, usage:renderUsage}[v]||(()=>{}))();
@@ -763,6 +777,137 @@ async function renderHome(){
   box.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
 }
 
+// ─────────────────────────── 일정 (회의실 예약)
+// 구글 회의실 캘린더에서 가져온 「우리 그룹」 예약만 보여줍니다.
+let CAL = {mode:'month', anchor:new Date()};
+const KSTF = o => new Intl.DateTimeFormat('ko-KR', Object.assign({timeZone:'Asia/Seoul'}, o));
+const ymd = d => new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul'}).format(d);
+
+function calRange(){
+  const a = new Date(CAL.anchor);
+  if(CAL.mode==='day')  return [new Date(a.setHours(0,0,0,0)), new Date(new Date(CAL.anchor).setHours(23,59,59,999))];
+  if(CAL.mode==='week'){
+    const s0=new Date(a); s0.setDate(s0.getDate()-s0.getDay()); s0.setHours(0,0,0,0);
+    const e0=new Date(s0); e0.setDate(e0.getDate()+6); e0.setHours(23,59,59,999);
+    return [s0,e0];
+  }
+  const s0=new Date(a.getFullYear(), a.getMonth(), 1);
+  const e0=new Date(a.getFullYear(), a.getMonth()+1, 0, 23,59,59,999);
+  return [s0,e0];
+}
+
+async function renderCal(){
+  const el=$('#p-cal');
+  const [s0,e0]=calRange();
+  const gs=new Date(s0); gs.setDate(gs.getDate()-7);
+  const ge=new Date(e0); ge.setDate(ge.getDate()+7);
+  el.innerHTML='<h1>일정</h1><div class="sub">불러오는 중…</div>';
+  const [cal,mtg]=await Promise.all([
+    SB.from('hd_cal_event').select('uid,title,room,starts_at,ends_at,all_day')
+      .gte('starts_at',gs.toISOString()).lte('starts_at',ge.toISOString()).order('starts_at'),
+    SB.from('hd_meeting').select('id,cal_uid').not('cal_uid','is',null)]);
+  if(cal.error) return el.innerHTML=`<h1>일정</h1><div class="empty">${esc(cal.error.message)}<br>
+    회의실_캘린더.sql 을 실행하셨는지 확인해주세요.</div>`;
+  const evs=cal.data||[];
+  const done=new Map((mtg.data||[]).filter(x=>x.cal_uid).map(x=>[x.cal_uid,x.id]));
+
+  const title = CAL.mode==='month' ? KSTF({year:'numeric',month:'long'}).format(CAL.anchor)
+    : CAL.mode==='week' ? `${ymd(s0)} ~ ${ymd(e0)}`
+    : KSTF({year:'numeric',month:'long',day:'numeric',weekday:'short'}).format(CAL.anchor);
+  const MODES=[['month','월'],['week','주'],['day','일']];
+
+  el.innerHTML=`<h1>일정</h1>
+    <div class="sub">회의실 예약 중 우리 그룹 것만 보입니다. 예약을 누르면 그 회의를 녹음하거나 회의록을 엽니다</div>
+    <div class="row" style="margin-bottom:14px;flex-wrap:wrap">
+      <button class="btn" id="cprev">←</button>
+      <button class="btn" id="ctoday">오늘</button>
+      <button class="btn" id="cnext">→</button>
+      <b style="font-size:16px;margin:0 8px">${esc(title)}</b>
+      <div class="chips" style="margin:0 0 0 auto">
+        ${MODES.map(([k,l])=>`<button class="chip${CAL.mode===k?' on':''}" data-mode="${k}">${l}</button>`).join('')}
+      </div>
+    </div>
+    ${CAL.mode==='month' ? monthHtml(s0,e0,evs,done) : listHtml(s0,e0,evs,done)}`;
+
+  $('#cprev').onclick=()=>{ shiftCal(-1); renderCal(); };
+  $('#cnext').onclick=()=>{ shiftCal(1);  renderCal(); };
+  $('#ctoday').onclick=()=>{ CAL.anchor=new Date(); renderCal(); };
+  el.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{ CAL.mode=b.dataset.mode; renderCal(); });
+  el.querySelectorAll('[data-ev]').forEach(b=>b.onclick=()=>{
+    const mid=b.dataset.mid;
+    if(mid) return openMeeting(mid);
+    REC.cal={uid:b.dataset.ev, title:b.dataset.title, room:b.dataset.room};
+    REC.preTitle=b.dataset.title;
+    go('rec');
+  });
+}
+
+function shiftCal(n){
+  const a=new Date(CAL.anchor);
+  if(CAL.mode==='month') a.setMonth(a.getMonth()+n);
+  else if(CAL.mode==='week') a.setDate(a.getDate()+7*n);
+  else a.setDate(a.getDate()+n);
+  CAL.anchor=a;
+}
+
+const hmOf = t => new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',
+  hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(t));
+
+function evBtn(e, done, cls){
+  const mid=done.get(e.uid)||'';
+  const k = mid ? 'done' : (new Date(e.ends_at)<new Date() ? 'miss' : '');
+  return `<button class="${cls} ${k}" data-ev="${esc(e.uid)}" data-mid="${mid}"
+    data-title="${esc(e.title)}" data-room="${esc(e.room||'')}"
+    title="${esc(e.title)}">${hmOf(e.starts_at)} ${esc(e.title)}</button>`;
+}
+
+function monthHtml(s0,e0,evs,done){
+  const first=new Date(s0); const start=new Date(first); start.setDate(1-first.getDay());
+  const days=[]; const cur=new Date(start);
+  for(let i=0;i<42;i++){ days.push(new Date(cur)); cur.setDate(cur.getDate()+1); }
+  const byDay={};
+  evs.forEach(e=>{ (byDay[ymd(new Date(e.starts_at))] ||= []).push(e); });
+  const today=ymd(new Date());
+  const W=['일','월','화','수','목','금','토'];
+  return `<div class="cgrid">
+    ${W.map(w=>`<div class="cgh">${w}</div>`).join('')}
+    ${days.map(d=>{
+      const key=ymd(d);
+      const out = d.getMonth()!==s0.getMonth();
+      const list=(byDay[key]||[]);
+      return `<div class="cday${out?' out':''}${key===today?' today':''}">
+        <div class="dn">${d.getDate()}</div>
+        ${list.slice(0,4).map(e=>evBtn(e,done,'cev')).join('')}
+        ${list.length>4?`<div class="dn">+${list.length-4}건</div>`:''}
+      </div>`;}).join('')}
+  </div>`;
+}
+
+function listHtml(s0,e0,evs,done){
+  const inRange=evs.filter(e=>{
+    const t=new Date(e.starts_at); return t>=s0 && t<=e0; });
+  if(!inRange.length) return '<div class="empty">이 기간에 잡힌 회의실 예약이 없습니다.</div>';
+  const byDay={};
+  inRange.forEach(e=>{ (byDay[ymd(new Date(e.starts_at))] ||= []).push(e); });
+  return '<div class="clist">' + Object.keys(byDay).sort().map(k=>`
+    <h1 style="font-size:16px;margin:18px 0 8px">${k}</h1>
+    ${byDay[k].map(e=>{
+      const mid=done.get(e.uid)||'';
+      const past=new Date(e.ends_at)<new Date();
+      return `<div class="card" style="display:flex;align-items:center;gap:12px">
+        <div style="min-width:0;flex:1">
+          <div class="ct">${esc(e.title)}</div>
+          <div class="cm"><span>${hmOf(e.starts_at)} ~ ${hmOf(e.ends_at)}</span>
+            ${e.room?`<span>${esc(e.room)}</span>`:''}
+            ${mid?'<span style="color:#1E7A46">회의록 있음</span>'
+                 :(past?'<span style="color:#C0392B">회의록 없음</span>':'')}</div>
+        </div>
+        <button class="btn${mid?'':' p'}" data-ev="${esc(e.uid)}" data-mid="${mid}"
+          data-title="${esc(e.title)}" data-room="${esc(e.room||'')}"
+          style="flex:none">${mid?'회의록 열기':(past?'지금 올리기':'녹음 시작')}</button>
+      </div>`;}).join('')}`).join('') + '</div>';
+}
+
 // 오늘 회의실 예약 — 예약해 두면 여기 떠서, 누르면 바로 녹음으로 갑니다
 async function drawTodayCal(){
   const box=$('#h-cal'); if(!box) return;
@@ -775,11 +920,22 @@ async function drawTodayCal(){
       .gte('starts_at',from).lte('starts_at',to).order('starts_at'),
     SB.from('hd_meeting').select('cal_uid').gte('held_on',kd)]);
   const evs=(cal.data||[]).filter(e=>!e.all_day);
-  if(cal.error || !evs.length){ box.innerHTML=''; return; }
   const done=new Set((mtg.data||[]).map(x=>x.cal_uid).filter(Boolean));
   const hm=t=>new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',
     hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(t));
-  box.innerHTML=`<h1 style="font-size:17px">오늘 회의실 예약</h1>
+  if(cal.error){
+    box.innerHTML=`<h1 style="font-size:17px">오늘 회의실 예약</h1>
+      <div class="empty">예약을 불러오지 못했습니다 · ${esc(cal.error.message)}</div>`;
+    return;
+  }
+  if(!evs.length){
+    box.innerHTML=`<h1 style="font-size:17px">오늘 회의실 예약 0건</h1>
+      <div class="empty">오늘 잡힌 우리 그룹 회의실 예약이 없습니다.<br>
+        구글 캘린더에 예약하실 때 제목에 회사명을 넣어주세요
+        (예: [B1, 소회의실] 더올마이티 주간회의)</div>`;
+    return;
+  }
+  box.innerHTML=`<h1 style="font-size:17px">오늘 회의실 예약 ${evs.length}건</h1>
     <div class="sub">예약된 회의는 녹음해 두시면 회의록이 자동으로 남습니다</div>
     ${evs.map(e=>{
       const past=new Date(e.ends_at) < now;
@@ -2382,6 +2538,7 @@ async function renderRec(){
     <div class="sub">이 기기의 마이크로 회의를 녹음합니다.
       끝내면 자동으로 올라가고, 전사·요약·하이라이트가 만들어집니다</div>
     <div class="box">
+      <div id="rc-today"></div>
       <div class="row" id="rc-cal-row" style="margin-bottom:9px;display:none">
         <select id="rc-cal" style="flex:1;min-width:300px" ${on?'disabled':''}>
           <option value="">회의실 예약에서 고르기 (선택)</option>
@@ -2433,6 +2590,7 @@ async function renderRec(){
     </div>
     <h1 style="font-size:16px;margin-top:24px">최근 올린 것</h1>
     <div id="up-list" class="box" style="color:#98A0AC">불러오는 중…</div>`;
+  drawRecToday();
   loadCalPicks().then(()=>{
     // 홈에서 예약을 눌러 들어온 경우 그 예약을 골라 둡니다
     if(REC.cal && REC.cal.uid){
@@ -2522,6 +2680,37 @@ async function loadCalPicks(){
     REC.cal={uid:sel.value, title:o.dataset.title, room:o.dataset.room};
     const ti=$('#rc-title'); if(ti && !ti.value.trim()) ti.value=o.dataset.title;
   };
+}
+
+// 녹음 화면 맨 위 — 오늘 예약된 회의를 눌러서 바로 시작할 수 있게
+async function drawRecToday(){
+  const box=$('#rc-today'); if(!box) return;
+  const now=new Date(), kd=ymd(now);
+  const [cal,mtg]=await Promise.all([
+    SB.from('hd_cal_event').select('uid,title,room,starts_at,ends_at,all_day')
+      .gte('starts_at', new Date(kd+'T00:00:00+09:00').toISOString())
+      .lte('starts_at', new Date(kd+'T23:59:59+09:00').toISOString()).order('starts_at'),
+    SB.from('hd_meeting').select('cal_uid').gte('held_on',kd)]);
+  const evs=(cal.data||[]).filter(e=>!e.all_day);
+  const done=new Set((mtg.data||[]).map(x=>x.cal_uid).filter(Boolean));
+  if(cal.error){ box.innerHTML=''; return; }
+  if(!evs.length){
+    box.innerHTML='<div class="sub" style="margin:0 0 10px">'
+      + '<b>오늘 회의 0건</b> — 회의실 예약이 없습니다. 회의명을 직접 적고 녹음하시면 됩니다</div>';
+    return;
+  }
+  box.innerHTML=`<div class="sub" style="margin:0 0 8px"><b>오늘 회의</b> — 예약된 회의를 누르면 회의명이 채워집니다</div>
+    <div class="row" style="flex-wrap:wrap;gap:7px;margin-bottom:12px">
+      ${evs.map(e=>`<button class="chip${(REC.cal&&REC.cal.uid===e.uid)?' on':''}"
+        data-pick="${esc(e.uid)}" data-title="${esc(e.title)}" data-room="${esc(e.room||'')}">
+        ${hmOf(e.starts_at)} ${esc(e.title)}${done.has(e.uid)?' · 회의록 있음':''}</button>`).join('')}
+    </div>`;
+  box.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>{
+    REC.cal={uid:b.dataset.pick, title:b.dataset.title, room:b.dataset.room};
+    const ti=$('#rc-title'); if(ti) ti.value=b.dataset.title;
+    const sel=$('#rc-cal'); if(sel) sel.value=b.dataset.pick;
+    box.querySelectorAll('[data-pick]').forEach(x=>x.classList.toggle('on', x===b));
+  });
 }
 
 async function recStart(){
@@ -2777,7 +2966,8 @@ function renderGuide(){
   ${box('0. 왼쪽 메뉴 보는 법',`<ul>
     <li><b>홈</b> — 로그인하면 처음 보이는 화면. 큰 버튼 3개로 바로 시작합니다</li>
     <li><b>쓰기</b> — 녹음, 업로드. 자료를 넣는 곳입니다</li>
-    <li><b>보기</b> — 회의록, 폴더, 액션아이템. 들어온 것을 보는 곳입니다</li>
+    <li><b>보기</b> — 일정, 회의록, 폴더, 액션아이템. 들어온 것을 보는 곳입니다</li>
+      <li><b>일정</b> — 회의실 예약을 월·주·일로 봅니다. 예약을 누르면 바로 녹음하거나 회의록을 엽니다</li>
     <li><b>물어보기</b> — 챗봇에게 묻거나, 단어로 검색합니다</li>
   </ul>`)}
   ${box('1. 회의를 녹음하려면',`<ol>
