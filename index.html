@@ -623,7 +623,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v12.44</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v12.45</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 비밀번호 바꾸기">비밀번호 변경</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -816,8 +816,18 @@ async function renderCal(){
     : KSTF({year:'numeric',month:'long',day:'numeric',weekday:'short'}).format(CAL.anchor);
   const MODES=[['month','월'],['week','주'],['day','일']];
 
+  let last='';
+  try{
+    const {data:sy}=await SB.from('hd_cal_event').select('synced_at')
+      .order('synced_at',{ascending:false}).limit(1).maybeSingle();
+    if(sy&&sy.synced_at){
+      const m=Math.max(0,Math.round((Date.now()-new Date(sy.synced_at))/60000));
+      last = m<1 ? '방금 전' : (m<60 ? `${m}분 전` : `${Math.round(m/60)}시간 전`);
+    }
+  }catch(e){}
   el.innerHTML=`<h1>일정</h1>
-    <div class="sub">회의실 예약 중 우리 그룹 것만 보입니다. 예약을 누르면 그 회의를 녹음하거나 회의록을 엽니다</div>
+    <div class="sub">회의실 예약 중 우리 그룹 것만 보입니다. 예약을 누르면 그 회의를 녹음하거나 회의록을 엽니다
+      ${last?` · 구글 캘린더에서 <b>${last}</b> 확인함 (2분마다 자동)`:''}</div>
     <div class="row" style="margin-bottom:14px;flex-wrap:wrap">
       <button class="btn" id="cprev">←</button>
       <button class="btn" id="ctoday">오늘</button>
