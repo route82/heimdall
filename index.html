@@ -333,7 +333,36 @@ mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
 
 <script type="module">
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-const SB = createClient('https://dwoiobqucmikbtikfjwk.supabase.co', 'sb_publishable_K6BW26u2jRkTBDwuMqaaFA_3HkfnOc9');
+// 로그인이 풀렸는데도 화면만 켜져 있어 「자료가 다 사라진 것처럼」 보이는 일을 막습니다.
+// (관리자가 비밀번호를 바꾸면 그 사람의 기존 로그인은 서버에서 무효가 됩니다)
+let AUTH_DEAD = false;
+function authDead(){
+  if(AUTH_DEAD) return;
+  AUTH_DEAD = true;
+  try{ localStorage.setItem('hd_auto','0'); }catch(e){}
+  document.body.innerHTML =
+    '<div class="auth"><div class="box" style="text-align:center">'
+    + '<h1 style="font-size:17px">다시 로그인해 주세요</h1>'
+    + '<p class="sub">로그인이 만료되었습니다. 비밀번호를 새로 받으셨다면 새 비밀번호로 들어와 주세요.<br>'
+    + '회의록은 그대로 있으니 안심하셔도 됩니다.</p>'
+    + '<button class="btn p full" id="relogin">로그인 화면으로</button></div></div>';
+  const b = document.getElementById('relogin');
+  if(b) b.onclick = async()=>{ try{ await SB.auth.signOut(); }catch(e){} location.reload(); };
+}
+
+const SB = createClient('https://dwoiobqucmikbtikfjwk.supabase.co', 'sb_publishable_K6BW26u2jRkTBDwuMqaaFA_3HkfnOc9', {
+  global: {
+    // 서버가 「너 누구야」 라고 되묻는 경우(401·403)를 한 곳에서 잡습니다
+    fetch: async (input, init) => {
+      const r = await fetch(input, init);
+      try{
+        const u = (typeof input === 'string' ? input : (input && input.url) || '');
+        if((r.status === 401 || r.status === 403) && u.includes('/rest/v1/')) authDead();
+      }catch(e){}
+      return r;
+    }
+  }
+});
 const $ = (s,r=document)=>r.querySelector(s);
 const esc = s => (s??'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const hms = s => { s=+s||0; return `${Math.floor(s/3600)}:${String(Math.floor(s%3600/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; };
@@ -569,7 +598,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v12.35</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v12.37</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 비밀번호 바꾸기">비밀번호 변경</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -3073,6 +3102,9 @@ async function boot(){
   if(!data.approved) return pendingPage(data);
   me=data; shell(); go('home'); checkPending();
 }
-SB.auth.onAuthStateChange((e)=>{ if(e==='SIGNED_IN'||e==='SIGNED_OUT') boot(); });
+SB.auth.onAuthStateChange((e)=>{
+  if(e==='SIGNED_IN'||e==='SIGNED_OUT') boot();
+  if(e==='TOKEN_REFRESH_FAILED'||e==='USER_DELETED') authDead();
+});
 boot();
 </script></body></html>
