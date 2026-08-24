@@ -623,7 +623,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v12.45</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v12.48</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 비밀번호 바꾸기">비밀번호 변경</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -2606,7 +2606,7 @@ async function renderRec(){
     if(REC.cal && REC.cal.uid){
       const sel=$('#rc-cal'); if(sel){ sel.value=REC.cal.uid; }
       const ti=$('#rc-title');
-      if(ti && !ti.value.trim() && REC.preTitle) ti.value=REC.preTitle;
+      if(ti && REC.preTitle) ti.value=REC.preTitle;
     }
   });
   $('#rc-go').onclick = on ? recStop : recStart;
@@ -2703,6 +2703,12 @@ async function drawRecToday(){
     SB.from('hd_meeting').select('cal_uid').gte('held_on',kd)]);
   const evs=(cal.data||[]).filter(e=>!e.all_day);
   const done=new Set((mtg.data||[]).map(x=>x.cal_uid).filter(Boolean));
+  // 이미 회의록이 만들어진 예약이 골라져 있으면 풀어줍니다
+  if(REC.cal && done.has(REC.cal.uid)){
+    REC.cal=null; REC.preTitle='';
+    const sel=$('#rc-cal'); if(sel) sel.value='';
+    const ti=$('#rc-title'); if(ti) ti.value='';
+  }
   if(cal.error){ box.innerHTML=''; return; }
   if(!evs.length){
     box.innerHTML='<div class="sub" style="margin:0 0 10px">'
@@ -2712,10 +2718,13 @@ async function drawRecToday(){
   box.innerHTML=`<div class="sub" style="margin:0 0 8px"><b>오늘 회의</b> — 예약된 회의를 누르면 회의명이 채워집니다</div>
     <div class="row" style="flex-wrap:wrap;gap:7px;margin-bottom:12px">
       ${evs.map(e=>`<button class="chip${(REC.cal&&REC.cal.uid===e.uid)?' on':''}"
-        data-pick="${esc(e.uid)}" data-title="${esc(e.title)}" data-room="${esc(e.room||'')}">
+        data-pick="${esc(e.uid)}" data-title="${esc(e.title)}" data-room="${esc(e.room||'')}"
+        data-done="${done.has(e.uid)?'1':'0'}">
         ${hmOf(e.starts_at)} ${esc(e.title)}${done.has(e.uid)?' · 회의록 있음':''}</button>`).join('')}
     </div>`;
   box.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>{
+    if(b.dataset.done==='1' &&
+       !confirm('이 회의는 이미 회의록이 있습니다.\n같은 예약으로 하나 더 녹음할까요?')) return;
     REC.cal={uid:b.dataset.pick, title:b.dataset.title, room:b.dataset.room};
     const ti=$('#rc-title'); if(ti) ti.value=b.dataset.title;
     const sel=$('#rc-cal'); if(sel) sel.value=b.dataset.pick;
@@ -2847,6 +2856,8 @@ async function recDone(){
       cal_uid:(REC.cal&&REC.cal.uid)||'', room:(REC.cal&&REC.cal.room)||'',
       ...sc, ...extra});
     if(e2){ toast(upErr('row', e2), 9000); renderRec(); return; }
+    // 다음 녹음 때 이 예약이 계속 골라져 있지 않도록 비웁니다
+    REC.cal=null; REC.preTitle='';
     toast(`<b>${esc(REC.title)}</b> (${recFmt(REC.dur||0)}) 올렸습니다.<br>처리가 끝나면 회의 목록에 나타납니다.`);
   }catch(e){
     toast('올리지 못했습니다: '+esc(e.message||e), 8000);
