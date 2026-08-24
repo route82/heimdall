@@ -534,6 +534,14 @@ function profilePage(row, msg=''){
     <select class="full" id="dp" style="margin-bottom:12px">
       <option value="">부서 선택</option>
     </select>
+
+    <div class="sub" style="text-align:left;margin:2px 0 8px">
+      아래 두 칸은 <b>회사 메일과 다를 때만</b> 적어주시면 됩니다. 나중에 바꿀 수 있습니다.</div>
+    <input class="full" id="gml" type="email" placeholder="구글 캘린더에 쓰는 계정 (회의실 예약용)"
+      value="${esc(row.google_email||'')}" style="margin-bottom:10px">
+    <input class="full" id="sml" type="email" placeholder="슬랙 계정 (슈퍼홀릭 · 그룹 AX 해당자만)"
+      value="${esc(row.slack_email||'')}" style="margin-bottom:12px">
+
     <button class="btn p full" id="save">저장하고 시작하기</button>
     <p style="margin-top:12px;font-size:13px;color:#C0392B">${esc(msg)}</p>
     <button class="btn full" id="out2" style="margin-top:6px;border:0;color:#5C6672;font-size:13px">다른 계정으로 로그인</button>
@@ -542,7 +550,10 @@ function profilePage(row, msg=''){
   $('#save').onclick = async () => {
     const nm=$('#nm').value.trim(), co=$('#co').value, dp=$('#dp').value;
     if(!nm||!co||!dp) return profilePage(row,'이름·회사·부서를 모두 선택해주세요.');
-    const {error} = await SB.from('hd_member').update({name:nm, company:co, dept:dp}).eq('id',row.id);
+    const gml=($('#gml').value||'').trim().toLowerCase();
+    const sml=($('#sml').value||'').trim().toLowerCase();
+    const {error} = await SB.from('hd_member')
+      .update({name:nm, company:co, dept:dp, google_email:gml, slack_email:sml}).eq('id',row.id);
     if(error) return profilePage(row, error.message);
     boot();
   };
@@ -598,7 +609,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v12.37</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v12.40</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 비밀번호 바꾸기">비밀번호 변경</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -649,12 +660,30 @@ function shell(){
     d.innerHTML=`<h1 style="font-size:16px;margin:0 0 6px">내 정보</h1>
       <div class="sub" style="margin:0 0 12px">로그인 아이디 <b>${esc(me.email)}</b><br>
         ${esc(me.company||'')} ${esc(me.dept||'')} · ${ROLE[me.role]||me.role}</div>
-      <input id="pw1" type="password" placeholder="새 비밀번호 (8자 이상)" class="full" style="margin-bottom:8px">
+      <div class="shsec">연결 계정 — 회사 메일과 다를 때만 적으시면 됩니다</div>
+      <input id="mygml" type="email" placeholder="구글 캘린더 계정 (회의실 예약용)"
+        value="${esc(me.google_email||'')}" class="full" style="margin:8px 0">
+      <input id="mysml" type="email" placeholder="슬랙 계정 (슈퍼홀릭 · 그룹 AX 해당자만)"
+        value="${esc(me.slack_email||'')}" class="full" style="margin-bottom:8px">
+      <button class="btn full" id="acsave" style="margin-bottom:14px">연결 계정 저장</button>
+      <div class="shsec">비밀번호</div>
+      <input id="pw1" type="password" placeholder="새 비밀번호 (8자 이상)" class="full" style="margin:8px 0 8px">
       <input id="pw2" type="password" placeholder="새 비밀번호 다시 한번" class="full" style="margin-bottom:12px">
       <div class="row"><button class="btn p" id="pwsave">비밀번호 바꾸기</button>
         <button class="btn" id="pwclose">닫기</button></div>`;
     document.body.appendChild(d);
     $('#pwclose').onclick=()=>d.remove();
+    $('#acsave').onclick=async()=>{
+      const b2=$('#acsave'); b2.disabled=true;
+      const g=($('#mygml').value||'').trim().toLowerCase();
+      const k=($('#mysml').value||'').trim().toLowerCase();
+      const {error}=await SB.from('hd_member')
+        .update({google_email:g, slack_email:k}).eq('id',me.id);
+      b2.disabled=false;
+      if(error) return toast('저장하지 못했습니다: '+esc(error.message), 6000);
+      me.google_email=g; me.slack_email=k;
+      toast('연결 계정을 저장했습니다');
+    };
     $('#pwsave').onclick=async()=>{
       const a=$('#pw1').value, b2=$('#pw2').value;
       if(a.length<8) return toast('비밀번호는 8자 이상이어야 합니다');
@@ -706,8 +735,10 @@ async function renderHome(){
         <div class="hic" style="background:#EAF7EF;color:#1E7A46">${svgIco('chat')}</div>
         <h2>물어보기</h2><p>"지난주 홍 대표님이 뭐라고 하셨지?"<br>회의 내용을 AI에게 질문합니다</p></button>
     </div>
+    <div id="h-cal"></div>
     <div id="h-rec" class="hrec"><div class="sub">최근 회의를 불러오는 중…</div></div>`;
   el.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
+  drawTodayCal();
 
   const [mres,ares]=await Promise.all([
     SB.from('hd_meeting')
@@ -730,6 +761,47 @@ async function renderHome(){
       : '<div class="empty">아직 회의가 없습니다. 위의 「녹음하기」로 시작해보세요.</div>'}`;
   box.querySelectorAll('.card').forEach(c=>c.onclick=()=>openMeeting(c.dataset.id));
   box.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
+}
+
+// 오늘 회의실 예약 — 예약해 두면 여기 떠서, 누르면 바로 녹음으로 갑니다
+async function drawTodayCal(){
+  const box=$('#h-cal'); if(!box) return;
+  const now=new Date();
+  const kd=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul'}).format(now);
+  const from=new Date(kd+'T00:00:00+09:00').toISOString();
+  const to  =new Date(kd+'T23:59:59+09:00').toISOString();
+  const [cal, mtg] = await Promise.all([
+    SB.from('hd_cal_event').select('uid,title,room,starts_at,ends_at,all_day')
+      .gte('starts_at',from).lte('starts_at',to).order('starts_at'),
+    SB.from('hd_meeting').select('cal_uid').gte('held_on',kd)]);
+  const evs=(cal.data||[]).filter(e=>!e.all_day);
+  if(cal.error || !evs.length){ box.innerHTML=''; return; }
+  const done=new Set((mtg.data||[]).map(x=>x.cal_uid).filter(Boolean));
+  const hm=t=>new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',
+    hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(t));
+  box.innerHTML=`<h1 style="font-size:17px">오늘 회의실 예약</h1>
+    <div class="sub">예약된 회의는 녹음해 두시면 회의록이 자동으로 남습니다</div>
+    ${evs.map(e=>{
+      const past=new Date(e.ends_at) < now;
+      const ok=done.has(e.uid);
+      return `<div class="card" style="display:flex;align-items:center;gap:12px">
+        <div style="min-width:0;flex:1">
+          <div class="ct">${esc(e.title)}</div>
+          <div class="cm"><span>${hm(e.starts_at)} ~ ${hm(e.ends_at)}</span>
+            ${e.room?`<span>${esc(e.room)}</span>`:''}
+            ${ok?'<span style="color:#1E7A46">회의록 있음</span>'
+               :(past?'<span style="color:#C0392B">회의록 없음</span>':'')}</div>
+        </div>
+        ${ok?'':`<button class="btn p" data-cal="${esc(e.uid)}"
+            data-title="${esc(e.title)}" data-room="${esc(e.room||'')}"
+            style="flex:none">${past?'지금 올리기':'녹음 시작'}</button>`}
+      </div>`;}).join('')}`;
+  box.querySelectorAll('[data-cal]').forEach(b=>b.onclick=()=>{
+    // 고른 예약을 기억해 두고 녹음 화면으로 갑니다
+    REC.cal={uid:b.dataset.cal, title:b.dataset.title, room:b.dataset.room};
+    REC.preTitle=b.dataset.title;
+    go('rec');
+  });
 }
 
 // ─────────────────────────── 회의 목록
@@ -1427,10 +1499,17 @@ async function renderMembers(){
       <div class="sub" style="margin:0 0 10px">
         로그인 아이디 <b>${esc(m.email)}</b> · 권한 <b>${ROLE[m.role]||m.role}</b>
         · 본 소속 ${esc(m.company||'')} ${esc(m.dept||'')}
+        ${m.google_email?` · 구글 ${esc(m.google_email)}`:''}
         ${(m.extra_scopes||[]).length?` · 겸직 ${(m.extra_scopes||[]).map(x=>esc(x.replace('|',' ').trim())).join(', ')}`:''}</div>
       <div class="row" style="margin-bottom:14px;flex-wrap:wrap">
         <button class="btn" id="mdet-pw">비밀번호 재설정 (임시 비밀번호 발급)</button>
         <span class="sub" style="margin:0;white-space:pre-line" id="mdet-out"></span></div>
+      <div class="shsec">구글 캘린더 계정</div>
+      <div class="row" style="margin-top:8px;flex-wrap:wrap">
+        <input id="mdet-gl" type="email" placeholder="${esc(m.email)} (헤임달과 같으면 비워두세요)"
+          value="${esc(m.google_email||'')}" style="flex:1;min-width:240px;max-width:340px">
+        <button class="btn p" id="mdet-glsave">저장</button>
+        <span class="sub" style="margin:0">회의실 예약을 이 사람 것으로 알아봅니다</span></div>
       <div class="shsec">슬랙 계정</div>
       <div class="row" style="margin-top:8px;flex-wrap:wrap">
         <input id="mdet-sl" type="email" placeholder="${esc(m.email)} (헤임달과 같으면 비워두세요)"
@@ -1482,6 +1561,17 @@ async function renderMembers(){
       }
       out.textContent='응답이 없습니다. 처리 서버가 켜져 있는지 확인해주세요.';
       btn.disabled=false;
+    };
+
+    const gl=$('#mdet-glsave');
+    if(gl) gl.onclick=async()=>{
+      gl.disabled=true;
+      const v=($('#mdet-gl').value||'').trim().toLowerCase();
+      const {error}=await SB.from('hd_member').update({google_email:v}).eq('id',id);
+      gl.disabled=false;
+      if(error) return toast('저장하지 못했습니다: '+esc(error.message), 7000);
+      m.google_email=v;
+      toast(v?'구글 캘린더 계정을 저장했습니다':'지웠습니다 (헤임달 이메일로 찾습니다)');
     };
 
     const sl=$('#mdet-slsave');
@@ -2292,6 +2382,12 @@ async function renderRec(){
     <div class="sub">이 기기의 마이크로 회의를 녹음합니다.
       끝내면 자동으로 올라가고, 전사·요약·하이라이트가 만들어집니다</div>
     <div class="box">
+      <div class="row" id="rc-cal-row" style="margin-bottom:9px;display:none">
+        <select id="rc-cal" style="flex:1;min-width:300px" ${on?'disabled':''}>
+          <option value="">회의실 예약에서 고르기 (선택)</option>
+        </select>
+        <span class="sub" style="margin:0">고르면 회의명이 자동으로 채워집니다</span>
+      </div>
       <div class="row" style="margin-bottom:9px">
         <input id="rc-title" placeholder="회의명" style="flex:2;min-width:220px" ${on?'disabled':''}>
         <input id="rc-parts" placeholder="참석자 (쉼표로 구분 · 선택)" style="flex:2;min-width:180px" ${on?'disabled':''}>
@@ -2337,6 +2433,14 @@ async function renderRec(){
     </div>
     <h1 style="font-size:16px;margin-top:24px">최근 올린 것</h1>
     <div id="up-list" class="box" style="color:#98A0AC">불러오는 중…</div>`;
+  loadCalPicks().then(()=>{
+    // 홈에서 예약을 눌러 들어온 경우 그 예약을 골라 둡니다
+    if(REC.cal && REC.cal.uid){
+      const sel=$('#rc-cal'); if(sel){ sel.value=REC.cal.uid; }
+      const ti=$('#rc-title');
+      if(ti && !ti.value.trim() && REC.preTitle) ti.value=REC.preTitle;
+    }
+  });
   $('#rc-go').onclick = on ? recStop : recStart;
   const ty=$('#rc-type'), shb=$('#rc-share-btn'), box=$('#rc-share-box');
   ty.onchange=()=>{
@@ -2393,6 +2497,33 @@ function recTick(){
   t.textContent = recFmt(Math.floor((Date.now()-REC.t0)/1000));
 }
 
+// 회의실 예약을 불러와 고를 수 있게 합니다 (구글 회의실 캘린더에서 가져온 것)
+async function loadCalPicks(){
+  const sel=$('#rc-cal'); if(!sel) return;
+  const now=new Date();
+  const from=new Date(now.getTime()-6*3600*1000).toISOString();
+  const to  =new Date(now.getTime()+12*3600*1000).toISOString();
+  const {data,error}=await SB.from('hd_cal_event')
+    .select('uid,title,room,starts_at,ends_at')
+    .gte('starts_at',from).lte('starts_at',to)
+    .order('starts_at');
+  const row=$('#rc-cal-row');
+  if(error || !data || !data.length){ if(row) row.style.display='none'; return; }
+  if(row) row.style.display='';
+  const hm=t=>new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',
+    hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(t));
+  sel.innerHTML='<option value="">회의실 예약에서 고르기 (선택)</option>'
+    + data.map(e=>`<option value="${esc(e.uid)}"
+        data-title="${esc(e.title)}" data-room="${esc(e.room||'')}">
+        ${hm(e.starts_at)}~${hm(e.ends_at)} · ${esc(e.title)}${e.room?' · '+esc(e.room):''}
+      </option>`).join('');
+  sel.onchange=()=>{
+    const o=sel.selectedOptions[0]; if(!o||!sel.value){ REC.cal=null; return; }
+    REC.cal={uid:sel.value, title:o.dataset.title, room:o.dataset.room};
+    const ti=$('#rc-title'); if(ti && !ti.value.trim()) ti.value=o.dataset.title;
+  };
+}
+
 async function recStart(){
   const t0=($('#rc-type')||{value:'meeting'}).value;
   if(t0!=='meeting' && !($('#rc-title').value||'').trim()){
@@ -2418,6 +2549,11 @@ async function recStart(){
   REC.chunks=[]; REC.stream=stream; REC.title=title;
   REC.parts=($('#rc-parts').value||'').trim();
   REC.scope=($('#rc-scope')||{value:'mine'}).value;
+  const cs=$('#rc-cal');
+  if(cs && cs.value){
+    const o=cs.selectedOptions[0];
+    REC.cal={uid:cs.value, title:o.dataset.title, room:o.dataset.room};
+  }
   REC.type=($('#rc-type')||{value:'meeting'}).value;
   REC.shares=[...document.querySelectorAll('.rc-share:checked')].map(x=>x.value);
   REC.shco=[...document.querySelectorAll('.rc-shco:checked')].map(x=>x.value);
@@ -2508,7 +2644,9 @@ async function recDone(){
     const {error:e2}=await SB.from('hd_job').insert({
       title:REC.title, participants:REC.parts||'',
       audio_path:name, kind:'audio', orig_name:`${REC.title}.${ext}`,
-      device:'웹 녹음', created_by:me.id, created_name:me.name, ...sc, ...extra});
+      device:'웹 녹음', created_by:me.id, created_name:me.name,
+      cal_uid:(REC.cal&&REC.cal.uid)||'', room:(REC.cal&&REC.cal.room)||'',
+      ...sc, ...extra});
     if(e2){ toast(upErr('row', e2), 9000); renderRec(); return; }
     toast(`<b>${esc(REC.title)}</b> (${recFmt(REC.dur||0)}) 올렸습니다.<br>처리가 끝나면 회의 목록에 나타납니다.`);
   }catch(e){
@@ -2647,6 +2785,8 @@ function renderGuide(){
     <li><b>● 회의 녹음 시작</b> → 마이크 허용 창이 뜨면 <b>허용</b></li>
     <li>회의가 끝나면 <b>■ 녹음 종료</b> — 자동으로 올라갑니다</li>
     <li>몇 분 뒤 <b>회의록</b> 탭에 나타납니다</li>
+    <li>회의실을 예약하고 하시는 회의라면, 녹음 화면 맨 위의
+        <b>「회의실 예약에서 고르기」</b> 에서 그 예약을 고르시면 회의명이 자동으로 채워집니다</li>
   </ol>
   <p>녹음 중에는 다른 앱으로 나가지 마세요 — 녹음이 멈출 수 있습니다.</p>`)}
   ${box('2. 나만 볼 녹음 (아이디어 노트 · 지시사항)',`
@@ -2722,6 +2862,8 @@ function renderGuide(){
     <li><b>지금 백업</b> — 회의록 전체를 PC에 저장합니다 (평소엔 매주 자동)</li>
     <li><b>메일 시험</b> — 서버가 죽었을 때 오는 알림 메일을 시험 발송합니다</li>
     <li><b>플라우드</b> — 가져오기 실행 · 상태 확인 · 계정 로그인 파일 만들기</li>
+    <li><b>회의실 캘린더</b> — 구글 회의실 캘린더의 예약을 10분마다 가져옵니다.
+        녹음 화면에서 「회의실 예약에서 고르기」 로 선택하면 회의명이 자동으로 채워집니다</li>
     <li><b>슬랙</b> — 상태 확인 · 시험 메시지 · 지금 보내기.
         회의록 화면의 <b>「슬랙에 공유」</b> 를 눌렀을 때만 슬랙으로 나갑니다
         (경영진 보고와는 별개입니다). 회사에 맞는 채널로 가고,
@@ -2804,6 +2946,8 @@ const CMDS = [
   ['plaud_status','플라우드 상태',    '플라우드 로그인·설정이 정상인지 확인합니다'],
   ['plaud_redo',  '플라우드 다시 만들기', '이미 가져온 플라우드 회의의 하이라이트·액션·마인드맵을 다시 만듭니다'],
   ['plaud_login', '플라우드 계정 추가',  '사람마다 플라우드 로그인을 하는 도우미 파일을 만듭니다'],
+  ['gcal',        '회의실 예약 가져오기', '구글 회의실 캘린더의 예약을 지금 바로 가져옵니다'],
+  ['gcal_status', '회의실 캘린더 상태',  '캘린더 연결 상태와 다가오는 예약을 확인합니다'],
   ['slack_status','슬랙 상태',      '슬랙 연결과 구성원 계정 연결 상태를 확인합니다'],
   ['slack_test',  '슬랙 시험 메시지', '알림 채널로 시험 메시지를 보냅니다'],
   ['slack',       '슬랙 지금 보내기', '경영진에 보고된 회의를 지금 바로 슬랙으로 보냅니다'],
