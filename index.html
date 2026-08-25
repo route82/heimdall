@@ -649,7 +649,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v12.49</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v12.52</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 비밀번호 바꾸기">비밀번호 변경</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -1370,13 +1370,26 @@ function startEdit(){
   const el=$('#p-meeting');
   const nm = s => (s||'').replace(/\s/g,'');
   const same = (a,b) => nm(a).length>1 && nm(b).length>1 && (nm(a).includes(nm(b)) || nm(b).includes(nm(a)));
-  const allowed = ['manager','admin','ceo','dev'].includes(me.role) || cur.att.some(a=>same(a, me.name));
-  if(!allowed) return toast('이 회의 참석자만 수정할 수 있습니다.<br>참석자: '+esc(cur.att.join(', ')||'미기재'),5000);
+  const mine = cur.m.created_by === me.id;      // 이 회의를 올린 본인
+  const allowed = mine || ['manager','admin','ceo','dev'].includes(me.role)
+                  || cur.att.some(a=>same(a, me.name));
+  if(!allowed) return toast('이 회의 참석자만 수정할 수 있습니다.<br>참석자: '
+    + esc(cur.att.join(', ')||'미기재')
+    + '<br>참석자 칸을 비우고 녹음하셨다면 관리자에게 말씀해주세요.', 6000);
   if(cur.m.status==='reported' && !['manager','admin','ceo','dev'].includes(me.role))
     return toast('경영진께 보고된 회의는 부서 관리자만 수정할 수 있습니다.',5000);
   editing=true;
   el.querySelectorAll('#segs p, .hl h3, .hl li').forEach(e=>{e.contentEditable='true';e.spellcheck=false;});
   const mt=$('#mtitle'); if(mt){ mt.contentEditable='true'; mt.spellcheck=false; }
+  // 참석자도 함께 고칠 수 있게 (녹음할 때 못 적었던 분들을 여기서 넣습니다)
+  const sub=el.querySelector('.sub');
+  if(sub && !$('#mparts')){
+    sub.insertAdjacentHTML('afterend',
+      '<div class="row" style="margin:10px 0"><span class="sub" style="margin:0">참석자</span>'
+      + '<input id="mparts" class="full" style="flex:1;min-width:220px;max-width:520px"'
+      + ' placeholder="쉼표로 구분 (예: 김현우, 홍석진)" value="'
+      + esc(cur.att.join(', ')) + '"></div>');
+  }
   $('#smview').style.display='none';
   const ta=$('#smedit'); ta.style.display='block'; ta.value=cur.m.summary_md||'';
   // 마인드맵 — 그림 대신 글상자를 보여줍니다. # 은 큰 가지, ## 는 작은 가지입니다
@@ -1422,6 +1435,17 @@ async function saveMeeting(){
     const pts=[...h.querySelectorAll('li')].map(li=>li.innerText.trim()).filter(Boolean);
     if(head!==o.headline || JSON.stringify(pts)!==JSON.stringify(o.points))
       await SB.from('hd_highlight').update({headline:head,points:pts}).eq('id',o.id);
+  }
+  const pin=$('#mparts');
+  if(pin){
+    const names=[...new Set(pin.value.split(',').map(x=>x.trim()).filter(Boolean))];
+    const before=[...cur.att].sort().join('|'), after=[...names].sort().join('|');
+    if(before!==after){
+      await SB.from('hd_attendee').delete().eq('meeting_id',id);
+      if(names.length)
+        await SB.from('hd_attendee').insert(names.map(n=>({meeting_id:id, name:n})));
+      msg.push('참석자 수정');
+    }
   }
   const mt2=$('#mtitle');
   if(mt2){
