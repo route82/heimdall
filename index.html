@@ -73,6 +73,7 @@ h1{font-size:23px;margin:0 0 4px;letter-spacing:-.01em}
 .tag{font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px}
 .t-draft{background:#EEF1F5;color:#5B6472}.t-review{background:#FFF3D6;color:#8A6100}
 .t-reported{background:#E3F5E9;color:#1B6B36}.t-archived{background:#EDE9F5;color:#5A3699}
+.bar .btn{display:inline-flex;align-items:center}
 .btn{appearance:none;border:1px solid #DDE2E9;background:#fff;border-radius:9px;padding:9px 16px;
  font-size:14px;font-weight:600;cursor:pointer;color:#3A424F}
 .btn.p{background:#2B6CB0;border-color:#2B6CB0;color:#fff}
@@ -298,7 +299,15 @@ mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
   .role{font-size:10.5px;padding:2px 6px}
   .nav{padding:11px 11px;font-size:15px}
 
-  .wrap{padding:16px 14px 84px}
+  .wrap{padding:16px 14px 132px}
+
+  /* 회의 화면 아래 단추들 — 좁은 화면에서는 한 줄에 다 안 들어가므로
+     화면 바닥에 붙여 두고 여러 줄로 접어서 보여줍니다 */
+  .bar{left:0;right:0;bottom:0;padding:9px 12px calc(9px + env(safe-area-inset-bottom));
+   background:#fff;border-top:1px solid #E6EAF0;box-shadow:0 -6px 18px rgba(20,26,35,.08);
+   flex-wrap:wrap;justify-content:center;gap:7px;max-height:38vh;overflow-y:auto}
+  .bar .btn{flex:1 1 auto;min-width:104px;justify-content:center;text-align:center;
+   padding:11px 12px;font-size:13.5px}
   h1{font-size:20px} .sub{font-size:12.5px;margin-bottom:16px}
   .card{padding:14px 16px;border-radius:11px}
   .ct{font-size:15.5px} .cm{font-size:12px;gap:8px}
@@ -649,7 +658,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v12.52</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v12.53</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 비밀번호 바꾸기">비밀번호 변경</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
