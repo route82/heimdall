@@ -78,6 +78,18 @@ body{background:#12161C;color:#fff;
 /* 오른쪽 위 아주 작은 설정 손잡이 — 3초 길게 눌러야 열립니다 */
 .gear{position:fixed;right:0;top:0;width:76px;height:76px;opacity:0}
 
+.chk{display:flex;align-items:center;gap:10px;font-size:16px;color:#C6CEDA;
+ background:#1B2028;border:1px solid #39414D;border-radius:14px;padding:16px 18px;margin-bottom:6px}
+.chk input{width:22px;height:22px;margin:0;flex:none}
+.tflag{display:inline-block;margin-left:10px;background:#7A4B00;color:#FFD79A;
+ border-radius:999px;font-size:13px;font-weight:700;padding:4px 12px;vertical-align:6px}
+.cnt{font-size:17px;font-weight:700;color:#8FC5FF;margin-bottom:12px;min-height:24px}
+.pick{display:flex;align-items:center;gap:16px;width:100%;text-align:left;
+ background:#1B2028;border:1px solid #2A313C;border-radius:14px;color:#E6EBF2;
+ font-family:inherit;font-size:18px;padding:16px 20px;margin-bottom:8px;cursor:pointer}
+.pick:active{background:#232B36}
+.pick .tm{color:#8E98A6;font-size:16px;flex:none;min-width:130px}
+.rowbtn{display:flex;gap:16px;align-items:center;justify-content:center;flex-wrap:wrap}
 .done{font-size:34px;font-weight:800}
 .done .ok{font-size:64px;display:block;margin-bottom:14px}
 </style>
@@ -97,7 +109,7 @@ const app = $('#app');
 const esc = s => String(s??'').replace(/[&<>"']/g,
   c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-// 이 태블릿의 설정 (회의실 이름·기본 회사)
+// 이 태블릿의 설정 (회의실 이름 · 시험 모드)
 const CFG = {
   get(){ try{ return JSON.parse(localStorage.getItem('hdroom')||'{}'); }catch(e){ return {}; } },
   set(v){ try{ localStorage.setItem('hdroom', JSON.stringify(v)); }catch(e){} },
@@ -148,31 +160,24 @@ function setupPage(msgText){
   const rooms=[...new Set(EVENTS.map(e=>e.room).filter(Boolean))].sort();
   app.innerHTML='<div class="mid"><div class="setup">'
     + '<h1>회의실 태블릿 설정</h1>'
-    + '<div class="sub" style="margin-bottom:18px">이 태블릿을 어느 회의실에 둘지 정합니다. 한 번만 하시면 됩니다.</div>'
+    + '<div class="sub" style="margin-bottom:18px">이 태블릿을 어느 회의실에 둘지만 정하면 됩니다.</div>'
     + (me ? '' :
         '<input id="em" type="email" placeholder="회의실 계정 이메일" value="'+esc(cfg.email||'')+'">'
       + '<input id="pw" type="password" placeholder="비밀번호">')
     + '<input id="rm" type="text" placeholder="회의실 이름 (예: 5F 대회의실)" list="rmlist" value="'+esc(cfg.room||'')+'">'
     + '<datalist id="rmlist">'+rooms.map(r=>'<option value="'+esc(r)+'">').join('')+'</datalist>'
-    + '<select id="co"><option value="">기본 회사 선택</option></select>'
-    + '<div class="sub" style="margin:-4px 0 14px;font-size:14px">참석자를 아무도 안 누르셨을 때 쓰는 회사입니다. 이름을 누르시면 그분들 회사로 자동으로 바뀝니다.</div>'
+    + '<label class="chk"><input type="checkbox" id="tm" '+(cfg.test?'checked':'')+'>'
+    + '<span>시험 모드 — 화면만 확인하고 <b>올리지 않습니다</b></span></label>'
+    + '<div class="sub" style="margin:6px 0 16px;font-size:14px">설치하면서 확인하실 때 켜두세요. '
+    + '실제로 쓰시기 전에 반드시 끄셔야 합니다.</div>'
     + '<button class="btn" id="save">저장하고 시작</button>'
     + '<div class="err" id="err">'+esc(msgText||'')+'</div>'
     + '</div></div>';
 
-  (async()=>{
-    const {data}=await SB.from('hd_org').select('company,sort,pickable').order('sort');
-    const cos=[...new Set((data||[]).filter(o=>o.pickable).map(o=>o.company))];
-    const s=$('#co');
-    if(s) s.innerHTML='<option value="">기본 회사 선택</option>'
-      + cos.map(c=>'<option '+(c===cfg.company?'selected':'')+'>'+esc(c)+'</option>').join('');
-  })();
-
   $('#save').onclick=async()=>{
     const err=$('#err'); err.textContent='';
-    const room=($('#rm').value||'').trim(), company=$('#co').value;
-    if(!room)    { err.textContent='회의실 이름을 적어주세요.'; return; }
-    if(!company) { err.textContent='기본 회사를 골라주세요.'; return; }
+    const room=($('#rm').value||'').trim();
+    if(!room){ err.textContent='회의실 이름을 적어주세요.'; return; }
     if(!me){
       const em=($('#em').value||'').trim(), pw=$('#pw').value||'';
       if(!em||!pw){ err.textContent='회의실 계정으로 로그인해주세요.'; return; }
@@ -180,17 +185,29 @@ function setupPage(msgText){
       if(error){ err.textContent='로그인하지 못했습니다: '+error.message; return; }
       cfg.email=em;
     }
-    cfg.room=room; cfg.company=company; CFG.set(cfg);
+    cfg.room=room; cfg.test=$('#tm').checked; CFG.set(cfg);
     location.reload();
   };
 }
 
 // ─────────────────────────── 자료 읽기
+// 로그인한 계정이 「회의실 전용 계정」 일 때만 이름 목록에서 뺍니다.
+// 개인 계정으로 로그인해도 그 사람이 사라지지 않게 하려는 것입니다.
+const isRoomAcct = m => {
+  const a=flat(m && m.name), b=flat(cfg.room);
+  if(!a) return false;
+  if(b && (a.indexOf(b)>=0 || b.indexOf(a)>=0)) return true;
+  return /회의실|미팅룸|회의룸|room/i.test(m.name||'');
+};
 async function loadMembers(){
   const {data}=await SB.from('hd_member')
     .select('id,name,company,dept,status,approved').eq('approved',true).order('name');
   MEMBERS=(data||[]).filter(m=>(m.status||'active')==='active'
-                            && (m.name||'').trim() && m.id!==me.id);
+                            && (m.name||'').trim()
+                            && !(m.id===me.id && isRoomAcct(m)));
+  // 회사별로 묶어 보여줍니다 (사람이 늘어도 자기 이름을 빨리 찾게)
+  MEMBERS.sort((x,y)=> (x.company||'').localeCompare(y.company||'')
+                    || (x.name||'').localeCompare(y.name||''));
 }
 async function loadEvents(){
   const now=Date.now();
@@ -202,7 +219,6 @@ async function loadEvents(){
   EVENTS=(data||[]).filter(e=>!e.all_day);
 }
 // 회의실 이름이 비슷하면 같은 곳으로 봅니다 (띄어쓰기·기호 차이 무시)
-const flat = t => String(t||'').replace(/[^0-9A-Za-z가-힣]/g,'').toLowerCase();
 function mine(){
   const r=flat(cfg.room);
   if(!r) return EVENTS;
@@ -219,6 +235,12 @@ function current(){
     return now >= s-20*60*1000 && now <= t+20*60*1000;
   }) || null;
 }
+// 예약 제목에서 회사를 알아봅니다 (참석자를 아무도 안 누르셨을 때 씁니다)
+function coFromTitle(t){
+  const x=flat(t);
+  const cos=[...new Set(MEMBERS.map(m=>m.company).filter(Boolean))];
+  return cos.find(c=>x.indexOf(flat(c))>=0) || '';
+}
 
 // ─────────────────────────── 대기 화면
 function idlePage(){
@@ -228,7 +250,8 @@ function idlePage(){
   const c=clk();
   app.innerHTML=
     '<div class="top">'
-    + '<div><div class="room">'+esc(cfg.room||'회의실')+'</div>'
+    + '<div><div class="room">'+esc(cfg.room||'회의실')
+    + (cfg.test?'<span class="tflag">시험 모드</span>':'')+'</div>'
     + '<div class="today" id="dy">'+esc(c.day)+'</div></div>'
     + '<div class="clock"><div class="hm" id="ck">'+c.hm+'</div>'
     + '<div class="sec">회의가 끝나면 회의록이 자동으로 만들어집니다</div></div></div>'
@@ -238,11 +261,13 @@ function idlePage(){
           + '<div class="tm">'+hm(ev.starts_at)+' ~ '+hm(ev.ends_at)+'</div></div>'
           : '<div class="sub">지금 잡힌 예약이 없습니다</div>')
     + '<button class="big go" id="start"><span class="dot"></span>회의 녹음 시작</button>'
-    + (ev ? '<button class="ghost" id="free">예약과 상관없이 녹음</button>' : '')
+    + '<div class="sub" style="font-size:14px">누르면 바로 녹음이 시작됩니다 · '
+    + '참석자는 녹음 중에 이름을 누르시면 됩니다</div>'
     + '</div>'
-    + (rest.length ? '<div class="list"><div class="h">오늘 남은 예약</div>'
-        + rest.slice(0,4).map(e=>'<div class="row"><span>'+hm(e.starts_at)+' ~ '+hm(e.ends_at)
-          + '</span><b>'+esc(e.title||'회의')+'</b></div>').join('') + '</div>' : '');
+    + (rest.length ? '<div class="list"><div class="h">다른 예약으로 시작하기 — 눌러주세요</div>'
+        + rest.slice(0,5).map((e,i)=>'<button class="pick" data-ev="'+i+'">'
+          + '<span class="tm">'+hm(e.starts_at)+' ~ '+hm(e.ends_at)+'</span>'
+          + '<b>'+esc(e.title||'회의')+'</b></button>').join('') + '</div>' : '');
 
   tick=setInterval(()=>{
     const c2=clk();
@@ -252,7 +277,9 @@ function idlePage(){
   }, 1000);
 
   $('#start').onclick=()=>startRec(ev);
-  const f=$('#free'); if(f) f.onclick=()=>startRec(null);
+  app.querySelectorAll('[data-ev]').forEach(b=>b.onclick=()=>{
+    startRec(rest[+b.dataset.ev]);
+  });
 }
 
 // ─────────────────────────── 녹음
@@ -271,7 +298,7 @@ async function startRec(ev){
     if(window.MediaRecorder && MediaRecorder.isTypeSupported(m)){ mime=m; break; }
 
   REC.stream=stream; REC.chunks=[]; REC.t0=Date.now(); REC.ev=ev||null;
-  REC.title=(ev&&ev.title)||'회의'; REC.who=new Set();
+  REC.title=(ev&&ev.title)||''; REC.who=new Set();
   REC.mr = mime ? new MediaRecorder(stream,{mimeType:mime, audioBitsPerSecond:64000})
                 : new MediaRecorder(stream);
   REC.mr.ondataavailable=e=>{ if(e.data&&e.data.size) REC.chunks.push(e.data); };
@@ -282,23 +309,42 @@ async function startRec(ev){
   recPage();
 }
 
+// 이름 버튼 격자 (회사 이름을 작게 함께 보여줍니다)
+function grid(sel){
+  if(!MEMBERS.length) return '<span class="sub">구성원 명단을 불러오지 못했습니다</span>';
+  return MEMBERS.map(m=>'<button class="nm'+(sel&&sel.has(m.id)?' on':'')
+    +'" data-id="'+m.id+'">'+esc(m.name)
+    +'<span class="co">'+esc(m.company||'')+'</span></button>').join('');
+}
+function bindGrid(){
+  app.querySelectorAll('.nm').forEach(b=>b.onclick=()=>{
+    const id=b.dataset.id;
+    if(REC.who.has(id)){ REC.who.delete(id); b.classList.remove('on'); }
+    else { REC.who.add(id); b.classList.add('on'); }
+    const c=$('#cnt');
+    if(c){
+      const picked=MEMBERS.filter(m=>REC.who.has(m.id));
+      c.textContent = picked.length
+        ? '참석 '+picked.length+'명 · '+picked.map(m=>m.name).join(', ')
+        : '아직 아무도 누르지 않았습니다';
+    }
+  });
+}
+
 function recPage(){
   clearInterval(tick);
   app.innerHTML=
-    '<div class="top"><div><div class="room">'+esc(cfg.room||'회의실')+'</div>'
+    '<div class="top"><div><div class="room">'+esc(cfg.room||'회의실')
+    + (cfg.test?'<span class="tflag">시험 모드</span>':'')+'</div>'
     + '<div class="today">녹음하고 있습니다</div></div>'
     + '<div class="clock"><div class="hm" id="ck">'+clk().hm+'</div></div></div>'
     + '<div class="mid">'
-    + '<div class="mtitle">'+esc(REC.title)+'</div>'
+    + '<div class="mtitle">'+esc(REC.title||'제목 없이 시작한 회의')+'</div>'
     + '<div class="elapsed" id="ela">0:00</div>'
     + '<div class="lv" id="lv"></div>'
-    + '<div class="who"><div class="h">들어오시면 <b>본인 이름</b>을 눌러주세요 · 안 누르셔도 녹음은 됩니다</div>'
-    + '<div class="grid" id="grid">'
-    + (MEMBERS.length
-        ? MEMBERS.map(m=>'<button class="nm" data-id="'+m.id+'">'+esc(m.name)
-            + '<span class="co">'+esc(m.company||'')+'</span></button>').join('')
-        : '<span class="sub">구성원 명단을 불러오지 못했습니다</span>')
-    + '</div></div>'
+    + '<div class="who"><div class="h">들어오시면 <b>본인 이름</b>을 눌러주세요</div>'
+    + '<div class="cnt" id="cnt">아직 아무도 누르지 않았습니다</div>'
+    + '<div class="grid">'+grid(REC.who)+'</div></div>'
     + '<button class="big stop rec" id="stop"><span class="dot"></span>회의 종료</button>'
     + '</div>';
 
@@ -306,12 +352,7 @@ function recPage(){
     const a=$('#ela'); if(a) a.textContent=el((Date.now()-REC.t0)/1000);
     const c=$('#ck'); if(c) c.textContent=clk().hm;
   }, 500);
-
-  app.querySelectorAll('.nm').forEach(b=>b.onclick=()=>{
-    const id=b.dataset.id;
-    if(REC.who.has(id)){ REC.who.delete(id); b.classList.remove('on'); }
-    else { REC.who.add(id); b.classList.add('on'); }
-  });
+  bindGrid();
   $('#stop').onclick=stopRec;
 }
 
@@ -335,39 +376,81 @@ function meter(stream){
 
 function stopRec(){
   if(!REC.mr || REC.mr.state!=='recording') return;
+  const sec=(Date.now()-REC.t0)/1000;
+  // 실수로 눌렀을 때를 걸러냅니다
+  if(sec<60 && !confirm('아직 '+Math.round(sec)+'초밖에 안 됐습니다.\n회의를 끝내고 올릴까요?')) return;
   clearInterval(REC.meter); clearInterval(tick);
-  REC.dur=Math.floor((Date.now()-REC.t0)/1000);
+  REC.dur=Math.floor(sec);
   REC.mr.stop();
   (REC.stream.getTracks()||[]).forEach(t=>t.stop());
   try{ if(REC.ac) REC.ac.close(); }catch(e){}
-  app.innerHTML='<div class="mid"><div class="done"><span class="ok">⏳</span>올리는 중입니다…</div></div>';
+  app.innerHTML='<div class="mid"><div class="done"><span class="ok">⏳</span>정리하는 중입니다…</div></div>';
 }
 
-async function finish(){
+function finish(){
   const type=REC.mr.mimeType||'audio/webm';
   const ext=type.indexOf('mp4')>=0?'mp4':type.indexOf('ogg')>=0?'ogg':'webm';
-  const blob=new Blob(REC.chunks,{type});
+  REC.blob=new Blob(REC.chunks,{type}); REC.ext=ext; REC.type=type;
   REC.mr=null; REC.chunks=[];
-  if(blob.size<4000){ msg('녹음이 비어 있습니다','마이크가 연결되어 있는지 확인해주세요'); return; }
+  if(REC.blob.size<4000){ msg('녹음이 비어 있습니다','마이크가 연결되어 있는지 확인해주세요'); return; }
+  // 아무도 이름을 누르지 않았으면 한 번 더 여쭙니다.
+  // 참석자가 곧 열람 권한이라 비워두면 팀장·관리자만 보게 됩니다.
+  if(!REC.who.size) return askWho();
+  upload();
+}
+
+function askWho(){
+  app.innerHTML=
+    '<div class="mid">'
+    + '<div class="mtitle">누가 참석하셨나요?</div>'
+    + '<div class="sub">이름을 누르시면 그분들께 회의록이 슬랙으로 갑니다.<br>'
+    + '누르지 않으시면 팀장님과 관리자에게만 보입니다.</div>'
+    + '<div class="who"><div class="cnt" id="cnt">아직 아무도 누르지 않았습니다</div>'
+    + '<div class="grid">'+grid(REC.who)+'</div></div>'
+    + '<div class="rowbtn">'
+    + '<button class="ghost" id="skip">그냥 올리기</button>'
+    + '<button class="big go" id="up" style="font-size:26px;padding:24px 44px">올리기</button>'
+    + '</div></div>';
+  bindGrid();
+  $('#up').onclick=upload;
+  $('#skip').onclick=upload;
+}
+
+async function upload(){
+  app.innerHTML='<div class="mid"><div class="done"><span class="ok">⏳</span>올리는 중입니다…</div></div>';
 
   // 이름을 누르신 분들이 참석자입니다. 그분들의 회사를 이 회의의 회사로 씁니다.
   const picked=MEMBERS.filter(m=>REC.who.has(m.id));
   const cos={};
   picked.forEach(m=>{ if(m.company) cos[m.company]=(cos[m.company]||0)+1; });
-  const company=Object.keys(cos).sort((a,b)=>cos[b]-cos[a])[0] || cfg.company || '';
+  let company=Object.keys(cos).sort((a,b)=>cos[b]-cos[a])[0] || '';
+  if(!company) company=coFromTitle(REC.title);          // 예약 제목에서 찾아보고
+  if(!company){                                          // 그래도 없으면 가장 많은 회사
+    const all={};
+    MEMBERS.forEach(m=>{ if(m.company) all[m.company]=(all[m.company]||0)+1; });
+    company=Object.keys(all).sort((a,b)=>all[b]-all[a])[0] || '';
+  }
   const dps=[...new Set(picked.filter(m=>m.company===company).map(m=>m.dept).filter(Boolean))];
   const dept = dps.length===1 ? dps[0] : '';
 
+  if(cfg.test){
+    msg('시험 모드라 올리지 않았습니다',
+        '회사 '+(company||'미정')+' · '
+        + (picked.length ? picked.map(m=>m.name).join(', ') : '참석자 없음')
+        + ' · '+el(REC.dur||0));
+    return;
+  }
+
   try{
-    const name='jobs/'+Date.now()+'_room.'+ext;   // 저장소 파일 이름은 영문·숫자만
+    const name='jobs/'+Date.now()+'_room.'+REC.ext;   // 저장소 파일 이름은 영문·숫자만
     const up=await SB.storage.from('hd-audio')
-      .upload(name, blob, {upsert:true, contentType:type});
+      .upload(name, REC.blob, {upsert:true, contentType:REC.type});
     if(up.error){ msg('올리지 못했습니다', up.error.message); return; }
 
     const ins=await SB.from('hd_job').insert({
       title: mkTitle(REC.title, company),
       participants: picked.map(m=>m.name).join(', '),
-      audio_path:name, kind:'audio', orig_name:REC.title+'.'+ext,
+      audio_path:name, kind:'audio', orig_name:(REC.title||'회의')+'.'+REC.ext,
       device:'회의실 태블릿', created_by:me.id, created_name:cfg.room||'회의실',
       company:company, dept:dept,
       cal_uid:(REC.ev&&REC.ev.uid)||'', room:cfg.room||'',
@@ -389,7 +472,7 @@ function msg(head, sub){
   clearInterval(tick);
   app.innerHTML='<div class="mid"><div class="done"><span class="ok">✓</span>'+esc(head)+'</div>'
     + '<div class="sub" style="max-width:640px">'+esc(sub||'')
-    + '<br><br>회의록은 몇 분 뒤 헤임달에 올라옵니다.</div>'
+    + (cfg.test?'':'<br><br>회의록은 몇 분 뒤 헤임달에 올라옵니다.')+'</div>'
     + '<button class="ghost" id="ok">확인</button></div>';
   const back=()=>{ loadEvents().catch(()=>{}).then(idlePage); };
   $('#ok').onclick=back;
@@ -415,7 +498,7 @@ async function boot(){
     if(data && data.approved && (data.status||'active')==='active') me=data;
   }
   await loadEvents().catch(()=>{});
-  if(!me || !cfg.room || !cfg.company){
+  if(!me || !cfg.room){
     setupPage(!me && session ? '이 계정은 아직 승인되지 않았습니다. 관리자에게 요청해주세요.' : '');
     return;
   }
