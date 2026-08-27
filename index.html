@@ -753,7 +753,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v14.8</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v14.9</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -3579,7 +3579,8 @@ const CMDS = [
   ['gcal',        '회의실 예약 가져오기', '구글 회의실 캘린더의 예약을 지금 바로 가져옵니다'],
   ['gcal_status', '회의실 캘린더 상태',  '캘린더 연결 상태와 다가오는 예약을 확인합니다'],
   ['slack_status','슬랙 상태',      '슬랙 연결과 구성원 계정 연결 상태를 확인합니다'],
-  ['slack_test',  '슬랙 시험 메시지', '알림 채널로 시험 메시지를 보냅니다'],
+  ['slack_test',  '슬랙 시험 메시지', '눌러본 사람에게 1:1 로 시험 메시지를 보냅니다'],
+  ['brief_now',   '브리핑 지금 만들기', '어제 회의로 브리핑을 만들고 대표님들께 슬랙으로 보냅니다'],
   ['slack',       '슬랙 지금 보내기', '경영진에 보고된 회의를 지금 바로 슬랙으로 보냅니다'],
 ];
 
