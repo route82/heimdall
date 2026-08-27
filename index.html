@@ -174,10 +174,11 @@ mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
 .st .stt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .st .stc{font-size:11px;color:#98A0AC;flex:none}
 .st .pdot{width:9px;height:9px;border-radius:3px;flex:none}
-.cgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:#E6EAF0;
+.cgrid{display:grid;grid-template-columns:repeat(7,1fr);
+ grid-template-rows:auto repeat(6,128px);gap:1px;background:#E6EAF0;
  border:1px solid #E6EAF0;border-radius:12px;overflow:hidden}
 .cgh{background:#F7F9FC;padding:8px 6px;text-align:center;font-size:12.5px;color:#5C6672;font-weight:600}
-.cday{background:#fff;min-height:104px;padding:6px 6px 8px}
+.cday{background:#fff;padding:6px 6px 8px;overflow:hidden;min-width:0}
 .cday.out{background:#FAFBFC}
 .cday .dn{font-size:12px;color:#98A0AC;margin-bottom:4px}
 .cday.today .dn{color:#2B6CB0;font-weight:700}
@@ -285,6 +286,10 @@ mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
 
 /* ── 좁은 화면 ─────────────────────────────────────── */
 @media(max-width:900px){
+  .cgrid{grid-template-rows:auto repeat(6,92px)}
+  .cgh{padding:6px 3px;font-size:11.5px}
+  .cday{padding:4px 4px 6px}
+  .cev{font-size:10.5px;padding:2px 4px;margin-bottom:2px}
   /* 좁은 화면에서는 사이드바를 서랍으로 숨깁니다 */
   .side{transform:translateX(-100%);transition:transform .22s ease;width:262px;
    box-shadow:0 0 0 rgba(0,0,0,0)}
@@ -736,7 +741,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v14.3</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v14.4</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -1035,8 +1040,8 @@ function monthHtml(s0,e0,evs,done){
       const list=(byDay[key]||[]);
       return `<div class="cday${out?' out':''}${key===today?' today':''}">
         <div class="dn">${d.getDate()}</div>
-        ${list.slice(0,4).map(e=>evBtn(e,done,'cev')).join('')}
-        ${list.length>4?`<div class="dn">+${list.length-4}건</div>`:''}
+        ${list.slice(0,3).map(e=>evBtn(e,done,'cev')).join('')}
+        ${list.length>3?`<div class="dn">+${list.length-3}건</div>`:''}
       </div>`;}).join('')}
   </div>`;
 }
