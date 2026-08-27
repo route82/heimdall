@@ -736,7 +736,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v14.1</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v14.2</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -783,7 +783,8 @@ function shell(){
     const d=document.createElement('div'); d.id='selfbox';
     d.style.cssText='position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:80;'
       +'background:#fff;border:1px solid #DDE2E9;border-radius:14px;padding:22px 24px;'
-      +'box-shadow:0 10px 40px rgba(0,0,0,.18);width:min(92vw,380px)';
+      +'box-shadow:0 10px 40px rgba(0,0,0,.18);width:min(92vw,380px);'
+      +'max-height:88vh;overflow-y:auto;-webkit-overflow-scrolling:touch';
     d.innerHTML=`<h1 style="font-size:16px;margin:0 0 6px">내 정보</h1>
       <div class="sub" style="margin:0 0 12px">로그인 아이디 <b>${esc(me.email)}</b><br>
         ${esc(me.company||'')} ${esc(me.dept||'')} · ${ROLE[me.role]||me.role}</div>
@@ -791,7 +792,8 @@ function shell(){
       <div class="sub" style="margin:2px 0 6px;font-size:11.5px">회의실 예약을
         내 것으로 알아봅니다. 로그인 아이디와 같으면 비워두세요</div>
       <input id="mygml" type="email" placeholder="${esc(me.email)}"
-        value="${esc(me.google_email||'')}" class="full" style="margin-bottom:4px">
+        value="${esc(me.google_email||'')}" class="full" style="margin-bottom:6px">
+      <button class="btn full" id="acsave-g" style="margin-bottom:6px">구글 캘린더 계정 저장</button>
       ${SLACK_WS.map((w,i)=>`
         <div style="margin-top:10px">
           <div style="font-size:13px;font-weight:700;color:#3A424F">${esc(w.name)}</div>
@@ -800,7 +802,7 @@ function shell(){
           <button class="btn full" type="button" data-mysladd="${i}"
             style="font-size:13px;margin-bottom:4px">+ 이메일 추가</button>
         </div>`).join('')}
-      <button class="btn full" id="acsave" style="margin:10px 0 14px">연결 계정 저장</button>
+      <button class="btn full" id="acsave" style="margin:10px 0 14px">슬랙 계정 저장</button>
       <div class="shsec">비밀번호</div>
       <input id="pw1" type="password" placeholder="새 비밀번호 (8자 이상)" class="full" style="margin:8px 0 8px">
       <input id="pw2" type="password" placeholder="새 비밀번호 다시 한번" class="full" style="margin-bottom:12px">
@@ -815,20 +817,34 @@ function shell(){
       b.onclick=()=>myEd[+b.dataset.mysladd].add();
     });
 
+    $('#acsave-g').onclick=async()=>{
+      const b1=$('#acsave-g');
+      const g=($('#mygml').value||'').trim().toLowerCase();
+      if(g && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(g))
+        return toast('이메일 형식이 아닙니다: '+esc(g), 6000);
+      b1.disabled=true;
+      const {error}=await SB.from('hd_member').update({google_email:g}).eq('id',me.id);
+      b1.disabled=false;
+      if(error) return toast('저장하지 못했습니다: '+esc(error.message), 6000);
+      me.google_email=g;
+      toast(g?'구글 캘린더 계정을 저장했습니다'
+             :'지웠습니다 (로그인 아이디로 회의실 예약을 찾습니다)');
+    };
+
     $('#acsave').onclick=async()=>{
       const b2=$('#acsave');
-      const g=($('#mygml').value||'').trim().toLowerCase();
       const vals=myEd.map(e=>e.value());
       if(vals.some(v=>v===null)) return;
-      const patch={google_email:g};
+      const patch={};
       SLACK_WS.forEach((w,i)=>{ patch[w.key]=vals[i]; });
       b2.disabled=true;
       const {error}=await SB.from('hd_member').update(patch).eq('id',me.id);
       b2.disabled=false;
       if(error) return toast('저장하지 못했습니다: '+esc(error.message), 6000);
-      me.google_email=g;
       SLACK_WS.forEach((w,i)=>{ me[w.key]=vals[i]; });
-      toast('연결 계정을 저장했습니다');
+      const cnt=vals.reduce((a,v)=>a+splitEm(v).length,0);
+      toast(cnt?`슬랙 계정 ${cnt}개를 저장했습니다`
+               :'슬랙 계정을 비웠습니다 (로그인 아이디로 찾습니다)');
     };
     $('#pwsave').onclick=async()=>{
       const a=$('#pw1').value, b2=$('#pw2').value;
