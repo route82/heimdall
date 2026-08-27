@@ -753,7 +753,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v14.7</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v14.8</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -1732,12 +1732,96 @@ async function renderBrief(){
   }
   const {data}=await SB.from('hd_brief').select('*').order('on_date',{ascending:false}).limit(14);
   el.innerHTML=`<h1>일일 브리핑</h1><div class="sub">전날 회의를 한 장으로 정리합니다</div>`
+   + (['admin','ceo'].includes(me.role)
+        ? `<div class="box" id="bto-box" style="margin-bottom:16px">불러오는 중…</div>` : '')
    + ((data&&data.length)? data.map(b=>`<div class="box"><div class="sub" style="margin:0 0 10px">${b.on_date}</div>
        <div class="md">${mdHtml(b.body_md)}</div></div>`).join('')
      : `<div class="empty">아직 브리핑이 없습니다.<br><br>
         전날 회의가 정리되면 다음 날 아침에 이 자리에 올라옵니다.<br>
         회의를 하나하나 다 읽지 않으셔도 흐름을 아실 수 있도록<br>
         <b>정해진 것 · 결정이 필요한 것 · 진행 중인 할 일</b> 순서로 정리됩니다.</div>`);
+  if(['admin','ceo'].includes(me.role)) drawBriefTo();
+}
+
+// ─────────────────────────── 브리핑 받는 분 (대표·관리자만)
+// 헤임달 계정이 없는 대표님도 넣을 수 있어서 구성원 표와 따로 둡니다.
+async function drawBriefTo(){
+  const box=$('#bto-box'); if(!box) return;
+  await loadOrg();
+  const {data,error}=await SB.from('hd_brief_to').select('*').order('name');
+  if(error) return box.innerHTML=`<div class="sub" style="margin:0;color:#B36B00">
+    받는 분 명단을 읽지 못했습니다 · ${esc(error.message)}<br>
+    「브리핑_받는분.sql」 을 아직 실행하지 않으셨다면 먼저 실행해주세요.</div>`;
+  const rows=data||[];
+  const cos=[...new Set(ORG.filter(o=>o.pickable).map(o=>o.company))];
+  box.innerHTML=`
+    <div class="row" style="align-items:center;margin-bottom:4px">
+      <b style="font-size:15px">브리핑 받는 분</b>
+      <span class="sub" style="margin:0">아침에 슬랙 1:1 로 갑니다</span>
+      <button class="btn p" id="bto-add" style="margin-left:auto">+ 사람 추가</button>
+    </div>
+    <div class="sub" style="margin:0 0 12px;font-size:12px">
+      회사를 하나도 체크하지 않으면 <b>전 회사</b> 브리핑이 갑니다.
+      체크하면 그 회사 회의만 모아 따로 만들어 보냅니다.
+      헤임달 계정이 없는 분도 넣으실 수 있습니다.</div>
+    ${rows.length? rows.map(r=>`
+      <div class="box" style="margin-bottom:10px" data-bto="${r.id}">
+        <div class="row" style="align-items:center;margin-bottom:8px">
+          <input class="bt-name" value="${esc(r.name||'')}" placeholder="이름"
+            style="max-width:150px;font-weight:700">
+          <label class="shlb"><input type="checkbox" class="bt-on" ${r.active?'checked':''}> 보냄</label>
+          <button class="btn" data-btdel="${r.id}" style="margin-left:auto;color:#C0392B">삭제</button>
+        </div>
+        <div class="row" style="flex-wrap:wrap;margin-bottom:8px">
+          <input class="bt-s1" value="${esc(r.slack_email||'')}"
+            placeholder="슈퍼홀릭 슬랙 이메일" style="flex:1;min-width:240px">
+          <input class="bt-s2" value="${esc(r.slack2_email||'')}"
+            placeholder="더올마이티 슬랙 이메일" style="flex:1;min-width:240px">
+        </div>
+        <div class="row" style="flex-wrap:wrap;gap:6px 14px">
+          <span class="sub" style="margin:0;min-width:70px">브리핑 범위</span>
+          ${cos.map(c=>`<label class="shlb"><input type="checkbox" class="bt-co"
+            value="${esc(c)}" ${(r.companies||[]).includes(c)?'checked':''}> ${esc(c)}</label>`).join('')}
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button class="btn p" data-btsave="${r.id}">저장</button>
+          <span class="sub" style="margin:0">${esc(r.note||'')}</span>
+        </div>
+      </div>`).join('')
+      : '<div class="sub" style="margin:0">아직 등록된 분이 없습니다.</div>'}`;
+
+  $('#bto-add').onclick=async()=>{
+    const nm=prompt('이름을 적어주세요 (예: 정원하)');
+    if(!nm || !nm.trim()) return;
+    const {error}=await SB.from('hd_brief_to').insert({name:nm.trim()});
+    if(error) return toast('추가하지 못했습니다: '+esc(error.message), 6000);
+    drawBriefTo();
+  };
+  box.querySelectorAll('[data-btsave]').forEach(b=>b.onclick=async()=>{
+    const card=b.closest('[data-bto]');
+    const em=[...card.querySelectorAll('.bt-s1,.bt-s2')].map(i=>(i.value||'').trim().toLowerCase());
+    const bad=em.filter(t=>t && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t));
+    if(bad.length) return toast('이메일 형식이 아닙니다: '+esc(bad.join(', ')), 6000);
+    const nm=(card.querySelector('.bt-name').value||'').trim();
+    if(!nm) return toast('이름을 적어주세요');
+    b.disabled=true;
+    const {error}=await SB.from('hd_brief_to').update({
+      name:nm, slack_email:em[0], slack2_email:em[1],
+      active:card.querySelector('.bt-on').checked,
+      companies:[...card.querySelectorAll('.bt-co:checked')].map(x=>x.value),
+    }).eq('id', b.dataset.btsave);
+    b.disabled=false;
+    if(error) return toast('저장하지 못했습니다: '+esc(error.message), 6000);
+    toast(`${esc(nm)}님 설정을 저장했습니다`);
+  });
+  box.querySelectorAll('[data-btdel]').forEach(b=>b.onclick=async()=>{
+    const card=b.closest('[data-bto]');
+    const nm=(card.querySelector('.bt-name').value||'').trim();
+    if(!confirm(`${nm}님을 브리핑 명단에서 빼시겠습니까?`)) return;
+    const {error}=await SB.from('hd_brief_to').delete().eq('id', b.dataset.btdel);
+    if(error) return toast('지우지 못했습니다: '+esc(error.message), 6000);
+    drawBriefTo();
+  });
 }
 
 // ─────────────────────────── 구성원 (관리자)
@@ -3535,6 +3619,7 @@ async function renderServer(){
           <option value="SLACK2_COMPANY">2번 슬랙으로 보낼 회사 (쉼표 구분)</option>
           <option value="SLACK2_CHANNEL">2번 슬랙 기본 채널 (# 없이)</option>
           <option value="SLACK2_CHANNEL_MAP">2번 슬랙 회사별 채널 (회사=채널, 회사=채널)</option>
+          <option value="BRIEF_SLACK">일일 브리핑을 슬랙으로 보낼지 (1 · 0)</option>
         </select>
         <input id="sv-val" placeholder="예: large-v3 · claude-sonnet-5 · 7" style="flex:1;min-width:200px">
         <button class="btn p" id="sv-set">바꾸기</button>
