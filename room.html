@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="ko"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>HEIMDALL 회의실</title>
+<meta name="theme-color" content="#12161C">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" href="./icons/favicon.ico?v=3" sizes="any">
+<style>
+/* ─────────────────────────────────────────────────────────────
+   회의실 태블릿 화면 (키오스크)
+   버튼 하나만 누르면 되게 만드는 것이 목적입니다.
+   손가락으로 누르는 화면이라 글자와 버튼을 크게 잡았습니다.
+   ───────────────────────────────────────────────────────────── */
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0;overflow:hidden}
+body{background:#12161C;color:#fff;
+ font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif;
+ user-select:none;-webkit-user-select:none}
+.wrap{height:100%;display:flex;flex-direction:column;padding:26px 30px}
+.top{display:flex;align-items:flex-start;gap:16px}
+.room{font-size:26px;font-weight:800;letter-spacing:-.3px}
+.today{font-size:15px;color:#8E98A6;margin-top:4px}
+.clock{margin-left:auto;text-align:right}
+.clock .hm{font-size:52px;font-weight:800;line-height:1;letter-spacing:-1px;
+ font-variant-numeric:tabular-nums}
+.clock .sec{font-size:14px;color:#6C7686;margin-top:6px}
+
+.mid{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;
+ text-align:center;gap:18px;min-height:0}
+
+.next{background:#1B2028;border:1px solid #2A313C;border-radius:20px;
+ padding:20px 34px;max-width:92%}
+.next .lb{font-size:14px;color:#6FA8E0;font-weight:700;letter-spacing:.04em}
+.next .tt{font-size:30px;font-weight:800;margin:8px 0 6px;line-height:1.3}
+.next .tm{font-size:17px;color:#A9B3C1}
+
+.big{border:0;border-radius:28px;font-family:inherit;cursor:pointer;
+ font-size:34px;font-weight:800;padding:34px 64px;letter-spacing:-.4px;
+ display:inline-flex;align-items:center;gap:16px;box-shadow:0 10px 34px rgba(0,0,0,.35)}
+.big:active{transform:scale(.98)}
+.go{background:#2F6FED;color:#fff}
+.stop{background:#D0342C;color:#fff}
+.dot{width:20px;height:20px;border-radius:50%;background:#fff;flex:none}
+.rec .dot{animation:bl 1.4s infinite}
+@keyframes bl{0%,100%{opacity:1}50%{opacity:.25}}
+
+.sub{font-size:16px;color:#8E98A6;line-height:1.6}
+.ghost{background:transparent;border:1px solid #39414D;color:#C6CEDA;
+ border-radius:16px;font-family:inherit;font-size:17px;padding:16px 28px;cursor:pointer}
+
+.list{margin-top:auto;padding-top:14px;border-top:1px solid #232A33}
+.list .h{font-size:13px;color:#6C7686;margin-bottom:8px;letter-spacing:.04em}
+.row{display:flex;gap:14px;font-size:15px;color:#A9B3C1;padding:5px 0}
+.row b{color:#E6EBF2;font-weight:600}
+
+.elapsed{font-size:76px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-1px}
+.mtitle{font-size:24px;font-weight:700;color:#C6CEDA}
+.lv{font-size:15px;color:#6FD08C;height:22px}
+
+.who{width:100%;max-width:1000px}
+.who .h{font-size:17px;color:#A9B3C1;margin-bottom:12px}
+.grid{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;
+ max-height:38vh;overflow-y:auto;padding:2px}
+.nm{background:#1B2028;border:2px solid #2A313C;color:#C6CEDA;border-radius:16px;
+ font-family:inherit;font-size:21px;font-weight:700;padding:16px 26px;cursor:pointer;min-width:120px}
+.nm.on{background:#2F6FED;border-color:#2F6FED;color:#fff}
+.nm .co{display:block;font-size:12px;font-weight:500;opacity:.6;margin-top:3px}
+
+.setup{max-width:520px;margin:0 auto;width:100%;text-align:left}
+.setup h1{font-size:24px;margin:0 0 6px}
+.setup input,.setup select{width:100%;background:#1B2028;border:1px solid #39414D;color:#fff;
+ border-radius:14px;font-family:inherit;font-size:19px;padding:16px 18px;margin-bottom:12px}
+.setup .btn{width:100%;background:#2F6FED;border:0;color:#fff;border-radius:14px;
+ font-family:inherit;font-size:20px;font-weight:700;padding:18px;cursor:pointer}
+.err{color:#FF8A80;font-size:15px;min-height:22px;margin-top:8px}
+
+/* 오른쪽 위 아주 작은 설정 손잡이 — 3초 길게 눌러야 열립니다 */
+.gear{position:fixed;right:0;top:0;width:76px;height:76px;opacity:0}
+
+.done{font-size:34px;font-weight:800}
+.done .ok{font-size:64px;display:block;margin-bottom:14px}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><div class="mid"><div class="sub">불러오는 중…</div></div></div>
+<div class="gear" id="gear"></div>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const SB = createClient('https://dwoiobqucmikbtikfjwk.supabase.co', 'sb_publishable_K6BW26u2jRkTBDwuMqaaFA_3HkfnOc9',
+  { auth:{ persistSession:true, autoRefreshToken:true } });
+
+const $  = s => document.querySelector(s);
+const app = $('#app');
+const esc = s => String(s??'').replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+// 이 태블릿의 설정 (회의실 이름·기본 회사)
+const CFG = {
+  get(){ try{ return JSON.parse(localStorage.getItem('hdroom')||'{}'); }catch(e){ return {}; } },
+  set(v){ try{ localStorage.setItem('hdroom', JSON.stringify(v)); }catch(e){} },
+};
+
+let me=null, cfg=CFG.get(), MEMBERS=[], EVENTS=[], tick=null;
+
+// 시각은 한국 기준으로 고정합니다
+const KST = o => new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',...o});
+const hm  = t => KST({hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(t));
+const ymd6 = d => {
+  const t=new Date((d?new Date(d):new Date()).getTime()+9*3600*1000);
+  return t.toISOString().slice(2,10).replace(/-/g,'');
+};
+const clk = () => {
+  const n=new Date();
+  return { hm:hm(n), day:KST({month:'long',day:'numeric',weekday:'long'}).format(n) };
+};
+function el(sec){
+  sec=Math.floor(sec);
+  const h=Math.floor(sec/3600), m=Math.floor(sec%3600/60), s=sec%60;
+  const p=x=>String(x).padStart(2,'0');
+  return h? h+':'+p(m)+':'+p(s) : m+':'+p(s);
+}
+// 제목 규칙은 헤임달과 같게 — 「날짜 회사 내용」
+function mkTitle(body, co){
+  let t=(body||'').trim().replace(/^\d{6}\s*/,'');
+  co=(co||'').trim();
+  if(co && t.startsWith(co)) t=t.slice(co.length).trim();
+  return [ymd6(), co, t||'회의'].filter(Boolean).join(' ');
+}
+
+// 화면이 꺼지지 않게 잡아둡니다
+let wake=null;
+async function keepAwake(){
+  try{
+    if(!('wakeLock' in navigator) || wake) return;
+    wake = await navigator.wakeLock.request('screen');
+    wake.addEventListener('release', ()=>{ wake=null; });
+  }catch(e){}
+}
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState==='visible'){ wake=null; keepAwake(); }
+});
+
+// ─────────────────────────── 설정 화면
+function setupPage(msgText){
+  const rooms=[...new Set(EVENTS.map(e=>e.room).filter(Boolean))].sort();
+  app.innerHTML='<div class="mid"><div class="setup">'
+    + '<h1>회의실 태블릿 설정</h1>'
+    + '<div class="sub" style="margin-bottom:18px">이 태블릿을 어느 회의실에 둘지 정합니다. 한 번만 하시면 됩니다.</div>'
+    + (me ? '' :
+        '<input id="em" type="email" placeholder="회의실 계정 이메일" value="'+esc(cfg.email||'')+'">'
+      + '<input id="pw" type="password" placeholder="비밀번호">')
+    + '<input id="rm" type="text" placeholder="회의실 이름 (예: 5F 대회의실)" list="rmlist" value="'+esc(cfg.room||'')+'">'
+    + '<datalist id="rmlist">'+rooms.map(r=>'<option value="'+esc(r)+'">').join('')+'</datalist>'
+    + '<select id="co"><option value="">기본 회사 선택</option></select>'
+    + '<div class="sub" style="margin:-4px 0 14px;font-size:14px">참석자를 아무도 안 누르셨을 때 쓰는 회사입니다. 이름을 누르시면 그분들 회사로 자동으로 바뀝니다.</div>'
+    + '<button class="btn" id="save">저장하고 시작</button>'
+    + '<div class="err" id="err">'+esc(msgText||'')+'</div>'
+    + '</div></div>';
+
+  (async()=>{
+    const {data}=await SB.from('hd_org').select('company,sort,pickable').order('sort');
+    const cos=[...new Set((data||[]).filter(o=>o.pickable).map(o=>o.company))];
+    const s=$('#co');
+    if(s) s.innerHTML='<option value="">기본 회사 선택</option>'
+      + cos.map(c=>'<option '+(c===cfg.company?'selected':'')+'>'+esc(c)+'</option>').join('');
+  })();
+
+  $('#save').onclick=async()=>{
+    const err=$('#err'); err.textContent='';
+    const room=($('#rm').value||'').trim(), company=$('#co').value;
+    if(!room)    { err.textContent='회의실 이름을 적어주세요.'; return; }
+    if(!company) { err.textContent='기본 회사를 골라주세요.'; return; }
+    if(!me){
+      const em=($('#em').value||'').trim(), pw=$('#pw').value||'';
+      if(!em||!pw){ err.textContent='회의실 계정으로 로그인해주세요.'; return; }
+      const {error}=await SB.auth.signInWithPassword({email:em, password:pw});
+      if(error){ err.textContent='로그인하지 못했습니다: '+error.message; return; }
+      cfg.email=em;
+    }
+    cfg.room=room; cfg.company=company; CFG.set(cfg);
+    location.reload();
+  };
+}
+
+// ─────────────────────────── 자료 읽기
+async function loadMembers(){
+  const {data}=await SB.from('hd_member')
+    .select('id,name,company,dept,status,approved').eq('approved',true).order('name');
+  MEMBERS=(data||[]).filter(m=>(m.status||'active')==='active'
+                            && (m.name||'').trim() && m.id!==me.id);
+}
+async function loadEvents(){
+  const now=Date.now();
+  const from=new Date(now-2*3600*1000).toISOString();
+  const to  =new Date(now+16*3600*1000).toISOString();
+  const {data}=await SB.from('hd_cal_event')
+    .select('uid,title,room,starts_at,ends_at,all_day')
+    .gte('starts_at',from).lte('starts_at',to).order('starts_at');
+  EVENTS=(data||[]).filter(e=>!e.all_day);
+}
+// 회의실 이름이 비슷하면 같은 곳으로 봅니다 (띄어쓰기·기호 차이 무시)
+const flat = t => String(t||'').replace(/[^0-9A-Za-z가-힣]/g,'').toLowerCase();
+function mine(){
+  const r=flat(cfg.room);
+  if(!r) return EVENTS;
+  return EVENTS.filter(e=>{
+    const x=flat(e.room);
+    return x && (x.indexOf(r)>=0 || r.indexOf(x)>=0);
+  });
+}
+// 지금 하고 있거나 곧 시작할 예약 (앞뒤 20분 여유)
+function current(){
+  const now=Date.now();
+  return mine().find(e=>{
+    const s=new Date(e.starts_at).getTime(), t=new Date(e.ends_at).getTime();
+    return now >= s-20*60*1000 && now <= t+20*60*1000;
+  }) || null;
+}
+
+// ─────────────────────────── 대기 화면
+function idlePage(){
+  clearInterval(tick);
+  const ev=current();
+  const rest=mine().filter(e=>new Date(e.ends_at).getTime()>Date.now());
+  const c=clk();
+  app.innerHTML=
+    '<div class="top">'
+    + '<div><div class="room">'+esc(cfg.room||'회의실')+'</div>'
+    + '<div class="today" id="dy">'+esc(c.day)+'</div></div>'
+    + '<div class="clock"><div class="hm" id="ck">'+c.hm+'</div>'
+    + '<div class="sec">회의가 끝나면 회의록이 자동으로 만들어집니다</div></div></div>'
+    + '<div class="mid">'
+    + (ev ? '<div class="next"><div class="lb">지금 이 회의실 예약</div>'
+          + '<div class="tt">'+esc(ev.title||'회의')+'</div>'
+          + '<div class="tm">'+hm(ev.starts_at)+' ~ '+hm(ev.ends_at)+'</div></div>'
+          : '<div class="sub">지금 잡힌 예약이 없습니다</div>')
+    + '<button class="big go" id="start"><span class="dot"></span>회의 녹음 시작</button>'
+    + (ev ? '<button class="ghost" id="free">예약과 상관없이 녹음</button>' : '')
+    + '</div>'
+    + (rest.length ? '<div class="list"><div class="h">오늘 남은 예약</div>'
+        + rest.slice(0,4).map(e=>'<div class="row"><span>'+hm(e.starts_at)+' ~ '+hm(e.ends_at)
+          + '</span><b>'+esc(e.title||'회의')+'</b></div>').join('') + '</div>' : '');
+
+  tick=setInterval(()=>{
+    const c2=clk();
+    const a=$('#ck'), b=$('#dy');
+    if(a) a.textContent=c2.hm;
+    if(b) b.textContent=c2.day;
+  }, 1000);
+
+  $('#start').onclick=()=>startRec(ev);
+  const f=$('#free'); if(f) f.onclick=()=>startRec(null);
+}
+
+// ─────────────────────────── 녹음
+const REC={};
+async function startRec(ev){
+  let stream;
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({audio:{
+      echoCancellation:true, noiseSuppression:true, autoGainControl:true}});
+  }catch(e){
+    alert('마이크를 쓸 수 없습니다.\n태블릿 설정에서 이 페이지의 마이크 사용을 허용해주세요.');
+    return;
+  }
+  let mime='';
+  for(const m of ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg'])
+    if(window.MediaRecorder && MediaRecorder.isTypeSupported(m)){ mime=m; break; }
+
+  REC.stream=stream; REC.chunks=[]; REC.t0=Date.now(); REC.ev=ev||null;
+  REC.title=(ev&&ev.title)||'회의'; REC.who=new Set();
+  REC.mr = mime ? new MediaRecorder(stream,{mimeType:mime, audioBitsPerSecond:64000})
+                : new MediaRecorder(stream);
+  REC.mr.ondataavailable=e=>{ if(e.data&&e.data.size) REC.chunks.push(e.data); };
+  REC.mr.onstop=finish;
+  REC.mr.start(5000);          // 5초씩 나눠 모읍니다 (길게 녹음해도 안전)
+  keepAwake();
+  meter(stream);
+  recPage();
+}
+
+function recPage(){
+  clearInterval(tick);
+  app.innerHTML=
+    '<div class="top"><div><div class="room">'+esc(cfg.room||'회의실')+'</div>'
+    + '<div class="today">녹음하고 있습니다</div></div>'
+    + '<div class="clock"><div class="hm" id="ck">'+clk().hm+'</div></div></div>'
+    + '<div class="mid">'
+    + '<div class="mtitle">'+esc(REC.title)+'</div>'
+    + '<div class="elapsed" id="ela">0:00</div>'
+    + '<div class="lv" id="lv"></div>'
+    + '<div class="who"><div class="h">들어오시면 <b>본인 이름</b>을 눌러주세요 · 안 누르셔도 녹음은 됩니다</div>'
+    + '<div class="grid" id="grid">'
+    + (MEMBERS.length
+        ? MEMBERS.map(m=>'<button class="nm" data-id="'+m.id+'">'+esc(m.name)
+            + '<span class="co">'+esc(m.company||'')+'</span></button>').join('')
+        : '<span class="sub">구성원 명단을 불러오지 못했습니다</span>')
+    + '</div></div>'
+    + '<button class="big stop rec" id="stop"><span class="dot"></span>회의 종료</button>'
+    + '</div>';
+
+  tick=setInterval(()=>{
+    const a=$('#ela'); if(a) a.textContent=el((Date.now()-REC.t0)/1000);
+    const c=$('#ck'); if(c) c.textContent=clk().hm;
+  }, 500);
+
+  app.querySelectorAll('.nm').forEach(b=>b.onclick=()=>{
+    const id=b.dataset.id;
+    if(REC.who.has(id)){ REC.who.delete(id); b.classList.remove('on'); }
+    else { REC.who.add(id); b.classList.add('on'); }
+  });
+  $('#stop').onclick=stopRec;
+}
+
+// 소리가 들어오는지 눈으로 보여줍니다 (마이크가 꺼져 있으면 바로 압니다)
+function meter(stream){
+  try{
+    const AC=window.AudioContext||window.webkitAudioContext;
+    const ac=new AC();
+    const an=ac.createAnalyser(); an.fftSize=512;
+    ac.createMediaStreamSource(stream).connect(an);
+    const buf=new Uint8Array(an.frequencyBinCount);
+    REC.meter=setInterval(()=>{
+      an.getByteFrequencyData(buf);
+      let sum=0; for(let i=0;i<buf.length;i++) sum+=buf[i];
+      const lv=$('#lv');
+      if(lv) lv.textContent = (sum/buf.length)>2 ? '● 소리 들어오는 중' : '';
+    }, 700);
+    REC.ac=ac;
+  }catch(e){}
+}
+
+function stopRec(){
+  if(!REC.mr || REC.mr.state!=='recording') return;
+  clearInterval(REC.meter); clearInterval(tick);
+  REC.dur=Math.floor((Date.now()-REC.t0)/1000);
+  REC.mr.stop();
+  (REC.stream.getTracks()||[]).forEach(t=>t.stop());
+  try{ if(REC.ac) REC.ac.close(); }catch(e){}
+  app.innerHTML='<div class="mid"><div class="done"><span class="ok">⏳</span>올리는 중입니다…</div></div>';
+}
+
+async function finish(){
+  const type=REC.mr.mimeType||'audio/webm';
+  const ext=type.indexOf('mp4')>=0?'mp4':type.indexOf('ogg')>=0?'ogg':'webm';
+  const blob=new Blob(REC.chunks,{type});
+  REC.mr=null; REC.chunks=[];
+  if(blob.size<4000){ msg('녹음이 비어 있습니다','마이크가 연결되어 있는지 확인해주세요'); return; }
+
+  // 이름을 누르신 분들이 참석자입니다. 그분들의 회사를 이 회의의 회사로 씁니다.
+  const picked=MEMBERS.filter(m=>REC.who.has(m.id));
+  const cos={};
+  picked.forEach(m=>{ if(m.company) cos[m.company]=(cos[m.company]||0)+1; });
+  const company=Object.keys(cos).sort((a,b)=>cos[b]-cos[a])[0] || cfg.company || '';
+  const dps=[...new Set(picked.filter(m=>m.company===company).map(m=>m.dept).filter(Boolean))];
+  const dept = dps.length===1 ? dps[0] : '';
+
+  try{
+    const name='jobs/'+Date.now()+'_room.'+ext;   // 저장소 파일 이름은 영문·숫자만
+    const up=await SB.storage.from('hd-audio')
+      .upload(name, blob, {upsert:true, contentType:type});
+    if(up.error){ msg('올리지 못했습니다', up.error.message); return; }
+
+    const ins=await SB.from('hd_job').insert({
+      title: mkTitle(REC.title, company),
+      participants: picked.map(m=>m.name).join(', '),
+      audio_path:name, kind:'audio', orig_name:REC.title+'.'+ext,
+      device:'회의실 태블릿', created_by:me.id, created_name:cfg.room||'회의실',
+      company:company, dept:dept,
+      cal_uid:(REC.ev&&REC.ev.uid)||'', room:cfg.room||'',
+      started_at:new Date(REC.t0).toISOString(),
+      ended_at:new Date(REC.t0+(REC.dur||0)*1000).toISOString(),
+    });
+    if(ins.error){ msg('기록을 남기지 못했습니다', ins.error.message); return; }
+
+    msg('회의가 끝났습니다',
+      picked.length
+        ? picked.map(m=>m.name).join(', ')+' 님께 회의록이 슬랙으로 갑니다'
+        : '참석자를 누르지 않으셔서 팀장님과 관리자에게만 보입니다');
+  }catch(e){
+    msg('올리지 못했습니다', e.message||String(e));
+  }
+}
+
+function msg(head, sub){
+  clearInterval(tick);
+  app.innerHTML='<div class="mid"><div class="done"><span class="ok">✓</span>'+esc(head)+'</div>'
+    + '<div class="sub" style="max-width:640px">'+esc(sub||'')
+    + '<br><br>회의록은 몇 분 뒤 헤임달에 올라옵니다.</div>'
+    + '<button class="ghost" id="ok">확인</button></div>';
+  const back=()=>{ loadEvents().catch(()=>{}).then(idlePage); };
+  $('#ok').onclick=back;
+  setTimeout(back, 12000);
+}
+
+// 설정 손잡이 — 오른쪽 위 구석을 3초 길게 눌러야 열립니다
+(function(){
+  let t=null;
+  const g=$('#gear');
+  const down=()=>{ t=setTimeout(()=>{ if(!REC.mr) setupPage(''); }, 3000); };
+  const up=()=>{ clearTimeout(t); };
+  g.addEventListener('touchstart',down); g.addEventListener('touchend',up);
+  g.addEventListener('mousedown',down);  g.addEventListener('mouseup',up);
+})();
+
+// ─────────────────────────── 시작
+async function boot(){
+  const ses=await SB.auth.getSession();
+  const session=ses.data && ses.data.session;
+  if(session){
+    const {data}=await SB.from('hd_member').select('*').eq('id',session.user.id).maybeSingle();
+    if(data && data.approved && (data.status||'active')==='active') me=data;
+  }
+  await loadEvents().catch(()=>{});
+  if(!me || !cfg.room || !cfg.company){
+    setupPage(!me && session ? '이 계정은 아직 승인되지 않았습니다. 관리자에게 요청해주세요.' : '');
+    return;
+  }
+  await loadMembers().catch(()=>{});
+  keepAwake();
+  idlePage();
+  // 예약과 명단을 조용히 새로 읽습니다 (녹음 중에는 건드리지 않습니다)
+  setInterval(async()=>{
+    if(REC.mr) return;
+    await loadEvents().catch(()=>{});
+    await loadMembers().catch(()=>{});
+    idlePage();
+  }, 120000);
+}
+boot();
+</script>
+</body></html>
