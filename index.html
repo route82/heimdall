@@ -70,6 +70,8 @@ h1{font-size:23px;margin:0 0 4px;letter-spacing:-.01em}
 .card.locked:hover{border-color:#DDE2E9;box-shadow:none}
 .card.locked .ct{color:#B6BEC9;letter-spacing:.12em}
 .cm{font-size:13px;color:#5C6672;display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.csum{margin-top:7px;font-size:13.5px;line-height:1.6;color:#3A424F}
+.csum.none{color:#AEB6C0}
 .tag{font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px}
 .t-draft{background:#EEF1F5;color:#5B6472}.t-review{background:#FFF3D6;color:#8A6100}
 .t-reported{background:#E3F5E9;color:#1B6B36}.t-archived{background:#EDE9F5;color:#5A3699}
@@ -89,6 +91,10 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:#2B6CB0}
  padding:11px 15px;cursor:pointer;border-bottom:2.5px solid transparent}
 .tab[aria-selected=true]{color:#2B6CB0;border-bottom-color:#2B6CB0}
 .pane{display:none}.pane.on{display:block}
+.pane.wide .md{font-size:15.5px;line-height:1.82}
+.mhead{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.mhead .atd{max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+ background:#F4F6F9;border-radius:7px;padding:2px 9px;font-size:12.5px;cursor:default}
 .seg{display:grid;grid-template-columns:70px 1fr;gap:14px;padding:7px 0}
 .seg:hover{background:#FAFBFD}
 .ts{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:#98A0AC;padding-top:3px;
@@ -406,7 +412,7 @@ const $ = (s,r=document)=>r.querySelector(s);
 const esc = s => (s??'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const hms = s => { s=+s||0; return `${Math.floor(s/3600)}:${String(Math.floor(s%3600/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; };
 // 슬랙 워크스페이스와 연결된 회사 (이 회사 회의에만 「슬랙에 공유」 가 보입니다)
-const SLACK_COS = ['슈퍼홀릭', '그룹 AX'];
+const SLACK_COS = ['슈퍼홀릭', '그룹 AX', '더올마이티', '루트82'];
 // 서버 시각은 세계 표준시(UTC)라, 화면에는 한국 시간으로 바꿔 보여줍니다
 const kst = t => {
   if(!t) return '';
@@ -666,7 +672,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v12.54</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v13.2</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 비밀번호 바꾸기">비밀번호 변경</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -1024,7 +1030,7 @@ async function renderList(){
   if(!showArch) q = q.neq('status','archived');
   const [mres, pres, att] = await Promise.all([q,
     SB.from('hd_project').select('id,name,color'),
-    SB.from('hd_attendee').select('meeting_id').eq('member_id', me.id)]);
+    SB.from('hd_attendee').select('meeting_id,member_id,name').limit(5000)]);
   const {data,error} = mres;
   if(error) return el.innerHTML=`<div class="empty">${esc(error.message)}</div>`;
   const PJ = Object.fromEntries((pres.data||[]).map(p=>[p.id,p]));
@@ -1036,12 +1042,18 @@ async function renderList(){
     locked = lc||0;
   }
   // 보기 범위 — 전체 / 내가 들어간 회의 / 나만 보는 노트
-  const mine = new Set((att.data||[]).map(a=>a.meeting_id));
+  const arows = att.data||[];
+  const CNT = {};                       // 회의마다 참가자 몇 명인지
+  arows.forEach(a=>{ CNT[a.meeting_id]=(CNT[a.meeting_id]||0)+1; });
+  const myname=(me.name||'').replace(/\s/g,'');
+  const mine = new Set(arows.filter(a=> a.member_id===me.id
+      || (myname.length>1 && (a.name||'').replace(/\s/g,'').includes(myname)))
+    .map(a=>a.meeting_id));
   const pick = m => mfil==='note' ? m.visibility==='private'
               : mfil==='mine' ? (mine.has(m.id) || m.owner_id===me.id)
               : true;
   const shown = data.filter(pick);
-  const FILS = [['all','전체'],['mine','내 회의'],['note','내 노트']];
+  const FILS = [['all','전체'],['mine','내 회의'],['note','예전 내 노트']];
 
   el.innerHTML = `<h1>회의록</h1><div class="sub">${shown.length}건 · ${ROLE[me.role]} 권한으로 보이는 것만 표시됩니다
     ${canArch?`<label style="margin-left:12px;cursor:pointer"><input type="checkbox" id="sharch"
@@ -1059,10 +1071,18 @@ async function renderList(){
           ${m.source?`<span class="tag" style="background:#FFF0E0;color:#B36B00">${esc(m.source)}</span>`:''}
           ${PJ[m.project_id]?`<span class="tag" style="background:#EEF2F7;color:#3A424F">${esc(PJ[m.project_id].name)}</span>`:''}
           <span>${m.held_on}</span>${m.duration_sec?`<span>${hms(m.duration_sec)}</span>`:''}
+          ${CNT[m.id]?`<span>참가자 ${CNT[m.id]}명</span>`:''}
           ${m.company?`<span>${esc(m.company)}${m.dept?' '+esc(m.dept):''}</span>`:''}
-          ${m.visibility==='private'?'<span style="color:#C2620F">나만 보기</span>':''}
-          ${m.summary_md?'':'<span>요약 없음</span>'}</div></div>`).join('')
-     : '<div class="empty">아직 올라온 회의가 없습니다.<br><br>대표님 맥에서 <b>./heimdall push</b> 를 실행하세요.</div>');
+          ${m.visibility==='private'?'<span style="color:#C2620F">나만 보기</span>':''}</div>
+        ${m.summary_md
+          ? `<div class="csum">${esc(oneLine(m.summary_md))}</div>`
+          : '<div class="csum none">요약 없음</div>'}</div>`).join('')
+     : (me.role==='member'
+        ? `<div class="empty">보실 수 있는 회의가 아직 없습니다.<br><br>
+             2026-08-26부터 회의록은 <b>참석한 사람 · 올린 사람 · 그 팀의 팀장</b>에게만 보입니다.<br>
+             참석하신 회의인데 안 보이면, 회의록에 이름이 안 들어갔을 수 있습니다.<br>
+             팀장님께 말씀하시면 참석자에 넣거나 폴더 권한을 열어드립니다.</div>`
+        : '<div class="empty">아직 올라온 회의가 없습니다.<br><br>대표님 맥에서 <b>./heimdall push</b> 를 실행하세요.</div>'));
   el.querySelectorAll('.card').forEach(c=>c.onclick=()=>{
     if(c.classList.contains('locked'))
       return toast('전사 경영진 회의는 개발자 권한으로 열 수 없습니다.');
@@ -1103,21 +1123,23 @@ function drawMeeting(){
     <span class="tag t-${m.status}">${STATUS[m.status]}</span>
     ${m.reported_at?`<span class="sub" style="margin:0">보고 ${m.reported_at.slice(0,10)}</span>`:''}</div>
   <h1 id="mtitle">${esc(m.title)}</h1>
-  <div class="sub">${m.source?`<span class="tag" style="background:#FFF0E0;color:#B36B00;margin-right:6px">${esc(m.source)} 사용 회의</span>`:''}${m.held_on} · ${hms(m.duration_sec)} · ${att.length?esc(att.join(', ')):'참석자 미기재'}
-    ${(m.company||m.dept)?` · ${esc(m.company||'')} ${esc(m.dept||'')}`:''}
-    ${m.visibility==='private'?' · <b style="color:#C2620F">나만 보기</b>':''}</div>
+  <div class="sub mhead">${m.source?`<span class="tag" style="background:#FFF0E0;color:#B36B00;margin-right:6px">${esc(m.source)} 사용 회의</span>`:''}<span>${m.held_on}</span><span>${hms(m.duration_sec)}</span>
+    ${(m.company||m.dept)?`<span>${esc(m.company||'')} ${esc(m.dept||'')}</span>`:''}
+    <span class="atd" title="${att.length?esc(att.join(', ')):'참석자 미기재'}">${att.length
+        ? `참가자 ${att.length}명 · ${esc(att.join(', '))}` : '참석자 미기재'}</span>
+    ${m.visibility==='private'?'<b style="color:#C2620F">나만 보기</b>':''}</div>
   <div class="row" style="margin-bottom:6px">
     <span style="font-size:13px;color:#5C6672">프로젝트</span>
     <button class="pjbtn none" id="pjsel">분류 안 됨</button>
   </div>
   <div class="tabs">
-    <button class="tab" aria-selected="true">하이라이트</button>
-    <button class="tab">전사</button><button class="tab">요약</button>
+    <button class="tab">하이라이트</button>
+    <button class="tab">전사</button><button class="tab" aria-selected="true">요약</button>
     <button class="tab">마인드맵</button>
     <button class="tab">액션아이템 ${acts.length?`(${acts.filter(a=>a.state==='open').length})`:''}</button>
     <button class="btn" id="cpy" style="margin-left:auto;align-self:center;flex:none">전체 복사</button>
   </div>
-  <div class="pane on">${hls.length? hls.map((h,i)=>`<div class="hl" data-i="${i}">
+  <div class="pane">${hls.length? hls.map((h,i)=>`<div class="hl" data-i="${i}">
       <div class="ts">${hms(h.start_sec)}</div><h3>${esc(h.headline)}</h3>
       ${(h.points||[]).length?`<ul>${h.points.map(p=>`<li>${esc(p)}</li>`).join('')}</ul>`:''}</div>`).join('')
     : '<div class="empty">하이라이트가 없습니다.</div>'}</div>
@@ -1125,7 +1147,7 @@ function drawMeeting(){
     <div id="segs">${segs.map(s=>`<div class="seg"><div class="ts">${hms(s.start_sec)}</div>
       <div>${s.speaker?`<span class="spk ${si(s.speaker)}">${esc(s.speaker)}</span><br>`:''}
       <p data-i="${s.idx}">${esc(s.text)}</p></div></div>`).join('')}</div></div>
-  <div class="pane"><div class="md" id="smview">${mdHtml(m.summary_md||'')}</div>
+  <div class="pane on wide"><div class="md" id="smview">${mdHtml(m.summary_md||'')}</div>
     <textarea id="smedit" class="full" style="display:none;min-height:520px;font-family:ui-monospace,Menlo,monospace;font-size:13.5px"></textarea></div>
   <div class="pane" id="mmpane">${(m.mindmap_md||'').trim()
     ? '<div class="sub" style="margin-bottom:8px">가지를 누르면 접었다 폈다 할 수 있습니다 · 마우스 휠로 확대</div><svg id="mmv" style="width:100%;height:600px;background:#fff;border:1px solid #E3E6EB;border-radius:12px"></svg>'
@@ -2602,6 +2624,37 @@ document.addEventListener('visibilitychange', ()=>{
     keepAwake(true);
 });
 
+// 오늘 날짜를 한국 기준 YYMMDD 로 (예: 260826)
+function ymd6(d){
+  const t = new Date((d?new Date(d):new Date()).getTime() + 9*3600*1000);
+  return t.toISOString().slice(2,10).replace(/-/g,'');
+}
+
+// 제목을 「날짜 회사 부서 내용」 으로 맞춰줍니다.
+// 사람이 이미 날짜나 회사를 앞에 적었으면 두 번 붙지 않게 걸러냅니다.
+function mkTitle(body, co, dp, when){
+  let t = (body||'').trim();
+  t = t.replace(/^\d{6}\s*/,'').replace(/^\d{2}[-.\/]\d{2}[-.\/]\d{2}\s*/,'');
+  co=(co||'').trim(); dp=(dp||'').trim();
+  if(co && t.startsWith(co)) t = t.slice(co.length).trim();
+  if(dp && t.startsWith(dp)) t = t.slice(dp.length).trim();
+  return [ymd6(when), co, dp, t || '회의'].filter(Boolean).join(' ');
+}
+
+// 요약에서 사람이 읽을 만한 첫 줄만 뽑습니다 (목록에 한 줄로 보여주려고)
+function oneLine(md, n){
+  n = n || 96;
+  if(!md) return '';
+  for(const raw of String(md).split('\n')){
+    const s0 = raw.trim();
+    if(!s0 || s0.startsWith('#') || s0.startsWith('|') || s0.startsWith('---')) continue;
+    const t = s0.replace(/^\*\*한 줄 요약\*\*\s*[:：]?\s*/,'')
+                .replace(/[*_`>]/g,'').replace(/^[-•]\s*/,'').trim();
+    if(t.length > 3) return t.length > n ? t.slice(0,n)+'…' : t;
+  }
+  return '';
+}
+
 function recFmt(s){
   const m=Math.floor(s/60), x=s%60;
   return (m<60? `${m}:${String(x).padStart(2,'0')}`
@@ -2622,27 +2675,14 @@ async function renderRec(){
         </select>
         <span class="sub" style="margin:0">고르면 회의명이 자동으로 채워집니다</span>
       </div>
-      <div class="row" style="margin-bottom:9px">
-        <input id="rc-title" placeholder="회의명" style="flex:2;min-width:220px" ${on?'disabled':''}>
+      <div class="row" style="margin-bottom:4px">
+        <input id="rc-title" placeholder="무슨 회의인가요 (예: 주간회의)" style="flex:2;min-width:220px" ${on?'disabled':''}>
         <input id="rc-parts" placeholder="참석자 (쉼표로 구분 · 선택)" style="flex:2;min-width:180px" ${on?'disabled':''}>
       </div>
-      <div class="row" style="margin-bottom:9px">
-        <select id="rc-type" style="min-width:230px" ${on?'disabled':''}>
-          <option value="meeting">회의 녹음 — 소속 규칙대로 공개</option>
-          <option value="idea">아이디어 노트 — 나만 보기 (공유 선택 가능)</option>
-          <option value="order">지시사항 — 나만 보기 (공유 선택 가능)</option>
-        </select>
-        <button class="btn" id="rc-share-btn" style="display:none" ${on?'disabled':''}>공유 대상 선택 (<span id="rc-share-n">0</span>)</button>
-      </div>
-      <div class="box" id="rc-share-box" style="display:none;margin-bottom:9px;max-height:320px;overflow:auto">
-        <div class="sub" style="margin:0 0 8px">아무것도 체크하지 않으면 <b>나만</b> 볼 수 있습니다</div>
-        <div class="shsec">사람</div>
-        <div id="rc-share-list" class="row" style="flex-wrap:wrap;gap:6px 16px">불러오는 중…</div>
-        <div class="shsec">회사 전체</div>
-        <div id="rc-share-co" class="row" style="flex-wrap:wrap;gap:6px 16px"></div>
-        <div class="shsec">부서</div>
-        <div id="rc-share-dp" class="row" style="flex-wrap:wrap;gap:6px 16px"></div>
-      </div>
+      <div class="sub" style="margin:0 0 9px;font-size:12px">제목은
+        <b>${esc(mkTitle('회의 내용', me.company||'', me.dept||''))}</b>
+        처럼 <b>날짜 · 회사 · 부서</b>가 앞에 자동으로 붙습니다</div>
+      <select id="rc-type" style="display:none"><option value="meeting">회의</option></select>
       ${(me.role==='admin' || (me.extra_scopes||[]).length)?`<div class="row" style="margin-bottom:9px" id="rc-scope-row">
         <select id="rc-scope" style="min-width:230px" ${on?'disabled':''}>
           <option value="mine">내 소속 (${esc(me.company||'')} ${esc(me.dept||'')})</option>
@@ -2677,52 +2717,6 @@ async function renderRec(){
     }
   });
   $('#rc-go').onclick = on ? recStop : recStart;
-  const ty=$('#rc-type'), shb=$('#rc-share-btn'), box=$('#rc-share-box');
-  ty.onchange=()=>{
-    const p=ty.value!=='meeting';
-    shb.style.display=p?'':'none';
-    if(!p) box.style.display='none';
-    const sr=$('#rc-scope-row'); if(sr) sr.style.display=p?'none':'';
-  };
-  shb.onclick=async()=>{
-    if(box.style.display==='none'){
-      box.style.display='';
-      const list=$('#rc-share-list');
-      if(!list.dataset.loaded){
-        const {data}=await SB.from('hd_member').select('id,name,company,dept')
-          .eq('approved',true).neq('id',me.id).order('name');
-        const mem=data||[];
-        list.innerHTML=mem.map(m=>`<label class="shlb">
-          <input type="checkbox" class="rc-share" value="${m.id}"> ${esc(m.name)}
-          <span class="sub" style="margin:0;font-size:11.5px">${esc(m.company||'')}</span></label>`).join('')
-          || '구성원이 없습니다';
-        // 회사 — 구성원이 실제로 속해 있는 회사만
-        const cos=[...new Set(mem.map(m=>m.company).concat([me.company]).filter(Boolean))].sort();
-        $('#rc-share-co').innerHTML = cos.map(c=>`<label class="shlb">
-          <input type="checkbox" class="rc-shco" value="${esc(c)}"> ${esc(c)} 전체</label>`).join('')
-          || '회사가 없습니다';
-        // 부서 — 회사|부서 로 묶어 보관합니다 (다른 회사의 같은 이름 부서와 안 섞이게)
-        const dps=[...new Set(mem.concat([me]).filter(m=>m.company&&m.dept)
-                    .map(m=>m.company+'|'+m.dept))].sort();
-        $('#rc-share-dp').innerHTML = dps.map(k=>{
-          const [c,d]=k.split('|');
-          return `<label class="shlb"><input type="checkbox" class="rc-shdp" value="${esc(k)}">
-            ${esc(d)} <span class="sub" style="margin:0;font-size:11.5px">${esc(c)}</span></label>`;
-        }).join('') || '부서가 없습니다';
-        list.dataset.loaded='1';
-      }
-    } else box.style.display='none';
-  };
-  document.addEventListener('change', e=>{
-    const cl=e.target.classList;
-    if(cl && (cl.contains('rc-share')||cl.contains('rc-shco')||cl.contains('rc-shdp'))){
-      const p1=document.querySelectorAll('.rc-share:checked').length;
-      const p2=document.querySelectorAll('.rc-shco:checked').length;
-      const p3=document.querySelectorAll('.rc-shdp:checked').length;
-      const t=[p1?p1+'명':'', p2?p2+'개 회사':'', p3?p3+'개 부서':''].filter(Boolean).join(' · ');
-      const el2=$('#rc-share-n'); if(el2) el2.textContent = t || '0';
-    }
-  });
   if(on) recTick();
   loadUploads();
 }
@@ -2800,15 +2794,9 @@ async function drawRecToday(){
 }
 
 async function recStart(){
-  const t0=($('#rc-type')||{value:'meeting'}).value;
-  if(t0!=='meeting' && !($('#rc-title').value||'').trim()){
-    $('#rc-title').value = new Date().toISOString().slice(2,10).replace(/-/g,'')
-      + (t0==='idea' ? ' 아이디어 노트' : ' 지시사항');
-  }
   if(!(me.company||'').trim())
     return toast('계정에 소속(회사)이 등록되어 있지 않습니다.<br>관리자에게 소속 등록을 요청해주세요.', 7000);
-  const title=($('#rc-title').value||'').trim()
-    || new Date().toISOString().slice(2,10).replace(/-/g,'')+' 회의';
+  const title=($('#rc-title').value||'').trim() || '회의';
   let stream;
   try{
     stream = await navigator.mediaDevices.getUserMedia({audio:{
@@ -2911,6 +2899,8 @@ async function recDone(){
       const [c,d]=REC.scope.slice(2).split('|');
       sc={company:c||sc.company, dept:d||''};      // 부서가 비면 회사 공용
     }
+    // 제목을 「날짜 · 회사 · 부서 · 내용」 으로 통일합니다 (2026-08-26 규칙)
+    REC.title = mkTitle(REC.title, sc.company, sc.dept);
     const extra = priv ? {visibility:'private',
       note_label: REC.type==='idea' ? '아이디어 노트' : '지시사항',
       share_ids: REC.shares||[],
@@ -2944,7 +2934,7 @@ async function renderUpload(){
       전사·요약·하이라이트가 똑같이 만들어집니다</div>
     <div class="box">
       <div class="row" style="margin-bottom:9px">
-        <input id="up-title" placeholder="회의명 (비우면 파일 이름을 씁니다)" style="flex:2;min-width:220px">
+        <input id="up-title" placeholder="무슨 회의인가요 (비우면 파일 이름을 씁니다)" style="flex:2;min-width:220px">
         <input id="up-parts" placeholder="참석자 (쉼표로 구분 · 선택)" style="flex:2;min-width:180px">
       </div>
       ${me.role==='admin'?`<div class="row" style="margin-bottom:9px">
@@ -3026,10 +3016,11 @@ async function doUpload(){
     const name=`jobs/${Date.now()}_${base||'file'}.${ext}`;
     const {error:e1}=await SB.storage.from('hd-audio').upload(name, f, {upsert:true});
     if(e1){ toast(upErr('file', e1), 9000); btn.disabled=false; btn.textContent='올리기'; return; }
-    const title=$('#up-title').value.trim()
-      || f.name.replace(/\.[^.]+$/,'');
     const usc=(me.role==='admin' && ($('#up-scope')||{value:'mine'}).value==='exec')
       ? {company:'그룹', dept:'전사 경영진'} : {company:me.company||'', dept:me.dept||''};
+    // 제목을 「날짜 · 회사 · 부서 · 내용」 으로 통일합니다 (2026-08-26 규칙)
+    const title=mkTitle($('#up-title').value.trim() || f.name.replace(/\.[^.]+$/,''),
+                        usc.company, usc.dept);
     const {error:e2}=await SB.from('hd_job').insert({
       title, participants:$('#up-parts').value.trim(),
       audio_path:name, kind:isAudio?'audio':'doc', orig_name:f.name,
@@ -3060,7 +3051,9 @@ function renderGuide(){
     <li><b>물어보기</b> — 챗봇에게 묻거나, 단어로 검색합니다</li>
   </ul>`)}
   ${box('1. 회의를 녹음하려면',`<ol>
-    <li><b>녹음</b> 탭 → 회의명을 적습니다 (참석자는 선택)</li>
+    <li><b>녹음</b> 탭 → 무슨 회의인지 적습니다 (참석자는 선택).
+        제목 앞에 <b>날짜 · 회사 · 부서</b>는 자동으로 붙습니다.
+        「주간회의」 라고만 적으시면 <b>260826 슈퍼홀릭 커머스팀 주간회의</b> 로 저장됩니다</li>
     <li><b>● 회의 녹음 시작</b> → 마이크 허용 창이 뜨면 <b>허용</b></li>
     <li>회의가 끝나면 <b>■ 녹음 종료</b> — 자동으로 올라갑니다</li>
     <li>몇 분 뒤 <b>회의록</b> 탭에 나타납니다</li>
@@ -3068,13 +3061,15 @@ function renderGuide(){
         <b>「회의실 예약에서 고르기」</b> 에서 그 예약을 고르시면 회의명이 자동으로 채워집니다</li>
   </ol>
   <p>녹음 중에는 다른 앱으로 나가지 마세요 — 녹음이 멈출 수 있습니다.</p>`)}
-  ${box('2. 나만 볼 녹음 (아이디어 노트 · 지시사항)',`
-    <p>녹음 탭에서 종류를 <b>아이디어 노트</b> 또는 <b>지시사항</b>으로 고르면
-       나만 볼 수 있습니다. 관리자도 볼 수 없습니다.</p>
-    <p>나중에 공유하려면 그 노트를 열어 <b>공유 대상 바꾸기</b>로 사람·회사·부서를 고르고,
-       팀 전체에 열려면 <b>팀에 공개</b>를 누릅니다.
-       필요 없어진 노트는 <b>삭제</b> 단추로 지울 수 있습니다 (내 노트만 가능).</p>
-    <p>회의록 탭 위 <b>내 노트</b> 단추, 또는 폴더의 <b>내 노트</b> 폴더에서 모아 볼 수 있습니다.</p>`)}
+  ${box('2. 「나만 보기」 는 없어졌습니다 (2026-08-26)',`
+    <p>아이디어 노트·지시사항을 <b>나만 보기</b>로 남기는 기능은 더 만들지 않습니다.
+       회의 내용을 두고 서로 다르게 기억하는 일이 생기면, 관련된 사람들이
+       같은 기록을 볼 수 있어야 한다는 판단입니다.</p>
+    <p>개인 메모로만 쓰고 싶은 이야기는 헤임달이 아니라
+       <b>본인 휴대폰 녹음</b>을 쓰시면 됩니다.</p>
+    <p>전에 만들어 두신 노트는 그대로 있고, <b>여전히 본인에게만</b> 보입니다.
+       회의록 탭 위 <b>내 노트</b> 단추에서 찾으실 수 있고,
+       필요하면 <b>공유 대상 바꾸기</b>·<b>팀에 공개</b>·<b>삭제</b>도 그대로 됩니다.</p>`)}
   ${box('3. 이미 있는 파일을 올리려면',`
     <p><b>업로드</b> 탭에서 음성 파일이나 문서를 올리면 똑같이 회의록이 만들어집니다.</p>
     <p>문서: 워드(docx) · 텍스트 · PDF · PPT · 한글(hwpx)<br>
@@ -3084,8 +3079,10 @@ function renderGuide(){
     <li>오른쪽 위 <b>전체 복사</b> — 지금 보는 탭의 글 전체가 복사됩니다 (카톡·메일에 붙여넣기)</li>
     <li><b>편집</b> — 제목·전사·하이라이트·요약·마인드맵을 바로 고칠 수 있습니다 (참석자만)</li>
     <li><b>워드로 내보내기</b> — 한 파일로 내려받습니다</li>
-    <li><b>슬랙에 공유</b> — 슬랙과 연결된 회사 회의에만 보입니다.
-        누르면 그 회사 채널에 요약이 올라가고, 액션아이템은 담당자에게 개인 DM 으로 갑니다</li>
+    <li>회의록이 만들어지면 <b>참석자와 그 팀 팀장에게 슬랙 1:1 메시지</b>가 자동으로 갑니다.
+        헤임달 안에 따로 알림은 만들지 않습니다</li>
+    <li><b>슬랙에 공유</b> — 더 많은 사람이 알아야 하는 회의는 이 단추를 눌러
+        회사 채널에 직접 올립니다. 전사 공지가 필요하면 공지방에 다시 공유해 주세요</li>
     <li><b>폴더</b> — 왼쪽 나무에서 회사 ▸ 부서 ▸ 폴더를 펼쳐 그 폴더의 회의만 봅니다</li>
   </ul>`)}
   ${box('5. 회의 내용을 찾으려면',`<ul>
@@ -3098,7 +3095,11 @@ function renderGuide(){
     <p>비밀번호를 잊으면 관리자에게 요청하세요. 임시 비밀번호를 만들어줍니다.</p>`)}
   ${box('7. 알아두실 것',`<ul>
     <li><b>회의록은 AI가 만든 초안입니다.</b> 중요한 숫자·결정은 꼭 확인해주세요</li>
-    <li>내가 볼 수 있는 회의는 <b>내 소속(겸직 포함) 회의와 내가 참석한 회의</b>입니다</li>
+    <li>내가 볼 수 있는 회의는 <b>내가 참석한 회의</b>, <b>내가 올린 회의</b>,
+        그리고 <b>따로 열람 권한을 받은 폴더</b>의 회의입니다 (2026-08-26 변경).
+        내 소속이라는 이유만으로는 더 이상 보이지 않습니다</li>
+    <li>봐야 하는데 안 보이는 회의가 있으면 팀장에게 말씀해주세요.
+        팀장은 우리 팀 회의를 모두 볼 수 있고, 폴더 권한도 열어줄 수 있습니다</li>
     <li>처리가 오래 걸리면 회의 길이 때문입니다. 1시간 회의는 5~10분쯤 걸립니다</li>
     <li>크롬 오른쪽 위 <b>앱으로 설치</b>를 누르면 앱처럼 쓸 수 있습니다 (휴대폰은 「홈 화면에 추가」)</li>
   </ul>`)}`;
@@ -3116,7 +3117,9 @@ function renderGuide(){
   const exec = `
   ${box('경영진 안내 — 보는 범위',`<ul>
     <li><b>공동대표</b>는 전사 전체, <b>임원</b>은 본인 회사 전체 회의가 보입니다
-        (단, 직원 개인의 아이디어 노트·지시사항은 아무도 못 봅니다)</li>
+        (단, 예전에 만들어진 직원 개인 노트는 아무도 못 봅니다)</li>
+    <li>일반 직원은 <b>참석한 회의 · 본인이 올린 회의 · 권한 받은 폴더</b>만 봅니다.
+        더 알려야 하는 회의는 회의록을 열고 <b>슬랙에 공유</b>로 올려주세요</li>
     <li><b>브리핑</b> — 부서에서 보고한 회의를 날짜별로 모아 봅니다</li>
     <li><b>사용료</b> — AI 사용 비용을 회사·부서별로 봅니다</li>
     <li><b>플라우드 회의</b>는 자동으로 들어오며, 녹음한 본인에게만 보입니다.
@@ -3260,6 +3263,14 @@ async function renderServer(){
           <option value="PLAUD_OWNER_EMAIL">플라우드 녹음 주인 메일 (계정 하나일 때)</option>
           <option value="PLAUD_MODE">가져오기 방식 (private · tag · all)</option>
           <option value="PLAUD_TAG">제목 표시 (tag 방식일 때)</option>
+          <option value="SLACK_AUTO">회의록 완성 시 슬랙 자동 알림 (1 · 0)</option>
+          <option value="SLACK_NOTIFY_PEOPLE">참석자·팀장에게 1:1 알림 (1 · 0)</option>
+          <option value="SLACK_AUTO_CHANNEL">자동 알림을 채널에도 올릴지 (0 권장)</option>
+          <option value="SLACK_NAME">1번 슬랙 이름 (예: 슈퍼홀릭)</option>
+          <option value="SLACK2_NAME">2번 슬랙 이름 (예: 더올마이티)</option>
+          <option value="SLACK2_COMPANY">2번 슬랙으로 보낼 회사 (쉼표 구분)</option>
+          <option value="SLACK2_CHANNEL">2번 슬랙 기본 채널 (# 없이)</option>
+          <option value="SLACK2_CHANNEL_MAP">2번 슬랙 회사별 채널 (회사=채널, 회사=채널)</option>
         </select>
         <input id="sv-val" placeholder="예: large-v3 · claude-sonnet-5 · 7" style="flex:1;min-width:200px">
         <button class="btn p" id="sv-set">바꾸기</button>
