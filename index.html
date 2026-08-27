@@ -764,7 +764,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v15.3</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v15.4</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -1745,33 +1745,39 @@ async function renderBrief(){
   if(me.role==='dev'){
     // 개발자에게는 서버가 브리핑을 아예 내려주지 않습니다. 가려진 모양만 보여줍니다.
     const bar = n => '■'.repeat(n);
-    el.innerHTML=`<h1>일일 브리핑</h1>
-      <div class="sub">전날 회의를 한 장으로 정리합니다</div>
+    el.innerHTML=`<h1>브리핑</h1>
+      <div class="sub">날짜별로 그날 회의를 모아 봅니다</div>
       <div class="box locked">
         <div class="sub" style="margin:0 0 10px">${bar(10)}</div>
         <div class="md" style="color:#C0C6CF;letter-spacing:.1em;line-height:2.2">
           ${bar(6)}<br>${bar(22)}<br>${bar(17)}<br>${bar(25)}<br><br>
           ${bar(8)}<br>${bar(20)}<br>${bar(14)}</div>
       </div>
-      <div class="empty">브리핑에는 전사 경영진 회의 내용이 섞여 있어
+      <div class="empty">브리핑에는 전사 경영진 회의가 섞여 있어
         <b>개발자 권한으로는 열람할 수 없습니다.</b><br><br>
         내용이 필요하시면 관리자에게 요청해 주세요.</div>`;
     return;
   }
-  const {data}=await SB.from('hd_brief').select('*').order('on_date',{ascending:false}).limit(14);
-  const days=(data||[]).map(b=>b.on_date);
-  let MTG={}, MATTN={};
-  if(days.length){
-    const [mr, ar] = await Promise.all([
-      SB.from('hd_meeting')
-        .select('id,title,held_on,company,dept,summary_md,duration_sec,started_at,ended_at,status,visibility')
-        .in('held_on', days).neq('visibility','private').order('started_at'),
-      SB.from('hd_attendee').select('meeting_id,name').limit(8000)]);
-    (mr.data||[]).forEach(m=>{ (MTG[m.held_on] ||= []).push(m); });
-    (ar.data||[]).forEach(a=>{ (MATTN[a.meeting_id] ||= []).push(a.name); });
-  }
+  // 브리핑은 AI 가 따로 쓰지 않습니다. 그날 회의 카드가 곧 브리핑입니다.
+  const since=new Date(Date.now()-30*864e5).toISOString().slice(0,10);
+  const [mr, ar] = await Promise.all([
+    SB.from('hd_meeting')
+      .select('id,title,held_on,company,dept,summary_md,duration_sec,started_at,ended_at,status,visibility')
+      .gte('held_on', since).neq('visibility','private')
+      .order('held_on',{ascending:false}).order('started_at'),
+    SB.from('hd_attendee').select('meeting_id,name').limit(8000)]);
+  if(mr.error) return el.innerHTML=`<h1>브리핑</h1><div class="empty">${esc(mr.error.message)}</div>`;
+  const MATTN={}; (ar.data||[]).forEach(a2=>{ (MATTN[a2.meeting_id] ||= []).push(a2.name); });
+  const BYD={}; (mr.data||[]).forEach(m=>{ (BYD[m.held_on] ||= []).push(m); });
+  const days=Object.keys(BYD).sort().reverse().slice(0,14);
+
+  const WD=['일','월','화','수','목','금','토'];
+  const dayLabel=d=>{
+    const t=new Date(d+'T00:00:00+09:00');
+    return `${d} (${WD[t.getDay()]})`;
+  };
   const mcard = m => {
-    const tp=titleParts(m), sb2=subTitle(m.summary_md), one=oneLine(m.summary_md,140);
+    const tp=titleParts(m), sb2=subTitle(m.summary_md), one=oneLine(m.summary_md,150);
     const tt=timeText(m);
     return `<div class="bcard">
       <div class="bct"><span class="mtag">${esc(tp.tag)}</span> ${esc(tp.name)}</div>
@@ -1780,25 +1786,25 @@ async function renderBrief(){
         ${(m.status==='confirmed'||m.status==='reported')?'<span class="tag t-reported">✓ 확정</span>':''}
         ${tt?`<span>${esc(tt)}</span>`:''}
         <span>${esc(attLine(MATTN[m.id]||[]))}</span>
-        ${m.company?`<span>${esc(m.company)}${m.dept?' '+esc(m.dept):''}</span>`:''}</div>
+        ${m.dept?`<span>${esc(m.dept)}</span>`:''}</div>
       <div class="bone">${esc(one||'요약이 아직 없습니다.')}</div>
       <button class="btn" data-open="${m.id}">회의록 자세히 보기 →</button>
     </div>`;
   };
-  el.innerHTML=`<h1>일일 브리핑</h1><div class="sub">전날 회의를 한 장으로 정리합니다</div>`
+
+  el.innerHTML=`<h1>브리핑</h1>
+    <div class="sub">날짜별로 그날 있었던 회의를 모아 보여드립니다 ·
+      대표님들께는 매일 아침 슬랙으로 같은 내용이 갑니다</div>`
    + (['admin','ceo'].includes(me.role)
         ? `<div class="box" id="bto-box" style="margin-bottom:16px">불러오는 중…</div>` : '')
-   + ((data&&data.length)? data.map(b=>`<div class="box">
-       <div class="sub" style="margin:0 0 10px">${b.on_date}</div>
-       <div class="md">${mdHtml(b.body_md)}</div>
-       ${(MTG[b.on_date]||[]).length?`
-         <div class="bsec">그날 회의 ${MTG[b.on_date].length}건</div>
-         ${MTG[b.on_date].map(mcard).join('')}`:''}
-     </div>`).join('')
-     : `<div class="empty">아직 브리핑이 없습니다.<br><br>
-        전날 회의가 정리되면 다음 날 아침에 이 자리에 올라옵니다.<br>
-        회의를 하나하나 다 읽지 않으셔도 흐름을 아실 수 있도록<br>
-        <b>정해진 것 · 결정이 필요한 것 · 진행 중인 할 일</b> 순서로 정리됩니다.</div>`);
+   + (days.length? days.map(d=>`<div class="box">
+        <div class="row" style="align-items:baseline;margin-bottom:2px">
+          <b style="font-size:15px">${esc(dayLabel(d))}</b>
+          <span class="sub" style="margin:0">회의 ${BYD[d].length}건</span></div>
+        <div style="margin-top:12px">${BYD[d].map(mcard).join('')}</div>
+      </div>`).join('')
+     : `<div class="empty">최근 30일 안에 올라온 회의가 없습니다.<br><br>
+        회의를 녹음해 올리시면 그날 날짜로 여기에 모입니다.</div>`);
   el.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openMeeting(b.dataset.open));
   if(['admin','ceo'].includes(me.role)) drawBriefTo();
 }
@@ -1817,12 +1823,12 @@ async function drawBriefTo(){
   box.innerHTML=`
     <div class="row" style="align-items:center;margin-bottom:4px">
       <b style="font-size:15px">브리핑 받는 분</b>
-      <span class="sub" style="margin:0">아침에 슬랙 1:1 로 갑니다</span>
+      <span class="sub" style="margin:0">전날 회의 카드가 아침에 슬랙 1:1 로 갑니다</span>
       <button class="btn p" id="bto-add" style="margin-left:auto">+ 사람 추가</button>
     </div>
     <div class="sub" style="margin:0 0 12px;font-size:12px">
-      회사를 하나도 체크하지 않으면 <b>전 회사</b> 브리핑이 갑니다.
-      체크하면 그 회사 회의만 모아 따로 만들어 보냅니다.
+      회사를 하나도 체크하지 않으면 <b>전 회사</b> 회의가 갑니다.
+      체크하면 그 회사 회의만 골라서 보냅니다.
       헤임달 계정이 없는 분도 넣으실 수 있습니다.</div>
     ${rows.length? rows.map(r=>`
       <div class="box" style="margin-bottom:10px" data-bto="${r.id}">
@@ -3587,7 +3593,9 @@ function renderGuide(){
         (단, 예전에 만들어진 직원 개인 노트는 아무도 못 봅니다)</li>
     <li>일반 직원은 <b>참석한 회의 · 본인이 올린 회의 · 권한 받은 폴더</b>만 봅니다.
         더 알려야 하는 회의는 받으신 슬랙 메시지를 공지방에 직접 공유해 주세요</li>
-    <li><b>브리핑</b> — 부서에서 보고한 회의를 날짜별로 모아 봅니다</li>
+    <li><b>브리핑</b> — 날짜별로 그날 있었던 회의를 카드로 모아 봅니다.
+        카드를 누르면 그 회의록으로 바로 들어갑니다.
+        같은 내용이 매일 아침 슬랙으로도 갑니다</li>
     <li><b>사용료</b> — AI 사용 비용을 회사·부서별로 봅니다</li>
     <li><b>플라우드 회의</b>는 자동으로 들어오며, 녹음한 본인에게만 보입니다.
         공유하려면 그 회의에서 「공유 대상 바꾸기」를 쓰면 됩니다</li>
