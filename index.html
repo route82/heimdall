@@ -413,6 +413,54 @@ const esc = s => (s??'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;
 const hms = s => { s=+s||0; return `${Math.floor(s/3600)}:${String(Math.floor(s%3600/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; };
 // 슬랙 워크스페이스와 연결된 회사 (이 회사 회의에만 「슬랙에 공유」 가 보입니다)
 const SLACK_COS = ['슈퍼홀릭', '그룹 AX', '더올마이티', '루트82'];
+
+// 회사마다 슬랙이 다릅니다. 사람마다 각 슬랙의 계정을 따로 적습니다.
+// 처리 서버의 SLACK2_COMPANY 와 짝이 맞아야 합니다.
+// 2번 슬랙(더올마이티)을 쓰는 회사. 처리 서버의 SLACK2_COMPANY 와 같아야 합니다.
+const SLACK2_COS = ['더올마이티'];
+
+const SLACK_WS = [
+  {key:'slack_email',  name:'슈퍼홀릭 슬랙',
+   note:'슈퍼홀릭 · 그룹 AX · 슈퍼홀릭인베스트먼트 · 라피스인터내셔널 회의가 이쪽으로 갑니다'},
+  {key:'slack2_email', name:'더올마이티 슬랙',
+   note:'더올마이티 회의가 이쪽으로 갑니다'},
+];
+
+// 이메일 줄 여러 개를 다루는 공통 도구
+function emRows(box, vals, ph){
+  box.innerHTML='';
+  const add=v=>{
+    const r=document.createElement('div');
+    r.className='row';
+    r.style.cssText='margin-bottom:6px;flex-wrap:nowrap';
+    r.innerHTML=`<input type="text" class="emx" value="${esc(v||'')}"
+        placeholder="${esc(ph||'슬랙 가입 이메일')}" style="flex:1;min-width:0">
+      <button class="delx" type="button" title="이 줄 지우기">×</button>`;
+    r.querySelector('.delx').onclick=()=>{
+      r.remove();
+      if(!box.querySelector('.emx')) add('');
+    };
+    box.appendChild(r);
+    return r;
+  };
+  (vals && vals.length ? vals : ['']).forEach(add);
+  return {
+    add(){ const r=add(''); r.querySelector('.emx').focus(); },
+    // 빈 줄·중복을 걸러 「a, b」 형태로 돌려줍니다. 형식이 틀리면 null.
+    value(){
+      const out=[];
+      [...box.querySelectorAll('.emx')].forEach(i=>{
+        const t=(i.value||'').trim().toLowerCase();
+        if(t && !out.includes(t)) out.push(t);
+      });
+      const bad=out.filter(t=>!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t));
+      if(bad.length){ toast('이메일 형식이 아닙니다: '+esc(bad.join(', ')), 6000); return null; }
+      return out.join(', ');
+    }
+  };
+}
+
+function splitEm(v){ return (v||'').split(',').map(x=>x.trim()).filter(Boolean); }
 // 서버 시각은 세계 표준시(UTC)라, 화면에는 한국 시간으로 바꿔 보여줍니다
 const kst = t => {
   if(!t) return '';
@@ -602,7 +650,10 @@ function profilePage(row, msg=''){
     <input class="full" id="gml" type="email" placeholder="구글 캘린더에 쓰는 계정 (회의실 예약용)"
       value="${esc(row.google_email||'')}" style="margin-bottom:10px">
     <input class="full" id="sml" type="text" placeholder="슬랙 계정 (회사 메일과 다를 때만)"
-      value="${esc(row.slack_email||'')}" style="margin-bottom:12px">
+      value="${esc(row.slack_email||row.slack2_email||'')}" style="margin-bottom:12px">
+    <div class="sub" style="text-align:left;margin:-6px 0 12px;font-size:12px">
+      회사에 맞는 슬랙으로 알아서 등록됩니다. 두 곳을 함께 쓰시면 나중에
+      「내 정보」 에서 나머지 하나를 추가하시면 됩니다.</div>
 
     <button class="btn p full" id="save">저장하고 시작하기</button>
     <p style="margin-top:12px;font-size:13px;color:#C0392B">${esc(msg)}</p>
@@ -614,8 +665,11 @@ function profilePage(row, msg=''){
     if(!nm||!co||!dp) return profilePage(row,'이름·회사·부서를 모두 선택해주세요.');
     const gml=($('#gml').value||'').trim().toLowerCase();
     const sml=($('#sml').value||'').trim().toLowerCase();
-    const {error} = await SB.from('hd_member')
-      .update({name:nm, company:co, dept:dp, google_email:gml, slack_email:sml}).eq('id',row.id);
+    // 고른 회사가 2번 슬랙 쪽이면 그 칸에 넣습니다
+    const k = SLACK2_COS.includes(co) ? 'slack2_email' : 'slack_email';
+    const up = {name:nm, company:co, dept:dp, google_email:gml};
+    up[k] = sml;
+    const {error} = await SB.from('hd_member').update(up).eq('id',row.id);
     if(error) return profilePage(row, error.message);
     boot();
   };
@@ -672,7 +726,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v13.6</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v13.7</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 비밀번호 바꾸기">비밀번호 변경</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -726,11 +780,15 @@ function shell(){
       <div class="shsec">연결 계정 — 회사 메일과 다를 때만 적으시면 됩니다</div>
       <input id="mygml" type="email" placeholder="구글 캘린더 계정 (회의실 예약용)"
         value="${esc(me.google_email||'')}" class="full" style="margin:8px 0">
-      <div class="sub" style="margin:2px 0 6px;font-size:12px">슬랙 계정 —
-        슬랙을 여러 곳에 쓰시면 하나씩 추가해 주세요</div>
-      <div id="myslist"></div>
-      <button class="btn full" id="mysladd" style="margin-bottom:8px">+ 슬랙 이메일 추가</button>
-      <button class="btn full" id="acsave" style="margin-bottom:14px">연결 계정 저장</button>
+      ${SLACK_WS.map((w,i)=>`
+        <div style="margin-top:10px">
+          <div style="font-size:13px;font-weight:700;color:#3A424F">${esc(w.name)}</div>
+          <div class="sub" style="margin:2px 0 6px;font-size:11.5px">${esc(w.note)}</div>
+          <div id="mysl${i}"></div>
+          <button class="btn full" type="button" data-mysladd="${i}"
+            style="font-size:13px;margin-bottom:4px">+ 이메일 추가</button>
+        </div>`).join('')}
+      <button class="btn full" id="acsave" style="margin:10px 0 14px">연결 계정 저장</button>
       <div class="shsec">비밀번호</div>
       <input id="pw1" type="password" placeholder="새 비밀번호 (8자 이상)" class="full" style="margin:8px 0 8px">
       <input id="pw2" type="password" placeholder="새 비밀번호 다시 한번" class="full" style="margin-bottom:12px">
@@ -738,48 +796,26 @@ function shell(){
         <button class="btn" id="pwclose">닫기</button></div>`;
     document.body.appendChild(d);
     $('#pwclose').onclick=()=>d.remove();
-    // ── 슬랙 이메일 여러 개 (워크스페이스마다 계정이 다를 때)
-    const myBox=$('#myslist');
-    function myRow(v){
-      const r=document.createElement('div');
-      r.className='row';
-      r.style.cssText='margin-bottom:6px;flex-wrap:nowrap';
-      r.innerHTML=`<input type="text" class="mysml" value="${esc(v||'')}"
-          placeholder="슬랙 가입 이메일" style="flex:1;min-width:0">
-        <button class="delx" title="이 줄 지우기">×</button>`;
-      r.querySelector('.delx').onclick=()=>{
-        r.remove();
-        if(!myBox.querySelector('.mysml')) myBox.appendChild(myRow(''));
-      };
-      return r;
-    }
-    (function(){
-      const vals=(me.slack_email||'').split(',').map(x=>x.trim()).filter(Boolean);
-      (vals.length?vals:['']).forEach(v=>myBox.appendChild(myRow(v)));
-    })();
-    $('#mysladd').onclick=()=>{
-      myBox.appendChild(myRow(''));
-      const ins=myBox.querySelectorAll('.mysml');
-      ins[ins.length-1].focus();
-    };
+    // ── 슬랙 계정 — 워크스페이스마다 칸이 따로 있습니다
+    const myEd = SLACK_WS.map((w,i)=>
+      emRows(d.querySelector('#mysl'+i), splitEm(me[w.key]), me.email));
+    d.querySelectorAll('[data-mysladd]').forEach(b=>{
+      b.onclick=()=>myEd[+b.dataset.mysladd].add();
+    });
 
     $('#acsave').onclick=async()=>{
       const b2=$('#acsave');
       const g=($('#mygml').value||'').trim().toLowerCase();
-      const seen=[];
-      [...myBox.querySelectorAll('.mysml')].forEach(i=>{
-        const t=(i.value||'').trim().toLowerCase();
-        if(t && !seen.includes(t)) seen.push(t);
-      });
-      const bad=seen.filter(t=>!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t));
-      if(bad.length) return toast('이메일 형식이 아닙니다: '+esc(bad.join(', ')), 6000);
-      const k=seen.join(', ');
+      const vals=myEd.map(e=>e.value());
+      if(vals.some(v=>v===null)) return;
+      const patch={google_email:g};
+      SLACK_WS.forEach((w,i)=>{ patch[w.key]=vals[i]; });
       b2.disabled=true;
-      const {error}=await SB.from('hd_member')
-        .update({google_email:g, slack_email:k}).eq('id',me.id);
+      const {error}=await SB.from('hd_member').update(patch).eq('id',me.id);
       b2.disabled=false;
       if(error) return toast('저장하지 못했습니다: '+esc(error.message), 6000);
-      me.google_email=g; me.slack_email=k;
+      me.google_email=g;
+      SLACK_WS.forEach((w,i)=>{ me[w.key]=vals[i]; });
       toast('연결 계정을 저장했습니다');
     };
     $('#pwsave').onclick=async()=>{
@@ -1800,14 +1836,18 @@ async function renderMembers(){
           value="${esc(m.google_email||'')}" style="flex:1;min-width:240px;max-width:340px">
         <button class="btn p" id="mdet-glsave">저장</button>
         <span class="sub" style="margin:0">회의실 예약을 이 사람 것으로 알아봅니다</span></div>
-      <div class="shsec">슬랙 계정</div>
-      <div class="sub" style="margin:8px 0 0">슬랙 가입 이메일이 헤임달과 다를 때만 넣으시면 됩니다.
-        슬랙을 여러 곳(슈퍼홀릭 · 더올마이티)에 쓰시면 <b>이메일을 하나씩 추가</b>해 주세요.
-        위에서부터 차례로 찾아봅니다.</div>
-      <div id="mdet-sllist" style="margin-top:8px"></div>
-      <div class="row" style="margin-top:8px;flex-wrap:wrap">
-        <button class="btn" id="mdet-sladd">+ 이메일 추가</button>
-        <button class="btn p" id="mdet-slsave">저장</button></div>
+      <div class="shsec">슬랙 계정 — 슬랙이 회사마다 다릅니다</div>
+      <div class="sub" style="margin:8px 0 0">가입 이메일이 헤임달과 같으면 비워두셔도 됩니다.
+        비워두면 로그인 이메일(${esc(m.email)})로 찾습니다.</div>
+      ${SLACK_WS.map((w,i)=>`
+        <div style="margin-top:12px">
+          <div style="font-size:13.5px;font-weight:700;color:#3A424F">${esc(w.name)}</div>
+          <div class="sub" style="margin:2px 0 6px;font-size:12px">${esc(w.note)}</div>
+          <div id="mdet-sl${i}"></div>
+          <button class="btn" type="button" data-sladd="${i}" style="font-size:13px">+ 이메일 추가</button>
+        </div>`).join('')}
+      <div class="row" style="margin-top:10px">
+        <button class="btn p" id="mdet-slsave">슬랙 계정 저장</button></div>
       <div class="shsec">겸직 소속 — 본 소속(급여 회사)은 위에서, 겸직은 여기서 관리합니다</div>
       <div style="margin-top:8px">
         ${COMPANIES.filter(c=>c!==m.company).map(co=>`
@@ -1866,57 +1906,28 @@ async function renderMembers(){
       toast(v?'구글 캘린더 계정을 저장했습니다':'지웠습니다 (헤임달 이메일로 찾습니다)');
     };
 
-    // ── 슬랙 계정 — 이메일을 여러 개 넣을 수 있습니다 (워크스페이스마다 계정이 다를 때)
-    const slBox=$('#mdet-sllist');
-    function slRow(v){
-      const d=document.createElement('div');
-      d.className='row';
-      d.style.cssText='margin-bottom:6px;flex-wrap:nowrap';
-      d.innerHTML=`<input type="text" class="slml" value="${esc(v||'')}"
-          placeholder="${esc(m.email)} (헤임달과 같으면 비워두세요)"
-          style="flex:1;min-width:220px;max-width:420px">
-        <button class="delx" title="이 줄 지우기">×</button>`;
-      d.querySelector('.delx').onclick=()=>{
-        d.remove();
-        if(!slBox.querySelector('.slml')) slBox.appendChild(slRow(''));
-      };
-      return d;
-    }
-    function slDraw(){
-      slBox.innerHTML='';
-      const vals=(m.slack_email||'').split(',').map(x=>x.trim()).filter(Boolean);
-      (vals.length?vals:['']).forEach(v=>slBox.appendChild(slRow(v)));
-    }
-    if(slBox) slDraw();
-
-    const sladd=$('#mdet-sladd');
-    if(sladd) sladd.onclick=()=>{
-      slBox.appendChild(slRow(''));
-      const ins=slBox.querySelectorAll('.slml');
-      ins[ins.length-1].focus();
-    };
+    // ── 슬랙 계정 — 워크스페이스마다 칸이 따로 있습니다
+    const slEd = SLACK_WS.map((w,i)=>
+      emRows($('#mdet-sl'+i), splitEm(m[w.key]), m.email));
+    box.querySelectorAll('[data-sladd]').forEach(b=>{
+      b.onclick=()=>slEd[+b.dataset.sladd].add();
+    });
 
     const sl=$('#mdet-slsave');
     if(sl) sl.onclick=async()=>{
-      // 빈 줄은 버리고, 같은 주소가 두 번 들어가지 않게 정리합니다
-      const seen=[];
-      [...slBox.querySelectorAll('.slml')].forEach(i=>{
-        const t=(i.value||'').trim().toLowerCase();
-        if(t && !seen.includes(t)) seen.push(t);
-      });
-      const bad=seen.filter(t=>!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t));
-      if(bad.length) return toast('이메일 형식이 아닙니다: '+esc(bad.join(', ')), 6000);
-      const v=seen.join(', ');
+      const vals=slEd.map(e=>e.value());
+      if(vals.some(v=>v===null)) return;          // 형식 오류는 이미 알렸습니다
+      const patch={};
+      SLACK_WS.forEach((w,i)=>{ patch[w.key]=vals[i]; });
       sl.disabled=true;
-      const {error}=await SB.from('hd_member').update({slack_email:v}).eq('id',id);
+      const {error}=await SB.from('hd_member').update(patch).eq('id',id);
       sl.disabled=false;
       if(error) return toast('저장하지 못했습니다: '+esc(error.message)
-        +'<br>슬랙_연동.sql 을 아직 실행하지 않으셨다면 먼저 실행해주세요.', 7000);
-      m.slack_email=v;
-      slDraw();
-      toast(seen.length
-        ? `슬랙 이메일 ${seen.length}개를 저장했습니다`
-        : '슬랙 이메일을 지웠습니다 (헤임달 이메일로 찾습니다)');
+        +'<br>「슬랙_워크스페이스별_계정.sql」 을 아직 실행하지 않으셨다면 먼저 실행해주세요.', 8000);
+      SLACK_WS.forEach((w,i)=>{ m[w.key]=vals[i]; });
+      const cnt=vals.reduce((a,v)=>a+splitEm(v).length,0);
+      toast(cnt? `슬랙 계정 ${cnt}개를 저장했습니다`
+               : '슬랙 계정을 비웠습니다 (로그인 이메일로 찾습니다)');
     };
 
     const xs=$('#mdet-xs');
