@@ -726,9 +726,9 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v13.7</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v13.8</span>
        <div class="frow">
-         <button class="btn" id="selfinfo" title="내 비밀번호 바꾸기">비밀번호 변경</button>
+         <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
          <button class="install" id="inst" style="display:none">앱으로 설치</button>
        </div>
@@ -3180,7 +3180,9 @@ function renderGuide(){
         "지난주 LBB 미팅에서 정해진 게 뭐야?" 처럼 물으면 됩니다</li>
   </ul>`)}
   ${box('6. 내 계정 관리',`
-    <p>왼쪽 아래 <b>비밀번호 변경</b> — 내 로그인 아이디 확인, 비밀번호 변경.</p>
+    <p>왼쪽 아래 <b>내 정보</b> — 로그인 아이디 확인, 구글 캘린더·슬랙 계정 연결, 비밀번호 변경.</p>
+    <p>슬랙을 슈퍼홀릭·더올마이티 두 곳에 쓰시는 분은 각 칸에 따로 넣어주세요.
+       회의가 어느 회사 것이냐에 따라 그쪽 슬랙으로 회의록이 갑니다.</p>
     <p>비밀번호를 잊으면 관리자에게 요청하세요. 임시 비밀번호를 만들어줍니다.</p>`)}
   ${box('7. 알아두실 것',`<ul>
     <li><b>회의록은 AI가 만든 초안입니다.</b> 중요한 숫자·결정은 꼭 확인해주세요</li>
