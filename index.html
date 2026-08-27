@@ -416,9 +416,6 @@ const SLACK_COS = ['슈퍼홀릭', '그룹 AX', '더올마이티', '루트82'];
 
 // 회사마다 슬랙이 다릅니다. 사람마다 각 슬랙의 계정을 따로 적습니다.
 // 처리 서버의 SLACK2_COMPANY 와 짝이 맞아야 합니다.
-// 2번 슬랙(더올마이티)을 쓰는 회사. 처리 서버의 SLACK2_COMPANY 와 같아야 합니다.
-const SLACK2_COS = ['더올마이티'];
-
 const SLACK_WS = [
   {key:'slack_email',  name:'슈퍼홀릭 슬랙',
    note:'슈퍼홀릭 · 그룹 AX · 슈퍼홀릭인베스트먼트 · 라피스인터내셔널 회의가 이쪽으로 갑니다'},
@@ -646,14 +643,22 @@ function profilePage(row, msg=''){
     </select>
 
     <div class="sub" style="text-align:left;margin:2px 0 8px">
-      아래 두 칸은 <b>회사 메일과 다를 때만</b> 적어주시면 됩니다. 나중에 바꿀 수 있습니다.</div>
-    <input class="full" id="gml" type="email" placeholder="구글 캘린더에 쓰는 계정 (회의실 예약용)"
-      value="${esc(row.google_email||'')}" style="margin-bottom:10px">
-    <input class="full" id="sml" type="text" placeholder="슬랙 계정 (회사 메일과 다를 때만)"
-      value="${esc(row.slack_email||row.slack2_email||'')}" style="margin-bottom:12px">
-    <div class="sub" style="text-align:left;margin:-6px 0 12px;font-size:12px">
-      회사에 맞는 슬랙으로 알아서 등록됩니다. 두 곳을 함께 쓰시면 나중에
-      「내 정보」 에서 나머지 하나를 추가하시면 됩니다.</div>
+      아래는 <b>모두 선택</b>입니다. 지금 비워두셔도 되고, 나중에
+      왼쪽 아래 <b>내 정보</b> 에서 넣으셔도 됩니다.</div>
+
+    <div style="text-align:left;font-size:13px;font-weight:700;color:#3A424F">구글 캘린더 계정</div>
+    <div class="sub" style="text-align:left;margin:2px 0 6px;font-size:12px">
+      회의실 예약을 내 것으로 알아봅니다</div>
+    <input class="full" id="gml" type="email" placeholder="${esc(row.email||'')}"
+      value="${esc(row.google_email||'')}" style="margin-bottom:12px">
+
+    ${SLACK_WS.map((w,i)=>`
+      <div style="text-align:left;font-size:13px;font-weight:700;color:#3A424F">${esc(w.name)}</div>
+      <div class="sub" style="text-align:left;margin:2px 0 6px;font-size:12px">
+        ${esc(w.name)}을 쓰시는 분만 넣으시면 됩니다</div>
+      <input class="full sml" type="text" data-k="${esc(w.key)}"
+        placeholder="${esc(w.name)} 가입 이메일"
+        value="${esc(row[w.key]||'')}" style="margin-bottom:12px">`).join('')}
 
     <button class="btn p full" id="save">저장하고 시작하기</button>
     <p style="margin-top:12px;font-size:13px;color:#C0392B">${esc(msg)}</p>
@@ -664,11 +669,14 @@ function profilePage(row, msg=''){
     const nm=$('#nm').value.trim(), co=$('#co').value, dp=$('#dp').value;
     if(!nm||!co||!dp) return profilePage(row,'이름·회사·부서를 모두 선택해주세요.');
     const gml=($('#gml').value||'').trim().toLowerCase();
-    const sml=($('#sml').value||'').trim().toLowerCase();
-    // 고른 회사가 2번 슬랙 쪽이면 그 칸에 넣습니다
-    const k = SLACK2_COS.includes(co) ? 'slack2_email' : 'slack_email';
     const up = {name:nm, company:co, dept:dp, google_email:gml};
-    up[k] = sml;
+    const bad=[];
+    document.querySelectorAll('.sml').forEach(i=>{
+      const t=(i.value||'').trim().toLowerCase();
+      if(t && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t)) bad.push(t);
+      up[i.dataset.k]=t;
+    });
+    if(bad.length) return profilePage(row,'이메일 형식이 아닙니다: '+bad.join(', '));
     const {error} = await SB.from('hd_member').update(up).eq('id',row.id);
     if(error) return profilePage(row, error.message);
     boot();
@@ -726,7 +734,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v13.8</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v13.9</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -777,9 +785,11 @@ function shell(){
     d.innerHTML=`<h1 style="font-size:16px;margin:0 0 6px">내 정보</h1>
       <div class="sub" style="margin:0 0 12px">로그인 아이디 <b>${esc(me.email)}</b><br>
         ${esc(me.company||'')} ${esc(me.dept||'')} · ${ROLE[me.role]||me.role}</div>
-      <div class="shsec">연결 계정 — 회사 메일과 다를 때만 적으시면 됩니다</div>
-      <input id="mygml" type="email" placeholder="구글 캘린더 계정 (회의실 예약용)"
-        value="${esc(me.google_email||'')}" class="full" style="margin:8px 0">
+      <div class="shsec">구글 캘린더 계정</div>
+      <div class="sub" style="margin:2px 0 6px;font-size:11.5px">회의실 예약을
+        내 것으로 알아봅니다. 로그인 아이디와 같으면 비워두세요</div>
+      <input id="mygml" type="email" placeholder="${esc(me.email)}"
+        value="${esc(me.google_email||'')}" class="full" style="margin-bottom:4px">
       ${SLACK_WS.map((w,i)=>`
         <div style="margin-top:10px">
           <div style="font-size:13px;font-weight:700;color:#3A424F">${esc(w.name)}</div>
