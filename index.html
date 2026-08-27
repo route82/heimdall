@@ -753,7 +753,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v14.6</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v14.7</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -2901,11 +2901,13 @@ async function renderRec(){
       끝내면 자동으로 올라가고, 전사·요약·하이라이트가 만들어집니다</div>
     <div class="box">
       <div id="rc-today"></div>
-      <div class="row" id="rc-cal-row" style="margin-bottom:9px;display:none">
-        <select id="rc-cal" style="flex:1;min-width:300px" ${on?'disabled':''}>
-          <option value="">회의실 예약에서 고르기 (선택)</option>
+      <div id="rc-cal-row" style="margin-bottom:12px">
+        <div style="font-size:13px;font-weight:700;color:#3A424F;margin-bottom:5px">회의실 예약에서 고르기</div>
+        <select id="rc-cal" class="full" style="max-width:640px" ${on?'disabled':''}>
+          <option value="">불러오는 중…</option>
         </select>
-        <span class="sub" style="margin:0">고르면 회의명이 자동으로 채워집니다</span>
+        <div class="sub" id="rc-cal-hint" style="margin:5px 0 0;font-size:12px">
+          고르면 회의명이 자동으로 채워집니다</div>
       </div>
       <div class="row" style="margin-bottom:4px">
         <input id="rc-title" placeholder="무슨 회의인가요 (예: 주간회의)" style="flex:1;min-width:220px" ${on?'disabled':''}>
@@ -2964,6 +2966,7 @@ function recTick(){
 // 회의실 예약을 불러와 고를 수 있게 합니다 (구글 회의실 캘린더에서 가져온 것)
 async function loadCalPicks(){
   const sel=$('#rc-cal'); if(!sel) return;
+  const hint=$('#rc-cal-hint');
   const now=new Date();
   const from=new Date(now.getTime()-6*3600*1000).toISOString();
   const to  =new Date(now.getTime()+12*3600*1000).toISOString();
@@ -2971,12 +2974,25 @@ async function loadCalPicks(){
     .select('uid,title,room,starts_at,ends_at')
     .gte('starts_at',from).lte('starts_at',to)
     .order('starts_at');
-  const row=$('#rc-cal-row');
-  if(error || !data || !data.length){ if(row) row.style.display='none'; return; }
-  if(row) row.style.display='';
+  if(error){
+    sel.innerHTML='<option value="">예약을 불러오지 못했습니다</option>';
+    sel.disabled=true;
+    if(hint) hint.innerHTML='<span style="color:#B36B00">'+esc(error.message)+'</span>';
+    return;
+  }
+  if(!data || !data.length){
+    sel.innerHTML='<option value="">지금 시간대에 잡힌 회의실 예약이 없습니다</option>';
+    sel.disabled=true;
+    if(hint) hint.innerHTML='예약이 있으면 여기서 고를 수 있습니다 · '
+      + '예약 제목에 <b>회사명</b>이 들어가야 우리 그룹 회의로 알아봅니다 '
+      + '(예: [B1, 소회의실] 더올마이티 주간회의)';
+    return;
+  }
+  sel.disabled=false;
+  if(hint) hint.textContent='고르면 회의명이 자동으로 채워집니다';
   const hm=t=>new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',
     hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(t));
-  sel.innerHTML='<option value="">회의실 예약에서 고르기 (선택)</option>'
+  sel.innerHTML='<option value="">고르지 않음 (회의명을 직접 적습니다)</option>'
     + data.map(e=>`<option value="${esc(e.uid)}"
         data-title="${esc(e.title)}" data-room="${esc(e.room||'')}">
         ${hm(e.starts_at)}~${hm(e.ends_at)} · ${esc(e.title)}${e.room?' · '+esc(e.room):''}
