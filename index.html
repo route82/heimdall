@@ -601,7 +601,7 @@ function profilePage(row, msg=''){
       아래 두 칸은 <b>회사 메일과 다를 때만</b> 적어주시면 됩니다. 나중에 바꿀 수 있습니다.</div>
     <input class="full" id="gml" type="email" placeholder="구글 캘린더에 쓰는 계정 (회의실 예약용)"
       value="${esc(row.google_email||'')}" style="margin-bottom:10px">
-    <input class="full" id="sml" type="email" placeholder="슬랙 계정 (슈퍼홀릭 · 그룹 AX 해당자만)"
+    <input class="full" id="sml" type="text" placeholder="슬랙 계정 (여러 개면 쉼표로)"
       value="${esc(row.slack_email||'')}" style="margin-bottom:12px">
 
     <button class="btn p full" id="save">저장하고 시작하기</button>
@@ -672,7 +672,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v13.3</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v13.5</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 비밀번호 바꾸기">비밀번호 변경</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -726,7 +726,7 @@ function shell(){
       <div class="shsec">연결 계정 — 회사 메일과 다를 때만 적으시면 됩니다</div>
       <input id="mygml" type="email" placeholder="구글 캘린더 계정 (회의실 예약용)"
         value="${esc(me.google_email||'')}" class="full" style="margin:8px 0">
-      <input id="mysml" type="email" placeholder="슬랙 계정 (슈퍼홀릭 · 그룹 AX 해당자만)"
+      <input id="mysml" type="text" placeholder="슬랙 계정 (여러 개면 쉼표로)"
         value="${esc(me.slack_email||'')}" class="full" style="margin-bottom:8px">
       <button class="btn full" id="acsave" style="margin-bottom:14px">연결 계정 저장</button>
       <div class="shsec">비밀번호</div>
@@ -1766,11 +1766,13 @@ async function renderMembers(){
         <button class="btn p" id="mdet-glsave">저장</button>
         <span class="sub" style="margin:0">회의실 예약을 이 사람 것으로 알아봅니다</span></div>
       <div class="shsec">슬랙 계정</div>
+      <div class="sub" style="margin:8px 0 0">슬랙 가입 이메일이 헤임달과 다를 때만 넣으시면 됩니다.
+        슬랙을 여러 곳(슈퍼홀릭 · 더올마이티)에 쓰시면 <b>이메일을 하나씩 추가</b>해 주세요.
+        위에서부터 차례로 찾아봅니다.</div>
+      <div id="mdet-sllist" style="margin-top:8px"></div>
       <div class="row" style="margin-top:8px;flex-wrap:wrap">
-        <input id="mdet-sl" type="email" placeholder="${esc(m.email)} (헤임달과 같으면 비워두세요)"
-          value="${esc(m.slack_email||'')}" style="flex:1;min-width:240px;max-width:340px">
-        <button class="btn p" id="mdet-slsave">저장</button>
-        <span class="sub" style="margin:0">슬랙 가입 이메일이 다를 때만 넣으시면 됩니다</span></div>
+        <button class="btn" id="mdet-sladd">+ 이메일 추가</button>
+        <button class="btn p" id="mdet-slsave">저장</button></div>
       <div class="shsec">겸직 소속 — 본 소속(급여 회사)은 위에서, 겸직은 여기서 관리합니다</div>
       <div style="margin-top:8px">
         ${COMPANIES.filter(c=>c!==m.company).map(co=>`
@@ -1829,16 +1831,57 @@ async function renderMembers(){
       toast(v?'구글 캘린더 계정을 저장했습니다':'지웠습니다 (헤임달 이메일로 찾습니다)');
     };
 
+    // ── 슬랙 계정 — 이메일을 여러 개 넣을 수 있습니다 (워크스페이스마다 계정이 다를 때)
+    const slBox=$('#mdet-sllist');
+    function slRow(v){
+      const d=document.createElement('div');
+      d.className='row';
+      d.style.cssText='margin-bottom:6px;flex-wrap:nowrap';
+      d.innerHTML=`<input type="text" class="slml" value="${esc(v||'')}"
+          placeholder="${esc(m.email)} (헤임달과 같으면 비워두세요)"
+          style="flex:1;min-width:220px;max-width:420px">
+        <button class="delx" title="이 줄 지우기">×</button>`;
+      d.querySelector('.delx').onclick=()=>{
+        d.remove();
+        if(!slBox.querySelector('.slml')) slBox.appendChild(slRow(''));
+      };
+      return d;
+    }
+    function slDraw(){
+      slBox.innerHTML='';
+      const vals=(m.slack_email||'').split(',').map(x=>x.trim()).filter(Boolean);
+      (vals.length?vals:['']).forEach(v=>slBox.appendChild(slRow(v)));
+    }
+    if(slBox) slDraw();
+
+    const sladd=$('#mdet-sladd');
+    if(sladd) sladd.onclick=()=>{
+      slBox.appendChild(slRow(''));
+      const ins=slBox.querySelectorAll('.slml');
+      ins[ins.length-1].focus();
+    };
+
     const sl=$('#mdet-slsave');
     if(sl) sl.onclick=async()=>{
+      // 빈 줄은 버리고, 같은 주소가 두 번 들어가지 않게 정리합니다
+      const seen=[];
+      [...slBox.querySelectorAll('.slml')].forEach(i=>{
+        const t=(i.value||'').trim().toLowerCase();
+        if(t && !seen.includes(t)) seen.push(t);
+      });
+      const bad=seen.filter(t=>!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t));
+      if(bad.length) return toast('이메일 형식이 아닙니다: '+esc(bad.join(', ')), 6000);
+      const v=seen.join(', ');
       sl.disabled=true;
-      const v=($('#mdet-sl').value||'').trim().toLowerCase();
       const {error}=await SB.from('hd_member').update({slack_email:v}).eq('id',id);
       sl.disabled=false;
       if(error) return toast('저장하지 못했습니다: '+esc(error.message)
         +'<br>슬랙_연동.sql 을 아직 실행하지 않으셨다면 먼저 실행해주세요.', 7000);
       m.slack_email=v;
-      toast(v?'슬랙 이메일을 저장했습니다':'슬랙 이메일을 지웠습니다 (헤임달 이메일로 찾습니다)');
+      slDraw();
+      toast(seen.length
+        ? `슬랙 이메일 ${seen.length}개를 저장했습니다`
+        : '슬랙 이메일을 지웠습니다 (헤임달 이메일로 찾습니다)');
     };
 
     const xs=$('#mdet-xs');
@@ -3150,7 +3193,8 @@ function renderGuide(){
         회의록 화면의 <b>「슬랙에 공유」</b> 를 눌렀을 때만 슬랙으로 나갑니다
         (경영진 보고와는 별개입니다). 회사에 맞는 채널로 가고,
         액션아이템은 담당자 개인 DM 으로 갑니다</li>
-    <li>슬랙 가입 이메일이 헤임달과 다른 사람은 구성원 상세의 「슬랙 계정」 에 넣어주세요</li>
+    <li>슬랙 가입 이메일이 헤임달과 다른 사람은 구성원 상세의 「슬랙 계정」 에 넣어주세요.
+        슬랙을 여러 곳에 쓰는 사람은 쉼표로 나란히 적으면 차례로 찾아봅니다</li>
     <li>서버가 30분 넘게 조용하면 관리자 메일로 자동 경고가 옵니다</li>
   </ul>`)}
   ${box('관리자 안내 — 계정·권한',`<ul>
