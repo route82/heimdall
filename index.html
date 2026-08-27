@@ -188,6 +188,18 @@ mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
 .cev.done{background:#E9F6EE;color:#1E7A46}
 .cev.miss{background:#FDECEA;color:#C0392B}
 .clist .card{margin-bottom:9px}
+/* 참석자 입력 — 이름을 하나씩 넣는 칸 */
+.atin{display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:#fff;
+ border:1px solid #DDE2E9;border-radius:10px;padding:6px 8px;min-height:44px}
+.atin:focus-within{border-color:#2B6CB0;box-shadow:0 0 0 3px rgba(43,108,176,.10)}
+.atin input{border:0;outline:0;flex:1;min-width:130px;font-size:14.5px;
+ padding:4px 2px;background:transparent;font-family:inherit}
+.atc{display:inline-flex;align-items:center;gap:4px;background:#EEF2F7;color:#2C3542;
+ border-radius:999px;padding:3px 5px 3px 11px;font-size:13.5px;font-weight:600}
+.atc.out{background:#FDECEA;color:#C0392B}
+.atc button{border:0;background:transparent;color:inherit;cursor:pointer;
+ font-size:15px;line-height:1;padding:0 4px;opacity:.55;font-family:inherit}
+.atc button:hover{opacity:1}
 .steps{display:flex;flex-wrap:wrap;gap:6px 10px;margin-top:8px}
 .step{display:flex;align-items:center;gap:5px;font-size:12px;color:#98A0AC}
 .step .sd{width:14px;height:14px;border-radius:50%;border:2px solid #DDE2E9;flex:none;
@@ -741,7 +753,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v14.4</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v14.5</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -1528,10 +1540,10 @@ function startEdit(){
   const sub=el.querySelector('.sub');
   if(sub && !$('#mparts')){
     sub.insertAdjacentHTML('afterend',
-      '<div class="row" style="margin:10px 0"><span class="sub" style="margin:0">참석자</span>'
-      + '<input id="mparts" class="full" style="flex:1;min-width:220px;max-width:520px"'
-      + ' placeholder="쉼표로 구분 (예: 김현우, 홍석진)" value="'
-      + esc(cur.att.join(', ')) + '"></div>');
+      '<div style="margin:10px 0;max-width:640px">'
+      + '<div style="font-size:13px;font-weight:700;color:#3A424F;margin-bottom:5px">참석자</div>'
+      + '<div id="mparts"></div></div>');
+    MATT = attInput($('#mparts'), cur.att);
   }
   $('#smview').style.display='none';
   const ta=$('#smedit'); ta.style.display='block'; ta.value=cur.m.summary_md||'';
@@ -1580,13 +1592,19 @@ async function saveMeeting(){
       await SB.from('hd_highlight').update({headline:head,points:pts}).eq('id',o.id);
   }
   const pin=$('#mparts');
-  if(pin){
-    const names=[...new Set(pin.value.split(',').map(x=>x.trim()).filter(Boolean))];
+  if(pin && MATT){
+    const names=[...new Set(MATT.value().map(x=>x.trim()).filter(Boolean))];
     const before=[...cur.att].sort().join('|'), after=[...names].sort().join('|');
     if(before!==after){
       await SB.from('hd_attendee').delete().eq('meeting_id',id);
-      if(names.length)
-        await SB.from('hd_attendee').insert(names.map(n=>({meeting_id:id, name:n})));
+      if(names.length){
+        // 헤임달 구성원이면 계정까지 연결해 둡니다 (열람 권한과 슬랙 알림에 씁니다)
+        await loadMembers();
+        await SB.from('hd_attendee').insert(names.map(n=>{
+          const hit=findMember(n);
+          return {meeting_id:id, name:n, member_id:hit?hit.id:null};
+        }));
+      }
       msg.push('참석자 수정');
     }
   }
@@ -2784,6 +2802,73 @@ function oneLine(md, n){
   return '';
 }
 
+// ── 참석자 입력 ────────────────────────────────────────────
+// 이름을 하나씩 넣고, 헤임달에 없는 이름은 빨갛게 보여줍니다.
+// 참석자가 곧 열람 권한이고 슬랙 알림 대상이라, 확실히 짚고 넘어가려는 것입니다.
+let MEMBERS = null;
+async function loadMembers(){
+  if(MEMBERS) return MEMBERS;
+  const {data}=await SB.from('hd_member')
+    .select('id,name,company,dept').eq('approved',true).order('name');
+  MEMBERS=(data||[]).filter(m=>(m.name||'').trim());
+  let dl=document.getElementById('hd-mnames');
+  if(!dl){ dl=document.createElement('datalist'); dl.id='hd-mnames'; document.body.appendChild(dl); }
+  dl.innerHTML=MEMBERS.map(m=>`<option value="${esc(m.name)}">`).join('');
+  return MEMBERS;
+}
+const flatName = t => (t||'').replace(/\s/g,'');
+function findMember(nm){
+  const t=flatName(nm);
+  if(t.length<2) return null;
+  return (MEMBERS||[]).find(m=>{
+    const x=flatName(m.name);
+    return x && (t.includes(x) || x.includes(t));
+  }) || null;
+}
+
+function attInput(host, initial){
+  host.innerHTML=`<div class="atin"><input type="text" list="hd-mnames"
+      placeholder="이름을 적고 Enter (예: 김현우)"></div>
+    <div class="sub" style="margin:5px 0 0;font-size:12px">
+      이름을 적고 <b>Enter</b> 를 누르면 하나씩 추가됩니다 ·
+      <span style="color:#C0392B">빨간 이름</span>은 헤임달에 없는 분이라
+      슬랙 알림이 가지 않습니다 (외부 참석자도 그대로 적어두시면 됩니다)</div>`;
+  const box=host.querySelector('.atin'), inp=host.querySelector('input');
+  let vals=(initial||[]).map(x=>(x||'').trim()).filter(Boolean);
+
+  const draw=()=>{
+    [...box.querySelectorAll('.atc')].forEach(x=>x.remove());
+    vals.forEach((v,i)=>{
+      const hit=findMember(v);
+      const c=document.createElement('span');
+      c.className='atc'+(hit?'':' out');
+      c.title=hit ? `${hit.name} · ${(hit.company||'')} ${(hit.dept||'')}`.trim()
+                  : '헤임달에 없는 이름입니다 · 슬랙 알림이 가지 않습니다';
+      c.innerHTML=`<span>${esc(v)}</span><button type="button" title="지우기">×</button>`;
+      c.querySelector('button').onclick=()=>{ vals.splice(i,1); draw(); };
+      box.insertBefore(c, inp);
+    });
+  };
+  const add=t=>{
+    t=(t||'').replace(/,+$/,'').trim();
+    if(!t) return;
+    if(!vals.some(v=>flatName(v)===flatName(t))) vals.push(t);
+    inp.value=''; draw();
+  };
+  inp.onkeydown=e=>{
+    if(e.key==='Enter' || e.key===','){ e.preventDefault(); add(inp.value); }
+    else if(e.key==='Backspace' && !inp.value && vals.length){ vals.pop(); draw(); }
+  };
+  inp.onblur=()=>add(inp.value);
+  inp.onpaste=e=>{
+    const t=(e.clipboardData||window.clipboardData).getData('text')||'';
+    if(/[,\n]/.test(t)){ e.preventDefault(); t.split(/[,\n]/).forEach(add); }
+  };
+  draw();
+  loadMembers().then(draw);           // 명부가 늦게 와도 색이 맞춰집니다
+  return { value(){ add(inp.value); return vals.slice(); } };
+}
+
 function recFmt(s){
   const m=Math.floor(s/60), x=s%60;
   return (m<60? `${m}:${String(x).padStart(2,'0')}`
@@ -2805,12 +2890,13 @@ async function renderRec(){
         <span class="sub" style="margin:0">고르면 회의명이 자동으로 채워집니다</span>
       </div>
       <div class="row" style="margin-bottom:4px">
-        <input id="rc-title" placeholder="무슨 회의인가요 (예: 주간회의)" style="flex:2;min-width:220px" ${on?'disabled':''}>
-        <input id="rc-parts" placeholder="참석자 (쉼표로 구분 · 선택)" style="flex:2;min-width:180px" ${on?'disabled':''}>
+        <input id="rc-title" placeholder="무슨 회의인가요 (예: 주간회의)" style="flex:1;min-width:220px" ${on?'disabled':''}>
       </div>
-      <div class="sub" style="margin:0 0 9px;font-size:12px">제목은
+      <div class="sub" style="margin:0 0 10px;font-size:12px">제목은
         <b>${esc(mkTitle('회의 내용', me.company||'', me.dept||''))}</b>
         처럼 <b>날짜 · 회사 · 부서</b>가 앞에 자동으로 붙습니다</div>
+      <div style="font-size:13px;font-weight:700;color:#3A424F;margin-bottom:5px">참석자</div>
+      <div id="rc-parts" style="margin-bottom:10px"></div>
       <select id="rc-type" style="display:none"><option value="meeting">회의</option></select>
       ${(me.role==='admin' || (me.extra_scopes||[]).length)?`<div class="row" style="margin-bottom:9px" id="rc-scope-row">
         <select id="rc-scope" style="min-width:230px" ${on?'disabled':''}>
@@ -2837,6 +2923,8 @@ async function renderRec(){
     <h1 style="font-size:16px;margin-top:24px">최근 올린 것</h1>
     <div id="up-list" class="box" style="color:#98A0AC">불러오는 중…</div>`;
   drawRecToday();
+  // 참석자 칸 — 녹음 중에도 늦게 오신 분을 추가할 수 있습니다
+  REC.att = attInput($('#rc-parts'), on ? (REC.attNames||[]) : []);
   loadCalPicks().then(()=>{
     // 홈에서 예약을 눌러 들어온 경우 그 예약을 골라 둡니다
     if(REC.cal && REC.cal.uid){
@@ -2939,7 +3027,8 @@ async function recStart(){
     if(window.MediaRecorder && MediaRecorder.isTypeSupported(m)){ mime=m; break; }
   }
   REC.chunks=[]; REC.stream=stream; REC.title=title;
-  REC.parts=($('#rc-parts').value||'').trim();
+  REC.attNames = REC.att ? REC.att.value() : [];
+  REC.parts = REC.attNames.join(', ');
   REC.scope=($('#rc-scope')||{value:'mine'}).value;
   const cs=$('#rc-cal');
   if(cs && cs.value){
@@ -2985,6 +3074,8 @@ function recWatchLevel(stream){
 
 function recStop(){
   if(!REC.mr || REC.mr.state!=='recording') return;
+  // 녹음 중에 참석자를 더 넣었으면 그것까지 반영합니다
+  if(REC.att){ REC.attNames=REC.att.value(); REC.parts=REC.attNames.join(', '); }
   clearInterval(REC.timer); REC.timer=null;
   keepAwake(false);
   REC.dur = Math.floor((Date.now()-REC.t0)/1000);
@@ -3042,8 +3133,8 @@ async function recDone(){
       cal_uid:(REC.cal&&REC.cal.uid)||'', room:(REC.cal&&REC.cal.room)||'',
       ...sc, ...extra});
     if(e2){ toast(upErr('row', e2), 9000); renderRec(); return; }
-    // 다음 녹음 때 이 예약이 계속 골라져 있지 않도록 비웁니다
-    REC.cal=null; REC.preTitle='';
+    // 다음 녹음 때 이 예약·참석자가 계속 남아 있지 않도록 비웁니다
+    REC.cal=null; REC.preTitle=''; REC.attNames=[];
     toast(`<b>${esc(REC.title)}</b> (${recFmt(REC.dur||0)}) 올렸습니다.<br>처리가 끝나면 회의 목록에 나타납니다.`);
   }catch(e){
     toast('올리지 못했습니다: '+esc(e.message||e), 8000);
@@ -3062,10 +3153,11 @@ async function renderUpload(){
     <div class="sub">직접 쓴 회의록 문서나 다른 기기로 녹음한 음성을 올리면,
       전사·요약·하이라이트가 똑같이 만들어집니다</div>
     <div class="box">
-      <div class="row" style="margin-bottom:9px">
-        <input id="up-title" placeholder="무슨 회의인가요 (비우면 파일 이름을 씁니다)" style="flex:2;min-width:220px">
-        <input id="up-parts" placeholder="참석자 (쉼표로 구분 · 선택)" style="flex:2;min-width:180px">
+      <div class="row" style="margin-bottom:10px">
+        <input id="up-title" placeholder="무슨 회의인가요 (비우면 파일 이름을 씁니다)" style="flex:1;min-width:220px">
       </div>
+      <div style="font-size:13px;font-weight:700;color:#3A424F;margin-bottom:5px">참석자</div>
+      <div id="up-parts" style="margin-bottom:10px"></div>
       ${me.role==='admin'?`<div class="row" style="margin-bottom:9px">
         <select id="up-scope" style="min-width:230px">
           <option value="mine">내 소속 (${esc(me.company||'')} ${esc(me.dept||'')})</option>
@@ -3086,9 +3178,12 @@ async function renderUpload(){
     </div>
     <h1 style="font-size:16px;margin-top:24px">최근 올린 것</h1>
     <div id="up-list" class="box" style="color:#98A0AC">불러오는 중…</div>`;
+  UPATT = attInput($('#up-parts'), []);
   $('#up-go').onclick=doUpload;
   loadUploads();
 }
+let UPATT = null;
+let MATT = null;
 
 async function loadUploads(){
   const box=$('#up-list'); if(!box) return;
@@ -3151,12 +3246,13 @@ async function doUpload(){
     const title=mkTitle($('#up-title').value.trim() || f.name.replace(/\.[^.]+$/,''),
                         usc.company, usc.dept);
     const {error:e2}=await SB.from('hd_job').insert({
-      title, participants:$('#up-parts').value.trim(),
+      title, participants:(UPATT?UPATT.value():[]).join(', '),
       audio_path:name, kind:isAudio?'audio':'doc', orig_name:f.name,
       device:'웹 업로드', created_by:me.id, created_name:me.name, ...usc});
     if(e2){ toast(upErr('row', e2), 9000); btn.disabled=false; btn.textContent='올리기'; return; }
     toast(`<b>${esc(title)}</b> 올렸습니다.<br>처리가 끝나면 회의 목록에 나타납니다.`);
     $('#up-file').value=''; $('#up-title').value='';
+    if(UPATT) UPATT = attInput($('#up-parts'), []);
     loadUploads();
   }catch(e){
     toast('올리지 못했습니다: '+esc(e.message||e), 6000);
