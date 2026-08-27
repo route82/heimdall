@@ -72,6 +72,12 @@ h1{font-size:23px;margin:0 0 4px;letter-spacing:-.01em}
 .cm{font-size:13px;color:#5C6672;display:flex;gap:14px;flex-wrap:wrap;align-items:center}
 .ct .mtag{color:#5C6672}
 .csub{margin-top:2px;font-size:13.5px;color:#5C6672;line-height:1.5}
+.bsec{margin:20px 0 10px;padding-top:16px;border-top:1px solid #EEF1F5;
+ font-size:14px;font-weight:700;color:#3A424F}
+.bcard{border:1px solid #E6EAF0;border-radius:12px;padding:14px 16px;margin-bottom:10px;background:#FCFDFE}
+.bct{font-size:16px;font-weight:700;line-height:1.4}
+.bct .mtag{color:#5C6672}
+.bone{margin:9px 0 11px;font-size:14px;line-height:1.65;color:#3A424F}
 .csum{margin-top:7px;font-size:13.5px;line-height:1.6;color:#3A424F}
 .csum.none{color:#AEB6C0}
 .tag{font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px}
@@ -758,7 +764,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v15.2</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v15.3</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -1753,15 +1759,47 @@ async function renderBrief(){
     return;
   }
   const {data}=await SB.from('hd_brief').select('*').order('on_date',{ascending:false}).limit(14);
+  const days=(data||[]).map(b=>b.on_date);
+  let MTG={}, MATTN={};
+  if(days.length){
+    const [mr, ar] = await Promise.all([
+      SB.from('hd_meeting')
+        .select('id,title,held_on,company,dept,summary_md,duration_sec,started_at,ended_at,status,visibility')
+        .in('held_on', days).neq('visibility','private').order('started_at'),
+      SB.from('hd_attendee').select('meeting_id,name').limit(8000)]);
+    (mr.data||[]).forEach(m=>{ (MTG[m.held_on] ||= []).push(m); });
+    (ar.data||[]).forEach(a=>{ (MATTN[a.meeting_id] ||= []).push(a.name); });
+  }
+  const mcard = m => {
+    const tp=titleParts(m), sb2=subTitle(m.summary_md), one=oneLine(m.summary_md,140);
+    const tt=timeText(m);
+    return `<div class="bcard">
+      <div class="bct"><span class="mtag">${esc(tp.tag)}</span> ${esc(tp.name)}</div>
+      ${sb2?`<div class="csub">${esc(sb2)}</div>`:''}
+      <div class="cm" style="margin-top:5px">
+        ${(m.status==='confirmed'||m.status==='reported')?'<span class="tag t-reported">✓ 확정</span>':''}
+        ${tt?`<span>${esc(tt)}</span>`:''}
+        <span>${esc(attLine(MATTN[m.id]||[]))}</span>
+        ${m.company?`<span>${esc(m.company)}${m.dept?' '+esc(m.dept):''}</span>`:''}</div>
+      <div class="bone">${esc(one||'요약이 아직 없습니다.')}</div>
+      <button class="btn" data-open="${m.id}">회의록 자세히 보기 →</button>
+    </div>`;
+  };
   el.innerHTML=`<h1>일일 브리핑</h1><div class="sub">전날 회의를 한 장으로 정리합니다</div>`
    + (['admin','ceo'].includes(me.role)
         ? `<div class="box" id="bto-box" style="margin-bottom:16px">불러오는 중…</div>` : '')
-   + ((data&&data.length)? data.map(b=>`<div class="box"><div class="sub" style="margin:0 0 10px">${b.on_date}</div>
-       <div class="md">${mdHtml(b.body_md)}</div></div>`).join('')
+   + ((data&&data.length)? data.map(b=>`<div class="box">
+       <div class="sub" style="margin:0 0 10px">${b.on_date}</div>
+       <div class="md">${mdHtml(b.body_md)}</div>
+       ${(MTG[b.on_date]||[]).length?`
+         <div class="bsec">그날 회의 ${MTG[b.on_date].length}건</div>
+         ${MTG[b.on_date].map(mcard).join('')}`:''}
+     </div>`).join('')
      : `<div class="empty">아직 브리핑이 없습니다.<br><br>
         전날 회의가 정리되면 다음 날 아침에 이 자리에 올라옵니다.<br>
         회의를 하나하나 다 읽지 않으셔도 흐름을 아실 수 있도록<br>
         <b>정해진 것 · 결정이 필요한 것 · 진행 중인 할 일</b> 순서로 정리됩니다.</div>`);
+  el.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openMeeting(b.dataset.open));
   if(['admin','ceo'].includes(me.role)) drawBriefTo();
 }
 
@@ -3967,8 +4005,20 @@ async function boot(){
     return;
   }
   if(!data.approved) return pendingPage(data);
-  me=data; shell(); go('home'); checkPending();
+  me=data; shell(); checkPending();
+  if(!openFromHash()) go('home');
 }
+
+// 주소 뒤에 #m/<회의번호> 가 붙어 있으면 그 회의를 바로 엽니다
+function openFromHash(){
+  const h=(location.hash||'').replace(/^#/,'');
+  const mt=h.match(/^m\/([0-9a-fA-F-]{16,})$/);
+  if(!mt) return false;
+  history.replaceState(null,'',location.pathname+location.search);
+  openMeeting(mt[1]);
+  return true;
+}
+window.addEventListener('hashchange', ()=>{ if(me) openFromHash(); });
 SB.auth.onAuthStateChange((e)=>{
   if(e==='SIGNED_IN'||e==='SIGNED_OUT') boot();
   if(e==='TOKEN_REFRESH_FAILED'||e==='USER_DELETED') authDead();
