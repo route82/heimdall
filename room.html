@@ -490,6 +490,19 @@ function msg(head, sub){
 })();
 
 // ─────────────────────────── 시작
+// 이 화면에는 서비스 워커를 쓰지 않습니다.
+// 예전에 등록된 것이 남아 있으면 화면이 안 뜰 수 있어 지웁니다.
+(async()=>{
+  try{
+    if(!navigator.serviceWorker) return;
+    const rs=await navigator.serviceWorker.getRegistrations();
+    for(const r of rs){
+      if((r.scope||'').indexOf(location.pathname.replace(/room\.html$/,''))>=0)
+        await r.unregister();
+    }
+  }catch(e){}
+})();
+
 async function boot(){
   const ses=await SB.auth.getSession();
   const session=ses.data && ses.data.session;
