@@ -753,7 +753,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v14.5</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v14.6</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -2855,11 +2855,29 @@ function attInput(host, initial){
     if(!vals.some(v=>flatName(v)===flatName(t))) vals.push(t);
     inp.value=''; draw();
   };
+  // 한글은 글자를 「조합」 하는 중에 Enter 가 들어옵니다.
+  // 그때 바로 넣어버리면 조합이 끝나고 마지막 글자가 뒤늦게 떨어집니다
+  // (김현우 → 「김현우」 와 「우」 가 따로 들어가던 문제).
+  // 그래서 조합이 끝난 뒤에 넣습니다.
+  let composing=false, wantAdd=false;
+  inp.addEventListener('compositionstart', ()=>{ composing=true; });
+  inp.addEventListener('compositionend', ()=>{
+    composing=false;
+    if(wantAdd){ wantAdd=false; add(inp.value); }
+  });
   inp.onkeydown=e=>{
-    if(e.key==='Enter' || e.key===','){ e.preventDefault(); add(inp.value); }
-    else if(e.key==='Backspace' && !inp.value && vals.length){ vals.pop(); draw(); }
+    const ime = composing || e.isComposing || e.keyCode===229;
+    if(e.key==='Enter'){
+      if(ime){ wantAdd=true; return; }      // 조합이 끝나면 넣습니다
+      e.preventDefault(); add(inp.value);
+    } else if(e.key===','){
+      if(ime) return;
+      e.preventDefault(); add(inp.value);
+    } else if(e.key==='Backspace' && !ime && !inp.value && vals.length){
+      vals.pop(); draw();
+    }
   };
-  inp.onblur=()=>add(inp.value);
+  inp.onblur=()=>{ if(!composing) add(inp.value); };
   inp.onpaste=e=>{
     const t=(e.clipboardData||window.clipboardData).getData('text')||'';
     if(/[,\n]/.test(t)){ e.preventDefault(); t.split(/[,\n]/).forEach(add); }
