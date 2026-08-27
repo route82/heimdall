@@ -734,7 +734,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v13.9</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v14.0</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -1859,16 +1859,23 @@ async function renderMembers(){
       <div class="row" style="margin-top:10px">
         <button class="btn p" id="mdet-slsave">슬랙 계정 저장</button></div>
       <div class="shsec">겸직 소속 — 본 소속(급여 회사)은 위에서, 겸직은 여기서 관리합니다</div>
+      <div class="sub" style="margin:8px 0 0">본 소속(<b>${esc(m.company||'')} ${esc(m.dept||'')}</b>)은
+        따로 체크하지 않아도 보입니다. 같은 회사의 <b>다른 부서</b>로 발령난 경우도 여기서 체크합니다.</div>
       <div style="margin-top:8px">
-        ${COMPANIES.filter(c=>c!==m.company).map(co=>`
+        ${COMPANIES.map(co=>{
+          // 본 소속 회사는 「회사 전체」와 본인 부서를 빼고, 나머지 부서만 보여줍니다
+          const own = co===m.company;
+          const ds = deptsOf(co).filter(d=>!(own && d===m.dept));
+          if(own && !ds.length) return '';
+          return `
           <div class="row" style="flex-wrap:wrap;gap:6px 14px;margin-top:6px">
-            <span style="font-size:13px;color:#5C6672;min-width:96px">${esc(co)}</span>
-            <label class="shlb"><input type="checkbox" class="mxs" value="${esc(co)}|"
-              ${(m.extra_scopes||[]).includes(co+'|')?'checked':''}> <b>회사 전체</b></label>
-            ${deptsOf(co).map(d=>{const v=co+'|'+d;
+            <span style="font-size:13px;color:#5C6672;min-width:96px">${esc(co)}${own?' <span style="font-size:11px;color:#98A0AC">(본 소속)</span>':''}</span>
+            ${own?'':`<label class="shlb"><input type="checkbox" class="mxs" value="${esc(co)}|"
+              ${(m.extra_scopes||[]).includes(co+'|')?'checked':''}> <b>회사 전체</b></label>`}
+            ${ds.map(d=>{const v=co+'|'+d;
               return `<label class="shlb"><input type="checkbox" class="mxs" value="${esc(v)}"
                 ${(m.extra_scopes||[]).includes(v)?'checked':''}> ${esc(d)}</label>`;}).join('')}
-          </div>`).join('')}
+          </div>`;}).join('')}
         <div class="row" style="margin-top:10px">
           <button class="btn p" id="mdet-xs">겸직 저장</button>
           <span class="sub" style="margin:0">체크한 회사·부서의 회의가 이 사람에게 보입니다</span></div>
