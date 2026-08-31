@@ -800,7 +800,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v16.3</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v16.4</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -925,6 +925,33 @@ function shell(){
   wireInstall();
 }
 
+// 화면이 「불러오는 중」 에서 멈춰 있으면 12초 뒤에 이유와 방법을 보여줍니다.
+// 아무 설명 없이 계속 도는 화면이 가장 답답합니다 (실측 — 대표님 계정 사고).
+let STUCK = null;
+function watchStuck(el){
+  clearTimeout(STUCK);
+  if(!el) return;
+  STUCK = setTimeout(()=>{
+    const t = (el.textContent || '').trim();
+    if(!/^불러오는 중/.test(t)) return;          // 이미 그려졌으면 그냥 둡니다
+    el.innerHTML = `<div class="empty" style="text-align:left;max-width:620px">
+      <b style="font-size:16px">자료를 불러오지 못했습니다</b><br><br>
+      로그인 정보가 오래되었거나 인터넷이 끊겼을 때 이렇게 됩니다.<br>
+      아래 순서로 해보시면 대부분 해결됩니다.<br><br>
+      1. <b>새로고침</b> — 맥 Command+Shift+R · 윈도우 Ctrl+Shift+R<br>
+      2. 그래도 안 되면 <b>나갔다가 다시 로그인</b><br><br>
+      <button class="btn p" id="stuck-reload">새로고침</button>
+      <button class="btn" id="stuck-out" style="margin-left:8px">나가서 다시 로그인</button>
+      </div>`;
+    const r=$('#stuck-reload'); if(r) r.onclick=()=>location.reload();
+    const o=$('#stuck-out');
+    if(o) o.onclick=async()=>{
+      try{ localStorage.setItem('hd_auto','0'); await SB.auth.signOut(); }catch(e){}
+      location.reload();
+    };
+  }, 12000);
+}
+
 function go(v){
   view=v; cur=null;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
@@ -934,6 +961,7 @@ function go(v){
     members:renderMembers, chat:renderChat, projects:renderProjects,
     upload:renderUpload, rec:renderRec, server:renderServer,
     guide:renderGuide, usage:renderUsage}[v]||(()=>{}))();
+  watchStuck(el);
 }
 
 // ─────────────────────────── 홈
