@@ -1,6 +1,6 @@
 {
-  "name": "HEIMDALL 회의실",
-  "short_name": "회의실",
+  "name": "HEIMDALL",
+  "short_name": "HEIMDALL",
   "description": "회의실 태블릿 — 버튼 하나로 회의를 녹음하고 회의록을 자동으로 만듭니다",
   "start_url": "./room.html",
   "scope": "./",
