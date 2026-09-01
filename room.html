@@ -29,11 +29,40 @@ body{background:#12161C;color:#fff;
 .mid{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;
  text-align:center;gap:18px;min-height:0}
 
-.next{background:#1B2028;border:1px solid #2A313C;border-radius:20px;
- padding:20px 34px;max-width:92%}
-.next .lb{font-size:14px;color:#6FA8E0;font-weight:700;letter-spacing:.04em}
+.next{position:relative;background:#1B2028;border:1px solid #2A313C;border-radius:20px;
+ padding:20px 34px 22px;max-width:92%;min-width:min(560px,88vw);
+ transition:border-color .35s ease, box-shadow .35s ease, background .35s ease}
+.next.on{background:#18202C;border-color:#2F6FED;
+ animation:halo 3.6s ease-in-out infinite}
+@keyframes halo{
+  0%,100%{box-shadow:0 0 0 0 rgba(47,111,237,.26), 0 10px 30px rgba(0,0,0,.32)}
+  50%    {box-shadow:0 0 0 9px rgba(47,111,237,.045), 0 10px 30px rgba(0,0,0,.32)}}
+.next .lb{display:inline-flex;align-items:center;gap:7px;
+ font-size:14px;color:#6FA8E0;font-weight:700;letter-spacing:.04em}
+.next .lb i{width:8px;height:8px;border-radius:50%;background:#2F6FED;flex:none;
+ animation:pulse 2.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.82)}}
 .next .tt{font-size:30px;font-weight:800;margin:8px 0 6px;line-height:1.3}
 .next .tm{font-size:17px;color:#A9B3C1}
+/* 예약 시간 안에서 지금이 어디쯤인지 */
+.bar{margin-top:14px;height:4px;border-radius:4px;background:#242C38;overflow:hidden}
+.bar i{display:block;height:100%;border-radius:4px;background:#2F6FED;
+ width:0;transition:width .9s ease}
+.barlb{margin-top:7px;font-size:13px;color:#6C7686;letter-spacing:.02em}
+/* 카드에서 시작 버튼으로 흐르는 연결선 */
+.tether{position:relative;width:2px;height:46px;border-radius:2px;
+ background:linear-gradient(#2F6FED33,#2F6FED10);overflow:hidden}
+.tether i{position:absolute;left:-2px;width:6px;height:6px;border-radius:50%;
+ background:#2F6FED;box-shadow:0 0 10px #2F6FEDaa;
+ animation:flow 2.4s cubic-bezier(.4,0,.6,1) infinite}
+@keyframes flow{0%{top:-8px;opacity:0}18%{opacity:1}82%{opacity:1}100%{top:46px;opacity:0}}
+.go .sub2{display:block;font-size:16px;font-weight:600;color:#DCE7FF;
+ margin-top:6px;letter-spacing:0;max-width:520px;overflow:hidden;
+ text-overflow:ellipsis;white-space:nowrap}
+.go .lbwrap{display:flex;flex-direction:column;align-items:flex-start;line-height:1.15}
+@media (prefers-reduced-motion: reduce){
+  .next.on,.next .lb i,.tether i,.rec .dot{animation:none}
+  .tether i{top:20px}}
 
 .big{border:0;border-radius:28px;font-family:inherit;cursor:pointer;
  font-size:34px;font-weight:800;padding:34px 64px;letter-spacing:-.4px;
@@ -137,6 +166,7 @@ const CFG = {
 };
 
 let me=null, cfg=CFG.get(), MEMBERS=[], EVENTS=[], tick=null;
+let PICKED=null;                 // 사람이 아래 목록에서 고른 회의
 
 // 시각은 한국 기준으로 고정합니다
 const KST = o => new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',...o});
@@ -273,13 +303,13 @@ function coFromTitle(t){
 // ─────────────────────────── 대기 화면
 function idlePage(){
   clearInterval(tick);
-  const ev=current();
+  const ev=PICKED || current();
   const now=Date.now();
   // 이 회의실 예약을 먼저, 그다음 다른 회의실 예약.
   // 소회의실에 잡아놓고 대회의실에서 하는 일이 잦아 전부 고를 수 있게 둡니다.
   const live=e=>new Date(e.ends_at).getTime()>now;
   const mineRest=mine().filter(e=>live(e) && e!==ev);
-  const others=EVENTS.filter(e=>live(e) && mine().indexOf(e)<0);
+  const others=EVENTS.filter(e=>live(e) && e!==ev && mine().indexOf(e)<0);
   const rest=mineRest.concat(others);
   const c=clk();
   app.innerHTML=
@@ -290,16 +320,26 @@ function idlePage(){
     + '<div class="clock"><div class="hm" id="ck">'+c.hm+'</div>'
     + '<div class="sec">회의가 끝나면 회의록이 자동으로 만들어집니다</div></div></div>'
     + '<div class="mid">'
-    + (ev ? '<div class="next"><div class="lb">지금 이 회의실 예약</div>'
+    + (ev ? '<div class="next on" id="card"><div class="lb"><i></i>이 회의로 녹음됩니다</div>'
           + '<div class="tt">'+esc(ev.title||'회의')+'</div>'
-          + '<div class="tm">'+hm(ev.starts_at)+' ~ '+hm(ev.ends_at)+'</div></div>'
-          : '<div class="sub">지금 잡힌 예약이 없습니다</div>')
-    + '<button class="big go" id="start"><span class="dot"></span>회의 녹음 시작</button>'
-    + '<div class="sub" style="font-size:14px">누르면 바로 녹음이 시작됩니다 · '
-    + '참석자는 녹음 중에 이름을 누르시면 됩니다</div>'
+          + '<div class="tm">'+hm(ev.starts_at)+' ~ '+hm(ev.ends_at)
+          + (PICKED ? ' · '+esc(ev.room||'')  : '')+'</div>'
+          + '<div class="bar"><i id="bari"></i></div>'
+          + '<div class="barlb" id="barlb"></div></div>'
+          + '<div class="tether"><i></i></div>'
+          : '<div class="sub">지금 잡힌 예약이 없습니다<br>'
+          + '<span style="font-size:14px">아래 버튼을 누르면 제목 없이 녹음을 시작합니다</span></div>')
+    + '<button class="big go" id="start"><span class="dot"></span>'
+    + '<span class="lbwrap"><span>회의 녹음 시작</span>'
+    + (ev ? '<span class="sub2">'+esc(ev.title||'회의')+'</span>' : '')
+    + '</span></button>'
+    + '<div class="sub" style="font-size:14px">'
+    + (ev ? '위 회의로 녹음됩니다 · 다른 회의면 아래에서 골라주세요'
+          : '누르면 바로 녹음이 시작됩니다')
+    + ' · 참석자는 녹음 중에 이름을 누르시면 됩니다</div>'
     + '</div>'
-    + (rest.length ? '<div class="list"><div class="h">다른 예약으로 시작하기 — 눌러주세요 · '
-        + '다른 회의실 예약도 여기서 고를 수 있습니다</div>'
+    + (rest.length ? '<div class="list"><div class="h">다른 회의 고르기 — 누르면 위 카드가 바뀝니다 · '
+        + '다른 회의실 예약도 여기 있습니다</div>'
         + rest.slice(0,6).map((e,i)=>'<button class="pick" data-ev="'+i+'">'
           + '<span class="tm">'+hm(e.starts_at)+' ~ '+hm(e.ends_at)+'</span>'
           + '<b>'+esc(e.title||'회의')+'</b>'
@@ -307,17 +347,48 @@ function idlePage(){
               ? '<span class="rmtag">'+esc(e.room)+'</span>' : '')
           + '</button>').join('') + '</div>' : '');
 
+  let ticks=0;
   tick=setInterval(()=>{
     const c2=clk();
     const a=$('#ck'), b=$('#dy');
     if(a) a.textContent=c2.hm;
     if(b) b.textContent=c2.day;
+    if(++ticks % 60 === 0) drawBar(ev);      // 1분마다 진행 바 갱신
   }, 1000);
 
+  drawBar(ev);
   $('#start').onclick=()=>startRec(ev);
+  // 다른 회의를 누르면 바로 녹음하지 않고 위 카드만 바꿉니다.
+  // 지나가다 잘못 눌러 진짜 회의가 시작되는 일을 막습니다.
   app.querySelectorAll('[data-ev]').forEach(b=>b.onclick=()=>{
-    startRec(rest[+b.dataset.ev]);
+    PICKED = rest[+b.dataset.ev] || null;
+    idlePage();
   });
+}
+
+// 예약 시간 안에서 지금이 어디쯤인지 — 1분마다 갱신됩니다
+function drawBar(ev){
+  const fill=$('#bari'), lb=$('#barlb');
+  if(!ev || !fill) return;
+  const draw=()=>{
+    const s=new Date(ev.starts_at).getTime(), e=new Date(ev.ends_at).getTime(), n=Date.now();
+    const all=Math.max(1, e-s);
+    const p=Math.max(0, Math.min(1, (n-s)/all));
+    fill.style.width=(p*100).toFixed(1)+'%';
+    if(!lb) return;
+    if(n < s){
+      const m=Math.round((s-n)/60000);
+      lb.textContent = m>=60 ? '시작까지 '+Math.floor(m/60)+'시간 '+(m%60)+'분'
+                             : '시작까지 '+m+'분';
+    }else if(n > e){
+      lb.textContent='예정된 시간이 지났습니다 — 그래도 녹음할 수 있습니다';
+    }else{
+      const m=Math.round((e-n)/60000);
+      lb.textContent = m>=60 ? '끝나기까지 '+Math.floor(m/60)+'시간 '+(m%60)+'분'
+                             : '끝나기까지 '+m+'분';
+    }
+  };
+  draw();
 }
 
 // ─────────────────────────── 녹음
@@ -337,6 +408,7 @@ async function startRec(ev){
 
   REC.stream=stream; REC.chunks=[]; REC.t0=Date.now(); REC.ev=ev||null;
   REC.title=(ev&&ev.title)||''; REC.who=new Set();
+  PICKED=null;
   REC.agenda=((ev&&ev.note)||'').trim();
   REC.room=cfg.room||'';
   REC.mr = mime ? new MediaRecorder(stream,{mimeType:mime, audioBitsPerSecond:64000})
