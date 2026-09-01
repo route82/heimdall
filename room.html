@@ -30,12 +30,16 @@
    ───────────────────────────────────────────────────────────── */
 :root{
   --bg:#080808; --s1:#0E0E0E; --s2:#161616; --line:#212121; --line2:#2C2C2C;
-  --tx:#F2F2F0; --mut:#9A9A97; --dim:#616160;
+  --tx:#F2F2F0; --mut:#B0B0AC; --dim:#848482;
   /* 글꼴 — 한글은 Pretendard, 영문·숫자는 Oswald.
      CDN 이 막히면 기기 기본 글꼴로 자동으로 내려갑니다. */
   --f-body:'Pretendard Variable',Pretendard,-apple-system,'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif;
   --f-disp:'Oswald','Pretendard Variable',Pretendard,-apple-system,'Apple SD Gothic Neo',sans-serif;
   --blue:#F2F2F0; --blue-s:#F2F2F0; --red:#F07570; --green:#4ADE80; --amber:#E0B341;
+  /* 밝은 바탕 위에 올리는 글자색. 흰 버튼에 흰 글자가 되는 것을 막습니다. */
+  --on-acc:#0A0A0A;
+  /* 밝은 바탕 위의 보조 글자 — 조금 흐리되 읽히는 선까지만 */
+  --on-acc2:#4A4A48;
   --r1:14px; --r2:20px; --r3:26px;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -57,12 +61,16 @@ button{font-family:inherit}
  overflow:auto;-webkit-overflow-scrolling:touch}
 
 /* ── 머리 */
-.top{display:flex;align-items:center;gap:16px;min-height:0}
+.top{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;
+ gap:clamp(10px,1.6vw,20px);min-height:0}
+.top .tl{min-width:0}
+.top .tc{justify-self:center;display:flex;align-items:center}
+.top .clock{justify-self:end;text-align:right}
 .room{font-size:clamp(20px,2.6vh,27px);font-weight:800;letter-spacing:-.4px;
  display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .today{font-size:clamp(13px,1.5vh,16px);color:var(--mut);margin-top:5px;
  display:flex;align-items:center;gap:9px;flex-wrap:wrap}
-.clock{margin-left:auto;text-align:right;flex:none}
+.clock{text-align:right;flex:none}
 .clock .hm{font-size:clamp(34px,5.4vh,52px);font-weight:600;line-height:1;
  letter-spacing:-.5px;font-variant-numeric:tabular-nums;font-family:var(--f-disp)}
 .clock .sec{font-size:clamp(12px,1.4vh,14px);color:var(--dim);margin-top:6px;font-family:var(--f-disp)}
@@ -100,20 +108,48 @@ button{font-family:inherit}
  animation:flow 2.4s cubic-bezier(.4,0,.6,1) infinite}
 @keyframes flow{0%{top:-8px;opacity:0}18%{opacity:1}82%{opacity:1}100%{top:100%;opacity:0}}
 
+/* ── 헤임달 로고 — PC 화면 왼쪽 위와 같은 파일을 씁니다.
+   그림 안의 색이 검정이라 어두운 바탕에서는 뒤집어서 밝게 만듭니다. */
+.lgh{height:clamp(26px,4vh,44px);width:auto;display:block;
+ filter:invert(1);opacity:.92}
+
 /* ── 큰 버튼 */
-.big{border:0;border-radius:var(--r3);cursor:pointer;
+.big{position:relative;overflow:hidden;border:0;border-radius:var(--r3);cursor:pointer;
  font-size:clamp(24px,3.6vh,34px);font-weight:800;letter-spacing:-.5px;
  padding:clamp(20px,3.2vh,32px) clamp(38px,4.4vw,62px);
  display:inline-flex;align-items:center;gap:16px;
  box-shadow:0 10px 30px rgba(0,0,0,.34);transition:transform .12s ease}
 .big:active{transform:scale(.985)}
-.go{background:var(--blue);color:#fff}
-.stop{background:var(--red);color:#fff}
-.dot{width:18px;height:18px;border-radius:50%;background:#fff;flex:none}
+.big>*{position:relative;z-index:1}
+
+/* 「지금 누르면 됩니다」 를 보여주는 유리 느낌 —
+   위에서 아래로 밝기가 떨어지는 바탕 + 3.4초마다 한 번 지나가는 빛줄기.
+   깜빡이지 않습니다. 하루 종일 켜져 있는 화면이라 켜졌다 꺼지는 움직임은 쓰지 않습니다. */
+.go{background:linear-gradient(163deg,#FAFAF8 0%,#EAEAE7 42%,#D2D2CE 100%);
+ background-color:#D2D2CE;color:var(--on-acc);
+ animation:gohalo 3.4s ease-in-out infinite}
+.go .dot{background:var(--on-acc);animation:godot 3.4s ease-in-out infinite}
+.go::after{content:'';position:absolute;top:0;bottom:0;left:0;width:46%;z-index:0;
+ pointer-events:none;transform:translateX(-160%) skewX(-14deg);
+ background:linear-gradient(90deg,rgba(255,255,255,0) 0%,rgba(255,255,255,.95) 50%,
+   rgba(255,255,255,0) 100%);
+ animation:sheen 3.4s cubic-bezier(.36,0,.24,1) infinite}
+@keyframes sheen{0%{transform:translateX(-160%) skewX(-14deg)}
+                 62%,100%{transform:translateX(340%) skewX(-14deg)}}
+@keyframes gohalo{
+  0%,100%{box-shadow:0 10px 30px rgba(0,0,0,.34), 0 0 0 0 rgba(242,242,240,.24)}
+  50%    {box-shadow:0 10px 30px rgba(0,0,0,.34), 0 0 0 12px rgba(242,242,240,.045)}}
+@keyframes godot{0%,100%{opacity:1}50%{opacity:.45}}
+
+.stop{background:var(--red);color:var(--on-acc)}
+.stop .dot{background:var(--on-acc)}
+.dot{width:18px;height:18px;border-radius:50%;background:var(--on-acc);flex:none}
 .rec .dot{animation:bl 1.4s infinite}
 @keyframes bl{0%,100%{opacity:1}50%{opacity:.25}}
 .lbwrap{display:flex;flex-direction:column;align-items:flex-start;line-height:1.15;min-width:0}
-.sub2{display:block;font-size:clamp(13px,1.6vh,16px);font-weight:600;color:#EDEDEA;
+.sub2{display:block;font-size:clamp(13px,1.6vh,16px);font-weight:600;
+ color:var(--on-acc2);   /* 밝은 버튼 안이라 어두운 색이어야 합니다 */
+ 
  margin-top:6px;letter-spacing:0;max-width:min(460px,42vw);
  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sub{font-size:clamp(13px,1.6vh,16px);color:var(--mut);line-height:1.65}
@@ -152,7 +188,7 @@ button{font-family:inherit}
 .card .body{min-height:0;overflow:auto;-webkit-overflow-scrolling:touch}
 
 .timer{align-items:center;text-align:center;gap:4px;flex:none}
-.mtitle{font-size:clamp(15px,1.9vh,20px);font-weight:700;color:#C9C9C6;
+.mtitle{font-size:clamp(15px,1.9vh,20px);font-weight:700;color:var(--mut);
  max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .elapsed{font-size:clamp(46px,8.4vh,84px);font-weight:600;line-height:1;font-family:var(--f-disp);
  font-variant-numeric:tabular-nums;letter-spacing:-2px;margin:6px 0 4px}
@@ -161,14 +197,14 @@ button{font-family:inherit}
 .lv i{width:8px;height:8px;border-radius:50%;background:var(--green);flex:none}
 
 .agn pre{margin:0;white-space:pre-wrap;word-break:break-word;font-family:inherit;
- font-size:clamp(14px,1.85vh,18px);line-height:1.75;color:#DADAD7}
+ font-size:clamp(14px,1.85vh,18px);line-height:1.75;color:var(--tx)}
 .cnt{font-size:clamp(13px,1.6vh,16px);font-weight:700;color:var(--blue-s);
  margin-bottom:10px;flex:none;min-height:20px}
 .grid{display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start}
 .nm{background:var(--s2);border:2px solid var(--line);color:var(--tx);border-radius:var(--r1);
  font-size:clamp(15px,2vh,20px);font-weight:700;padding:12px 18px;cursor:pointer;
  min-width:104px;transition:background .15s ease,border-color .15s ease,color .15s ease}
-.nm.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.nm.on{background:var(--blue);border-color:var(--blue);color:var(--on-acc)}
 .nm .co{display:block;font-size:clamp(10px,1.15vh,12px);font-weight:500;opacity:.62;margin-top:3px}
 
 /* ── 발: 종료 버튼 줄 */
@@ -202,9 +238,9 @@ button{font-family:inherit}
 .setup input,.setup select{width:100%;background:var(--s2);border:1px solid var(--line2);
  color:var(--tx);border-radius:var(--r1);font-family:inherit;
  font-size:clamp(16px,2vh,19px);padding:15px 17px;margin-bottom:11px}
-.setup .btn{width:100%;background:var(--blue);border:0;color:#fff;border-radius:var(--r1);
+.setup .btn{width:100%;background:var(--blue);border:0;color:var(--on-acc);border-radius:var(--r1);
  font-family:inherit;font-size:clamp(17px,2.2vh,20px);font-weight:700;padding:17px;cursor:pointer}
-.err{color:#F5908B;font-size:clamp(13px,1.6vh,15px);min-height:22px;margin-top:8px}
+.err{color:var(--red);font-size:clamp(13px,1.6vh,15px);min-height:22px;margin-top:8px}
 .chk{display:flex;align-items:center;gap:11px;font-size:clamp(14px,1.7vh,16px);color:var(--tx);
  background:var(--s2);border:1px solid var(--line2);border-radius:var(--r1);
  padding:15px 17px;margin-bottom:6px}
@@ -212,8 +248,10 @@ button{font-family:inherit}
 .gear{position:fixed;right:0;top:0;width:76px;height:76px;opacity:0}
 
 @media (prefers-reduced-motion: reduce){
-  .next.on,.next .lb i,.tether i,.rec .dot{animation:none}
-  .tether i{top:40%}}
+  .next.on,.next .lb i,.tether i,.rec .dot,
+  .go,.go .dot,.go::after{animation:none}
+  .tether i{top:40%}
+  .go::after{display:none}}
 /* 세로로 세운 태블릿 · 좁은 화면에서는 한 단으로 */
 @media (max-width:900px){ .rec2{grid-template-columns:1fr} }
 </style>
@@ -402,9 +440,10 @@ function idlePage(){
   const c=clk();
   app.innerHTML=
     '<div class="top">'
-    + '<div><div class="room">'+esc(cfg.room||'회의실')
+    + '<div class="tl"><div class="room">'+esc(cfg.room||'회의실')
     + (cfg.test?'<span class="tflag">시험 모드 · 나만 보기</span>':'')+'</div>'
     + '<div class="today" id="dy">'+esc(c.day)+'</div></div>'
+    + '<div class="tc"><img src="./assets/logo-horizontal.svg" alt="HEIMDALL" class="lgh"></div>'
     + '<div class="clock"><div class="hm" id="ck">'+c.hm+'</div>'
     + '<div class="sec">회의가 끝나면 회의록이 자동으로 만들어집니다</div></div></div>'
     + '<div class="mid">'
@@ -528,6 +567,7 @@ function bindGrid(){
         ? '참석 '+picked.length+'명 · '+picked.map(m=>m.name).join(', ')
         : '아직 아무도 누르지 않았습니다';
     }
+    paintUp();          // 참석자 확인 화면일 때만 동작합니다
   });
 }
 
@@ -536,10 +576,12 @@ function recPage(){
   const hasAg = !!(REC.agenda && REC.agenda.trim());
   app.innerHTML=
     // 머리
-    '<div class="top"><div><div class="room">'+esc(REC.room||cfg.room||'회의실')
+    '<div class="top"><div class="tl">'
+    + '<div class="room">'+esc(REC.room||cfg.room||'회의실')
     + (cfg.test?'<span class="tflag">시험 모드 · 나만 보기</span>':'')+'</div>'
     + '<div class="today"><span>녹음하고 있습니다</span>'
     + '<button class="pillbtn" id="rmch">회의실 바꾸기</button></div></div>'
+    + '<div class="tc"><img src="./assets/logo-horizontal.svg" alt="HEIMDALL" class="lgh"></div>'
     + '<div class="clock"><div class="hm" id="ck">'+clk().hm+'</div>'
     + '<div class="sec">'+esc(clk().day)+'</div></div></div>'
     // 본문 — 왼쪽 시간·안건 / 오른쪽 참석자
@@ -642,20 +684,35 @@ function finish(){
 }
 
 function askWho(){
+  // 단추는 하나입니다. 예전에는 「그냥 올리기」와 「올리기」 두 개였는데
+  // 둘 다 upload() 를 부르는 같은 단추였습니다 (2026-09-01 정리).
+  // 대신 지금 누른 인원에 따라 단추에 적힌 말이 바뀝니다.
   app.innerHTML=
-    '<div class="mid">'
+    '<div></div><div class="mid">'
     + '<div class="mtitle">누가 참석하셨나요?</div>'
     + '<div class="sub">이름을 누르시면 그분들께 회의록이 슬랙으로 갑니다.<br>'
-    + '누르지 않으시면 팀장님과 관리자에게만 보입니다.</div>'
+    + '안 누르고 올리셔도 됩니다 — 그때는 팀장님과 관리자에게만 보입니다.</div>'
     + '<div class="who"><div class="cnt" id="cnt">아직 아무도 누르지 않았습니다</div>'
     + '<div class="grid">'+grid(REC.who)+'</div></div>'
-    + '<div class="rowbtn">'
-    + '<button class="ghost" id="skip">그냥 올리기</button>'
-    + '<button class="big go" id="up" style="font-size:26px;padding:24px 44px">올리기</button>'
-    + '</div></div>';
+    + '<button class="big go" id="up" style="font-size:26px;padding:24px 44px">'
+    + '<span id="uplb">참석자 없이 올리기</span></button>'
+    + '<div class="sub" style="font-size:13px" id="uphint">'
+    + '이대로 올리면 팀장님과 관리자에게만 보입니다</div>'
+    + '</div><div></div>';
   bindGrid();
   $('#up').onclick=upload;
-  $('#skip').onclick=upload;
+  paintUp();
+}
+
+// 누른 인원에 따라 올리기 단추의 말을 바꿉니다
+function paintUp(){
+  const lb=$('#uplb'); if(!lb) return;
+  const n=REC.who.size;
+  lb.textContent = n ? n+'명으로 올리기' : '참석자 없이 올리기';
+  const h=$('#uphint');
+  if(h) h.textContent = n
+    ? '이 '+n+'명에게 회의록이 슬랙으로 갑니다'
+    : '이대로 올리면 팀장님과 관리자에게만 보입니다';
 }
 
 async function upload(){

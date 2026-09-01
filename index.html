@@ -51,8 +51,8 @@
   --line:#212121;    /* 기본 선 */
   --line2:#171717;   /* 흐린 선 */
   --tx:#F2F2F0;      /* 본문 */
-  --tx2:#9A9A97;     /* 보조 */
-  --tx3:#616160;     /* 흐림 */
+  --tx2:#B0B0AC;     /* 보조 */
+  --tx3:#848482;     /* 흐림 — 어느 바탕에서도 읽히는 선 */
   --ac:#F2F2F0;      /* 액센트 = 흰색 하나 */
   --acon:#0A0A0A;    /* 액센트 위 글자 */
   --acbg:#1E1E1E;    /* 액센트 옅은 바탕 */
@@ -77,7 +77,7 @@
 html[data-theme=light]{
   --bg:#FBFBFA; --s1:#FFFFFF; --s2:#F4F4F2; --s3:#EEEEEB;
   --line:#E3E3DF; --line2:#EFEFEC;
-  --tx:#0A0A0A; --tx2:#5C5C5A; --tx3:#8C8C89;
+  --tx:#0A0A0A;--tx2:#555553;--tx3:#6B6B68;
   --ac:#0A0A0A; --acon:#FFFFFF; --acbg:#EFEFEC; --acln:#C9C9C4;
   --ok:#146B36;   --okbg:#E9F5EC;
   --warn:#8A6100; --warnbg:#FAF1DB;
@@ -250,7 +250,7 @@ th{background:var(--s2);font-weight:600}
 .hit:hover{border-color:var(--acln)}
 .hit .h{font-size:12.5px;color:var(--tx2);margin-bottom:3px}
 mark{background:var(--mark);color:var(--markt);padding:1px 3px;border-radius:3px}
-.empty{padding:52px;text-align:center;color:var(--tx3);background:var(--s1);
+.empty{padding:52px;text-align:center;color:var(--tx2);background:var(--s1);
  border:1px dashed var(--line);border-radius:12px}
 
 /* ── 로그인 ─────────────────────────────────────────
@@ -338,7 +338,7 @@ mark{background:var(--mark);color:var(--markt);padding:1px 3px;border-radius:3px
  grid-template-rows:auto repeat(6,128px);gap:1px;background:var(--line);
  border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .cgh{background:var(--s2);padding:8px 6px;text-align:center;font-size:10.5px;
- letter-spacing:.075em;text-transform:uppercase;color:var(--tx3);font-weight:600}
+ letter-spacing:.075em;text-transform:uppercase;color:var(--tx2);font-weight:600}
 .cday{background:var(--s1);padding:6px 6px 8px;overflow:hidden;min-width:0}
 .cday.out{background:var(--bg)}
 .cday .dn{font-size:12px;color:var(--tx3);margin-bottom:4px}
@@ -416,7 +416,7 @@ mark{background:var(--mark);color:var(--markt);padding:1px 3px;border-radius:3px
 .tb .fi{width:17px;height:17px;flex:none;color:var(--tx3)}
 .tb.sel .fi{color:var(--tx)}
 .tb .tt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tb .tc{font-size:12px;color:var(--tx3);background:var(--s2);border-radius:20px;
+.tb .tc{font-size:12px;color:var(--tx2);background:var(--s2);border-radius:20px;
  padding:1px 9px;flex:none;font-weight:500}
 .tb.sel .tc{background:var(--s3);color:var(--tx)}
 .tw{width:18px;height:18px;flex:none;display:flex;align-items:center;justify-content:center;
@@ -1027,7 +1027,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v19.2</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v19.9</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -1687,7 +1687,7 @@ function drawMeeting(){
     <div id="agbox" style="border:1px solid var(--line);background:var(--s2);border-radius:12px;padding:13px 16px;margin-bottom:16px;${(m.agenda_md||'').trim()?'':'display:none'}">
       <div style="font-size:13px;font-weight:700;color:var(--ac);margin-bottom:7px">사전 안건</div>
       <div class="md" id="agview">${mdHtml(m.agenda_md||'')}</div>
-      <textarea id="agedit" class="full" style="display:none;min-height:200px;font-family:ui-monospace,Menlo,monospace;font-size:13.5px"></textarea>
+      <textarea id="agedit" class="full" style="display:none;min-height:200px;font-family:var(--f-body);font-size:14.5px;line-height:1.7"></textarea>
     </div>
     <div class="md" id="smview">${mdHtml(m.summary_md||'')}</div>
     <textarea id="smedit" class="full" style="display:none;min-height:520px;font-family:ui-monospace,Menlo,monospace;font-size:13.5px"></textarea></div>
@@ -1969,7 +1969,8 @@ function startEdit(){
     const agv=$('#agview'); if(agv) agv.style.display='none';
     const agt=$('#agedit');
     if(agt){ agt.style.display='block'; agt.value=cur.m.agenda_md||'';
-      agt.placeholder='회의 전에 정해둔 안건을 적어주세요. 마크다운을 그대로 씁니다.'; }
+      agt.placeholder='회의 전에 정해둔 안건을 적어주세요. 마크다운을 그대로 씁니다.';
+      autoGrow(agt, 620); }
   }
   // 마인드맵 — 그림 대신 글상자를 보여줍니다. # 은 큰 가지, ## 는 작은 가지입니다
   const pane=$('#mmpane');
@@ -3576,6 +3577,24 @@ function recTick(){
   t.textContent = recFmt(Math.floor((Date.now()-REC.t0)/1000));
 }
 
+// 글이 길어지면 칸이 저절로 늘어납니다. 정해둔 높이를 넘으면 그때부터 스크롤합니다.
+// (2026-09-01 — 고정 높이라 긴 안건이 잘려 보였습니다)
+function autoGrow(el, maxPx){
+  if(!el) return;
+  const fit=()=>{
+    el.style.height='auto';
+    const h=Math.min(el.scrollHeight+2, maxPx);
+    el.style.height=h+'px';
+    el.style.overflowY = (el.scrollHeight+2 > maxPx) ? 'auto' : 'hidden';
+  };
+  el.addEventListener('input', fit);
+  fit();
+  // 글꼴이 늦게 오면 높이가 달라지므로 한 번 더 맞춥니다
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(fit).catch(()=>{});
+  setTimeout(fit, 60);
+  return fit;
+}
+
 // 사전 안건 — 녹음 전에는 고쳐 쓸 수 있고, 녹음 중에는 크게 읽기만 합니다
 function drawAgendaBox(recording){
   const box=$('#rc-ag'); if(!box) return;
@@ -3587,10 +3606,15 @@ function drawAgendaBox(recording){
       : '<div class="sub" style="margin:0">적어둔 안건이 없습니다.</div>';
     return;
   }
-  box.innerHTML = `<textarea id="rc-agt" class="full" style="min-height:130px;
-      font-family:ui-monospace,Menlo,monospace;font-size:13px"
+  box.innerHTML = `<textarea id="rc-agt" class="full" style="min-height:150px;
+      font-family:var(--f-body);font-size:14.5px;line-height:1.7;white-space:pre-wrap"
       placeholder="회의 전에 정해둔 안건을 적어주세요. 예약을 고르면 캘린더 설명이 자동으로 들어옵니다."></textarea>`;
-  const t=$('#rc-agt'); if(t){ t.value=v; t.oninput=()=>{ REC.agenda=t.value; }; }
+  const t=$('#rc-agt');
+  if(t){
+    t.value=v;
+    const fit=autoGrow(t, 520);
+    t.oninput=()=>{ REC.agenda=t.value; };
+  }
 }
 
 // 고른 예약의 캘린더 설명을 사전 안건으로 가져옵니다 (이미 적어둔 글은 덮지 않습니다)
