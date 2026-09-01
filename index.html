@@ -776,7 +776,7 @@ function shell(){
   const groups = [
     ['',      [['home','홈']]],
     ['쓰기',   [['rec','녹음'],['upload','업로드']]],
-    ['보기',   [['cal','일정'],['list','회의록'],['projects','폴더'],['actions','액션아이템']]],
+    ['보기',   [['cal','일정'],['list','회의록'],['projects','폴더']]],
     ['물어보기',[['chat','물어보기'],['search','검색']]],
   ];
   const admin = [];
@@ -800,7 +800,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v17.7</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v18.0</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -994,17 +994,15 @@ async function renderHome(){
   el.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
   drawTodayCal();
 
-  const [mres,ares]=await Promise.all([
+  const [mres]=await Promise.all([
     SB.from('hd_meeting')
       .select('id,title,held_on,status,duration_sec,company,dept,visibility')
-      .neq('status','archived').order('held_on',{ascending:false}).limit(5),
-    SB.from('hd_action').select('id').eq('state','open').eq('owner_name',me.name)]);
+      .neq('status','archived').order('held_on',{ascending:false}).limit(5)]);
   const box=$('#h-rec'); if(!box) return;
-  const rows=mres.data||[], na=(ares.data||[]).length;
+  const rows=mres.data||[];
+  // 「내가 할 일」 은 화면에서 뺐습니다 (2026-09-01).
+  // 할 일은 「물어보기」 에서 확인합니다. 액션아이템 자료 자체는 계속 쌓입니다.
   box.innerHTML=`
-    ${na?`<div class="box" style="margin-bottom:14px;display:flex;align-items:center;gap:10px">
-      <b>내가 할 일 ${na}건</b><span class="sub" style="margin:0">이 남아 있습니다</span>
-      <button class="btn" data-go="actions" style="margin-left:auto">보러 가기</button></div>`:''}
     <h1 style="font-size:17px">최근 회의</h1>
     ${rows.length? rows.map(m=>{const tp=titleParts(m); return `<div class="card" data-id="${m.id}">
         <div class="ct"><span class="mtag">${esc(tp.tag)}</span> ${esc(tp.name)}</div>
@@ -1213,6 +1211,45 @@ async function drawTodayCal(){
   });
 }
 
+// 같은 회의의 지난 기록을 찾기 위한 열쇠.
+// 제목에서 날짜·숫자·기호를 털어내고 남은 글자로 봅니다.
+//   「260901 그룹 AX 주간회의」 「260908 그룹 AX 주간회의」 → 같은 회의
+function seriesKey(m){
+  const name = titleParts(m).name || '';
+  return (m.company||'') + '|' +
+    name.replace(/[0-9]/g,'').replace(/[^0-9A-Za-z가-힣]/g,'').toLowerCase();
+}
+
+// 앞으로 잡힌 회의 — 아직 녹음하지 않은 예약만 보여줍니다
+async function upcomingHtml(){
+  const now = new Date();
+  const to  = new Date(now.getTime() + 14*24*3600*1000);
+  const [cal, mtg] = await Promise.all([
+    SB.from('hd_cal_event').select('uid,title,room,starts_at,ends_at,all_day')
+      .gte('starts_at', now.toISOString()).lte('starts_at', to.toISOString())
+      .order('starts_at').limit(40),
+    SB.from('hd_meeting').select('cal_uid').not('cal_uid','is',null).limit(500)]);
+  const done = new Set((mtg.data||[]).map(x=>x.cal_uid).filter(Boolean));
+  const evs = (cal.data||[]).filter(e=>!e.all_day && !done.has(e.uid)).slice(0,6);
+  if(!evs.length) return '';
+  const D = t => new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',
+      month:'numeric',day:'numeric',weekday:'short'}).format(new Date(t));
+  const T = t => new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',
+      hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(t));
+  return `<div class="box" style="margin-bottom:18px;padding:14px 16px">
+    <div class="sub" style="margin:0 0 9px;font-size:12.5px;font-weight:700;color:#2E5496">
+      앞으로 잡힌 회의 ${evs.length}건 — 아직 녹음하지 않은 예약입니다</div>
+    ${evs.map(e=>`<div class="row" style="gap:12px;padding:6px 0;align-items:baseline">
+      <span class="sub" style="margin:0;min-width:112px;font-variant-numeric:tabular-nums">
+        ${esc(D(e.starts_at))} ${esc(T(e.starts_at))}</span>
+      <b style="font-weight:600">${esc(e.title||'회의')}</b>
+      ${e.room?`<span class="sub" style="margin:0">${esc(e.room)}</span>`:''}
+    </div>`).join('')}
+    <div class="row" style="margin-top:10px">
+      <button class="btn" data-go="rec">녹음하러 가기</button>
+      <button class="btn" data-go="cal">일정 보기</button></div></div>`;
+}
+
 // ─────────────────────────── 회의 목록
 async function renderList(){
   const el=$('#p-list'); el.innerHTML='<div class="sub">불러오는 중…</div>';
@@ -1249,7 +1286,8 @@ async function renderList(){
   const shown = data.filter(pick);
   const FILS = [['all','전체'],['mine','내 회의'],['note','예전 내 노트']];
 
-  el.innerHTML = `<h1>회의록</h1><div class="sub">${shown.length}건 · ${ROLE[me.role]} 권한으로 보이는 것만 표시됩니다
+  const up = await upcomingHtml().catch(()=>'');
+  el.innerHTML = `<h1>회의록</h1>${up}<div class="sub">${shown.length}건 · ${ROLE[me.role]} 권한으로 보이는 것만 표시됩니다
     ${canArch?`<label style="margin-left:12px;cursor:pointer"><input type="checkbox" id="sharch"
       ${showArch?'checked':''} style="width:14px;height:14px;vertical-align:-2px"> 보관된 회의 보기</label>`:''}</div>
     <div class="chips" style="margin:0 0 14px">
@@ -1287,6 +1325,7 @@ async function renderList(){
     openMeeting(c.dataset.id);});
   el.querySelectorAll('[data-fil]').forEach(b=>b.onclick=()=>{
     sessionStorage.setItem('hd_mfil', b.dataset.fil); renderList();});
+  el.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
   const sa=$('#sharch');
   if(sa) sa.onchange=()=>{sessionStorage.setItem('hd_show_arch', sa.checked?'1':'0'); renderList();};
 }
@@ -1314,6 +1353,32 @@ async function openMeeting(id){
     cur.ev=ev||null;
   }
   drawMeeting();
+}
+
+// 같은 회의가 반복될 때, 지난 기록을 시간순으로 함께 보여줍니다.
+// 「그때 왜 그렇게 결정했지?」 를 찾으러 목록을 뒤지지 않게 하려는 것입니다.
+async function drawSeries(m){
+  const box=$('#series'); if(!box || !m) return;
+  const key = seriesKey(m);
+  if(key.split('|')[1].length < 2) return;      // 제목이 너무 짧으면 묶지 않습니다
+  let q = SB.from('hd_meeting')
+      .select('id,title,held_on,company,summary_md,status')
+      .neq('id', m.id).neq('status','archived')
+      .order('held_on',{ascending:false}).limit(80);
+  if(m.company) q = q.eq('company', m.company);
+  const {data} = await q;
+  const rows = (data||[]).filter(x=>seriesKey(x)===key).slice(0,6);
+  if(!rows.length) return;
+  box.innerHTML = `<div class="hist" style="border-color:#DCE3EC">
+    <b>같은 회의의 지난 기록 ${rows.length}건</b>
+    ${rows.map(x=>`<div class="srow" data-sid="${x.id}"
+        style="display:flex;gap:12px;align-items:baseline;padding:5px 0;cursor:pointer">
+      <span style="min-width:86px;font-variant-numeric:tabular-nums">${esc(x.held_on||'')}</span>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+        ${esc(subTitle(x.summary_md) || titleParts(x).name)}</span>
+      ${(x.status==='confirmed'||x.status==='reported')?'<span style="color:#2E7D32">확정</span>':''}
+    </div>`).join('')}</div>`;
+  box.querySelectorAll('[data-sid]').forEach(r=>r.onclick=()=>openMeeting(r.dataset.sid));
 }
 
 // 참석자·팀장에게 슬랙으로 (다시) 보냅니다. 실제 발송은 처리 서버가 합니다.
@@ -1358,7 +1423,6 @@ function drawMeeting(){
     <button class="tab">하이라이트</button>
     <button class="tab">전사</button><button class="tab" aria-selected="true">요약</button>
     <button class="tab">마인드맵</button>
-    <button class="tab">액션아이템 ${acts.length?`(${acts.filter(a=>a.state==='open').length})`:''}</button>
     <button class="btn" id="cpy" style="margin-left:auto;align-self:center;flex:none">전체 복사</button>
   </div>
   <div class="pane">${hls.length? hls.map((h,i)=>`<div class="hl" data-i="${i}">
@@ -1381,7 +1445,7 @@ function drawMeeting(){
     ? '<div class="sub" style="margin-bottom:8px">가지를 누르면 접었다 폈다 할 수 있습니다 · 마우스 휠로 확대</div><svg id="mmv" style="width:100%;height:600px;background:#fff;border:1px solid #E3E6EB;border-radius:12px"></svg>'
     : '<div class="empty">마인드맵이 없습니다.<br>이 기능이 생기기 전에 만들어진 회의입니다.</div>'}
     <textarea id="mmedit" class="full" style="display:none;min-height:520px;font-family:ui-monospace,Menlo,monospace;font-size:13.5px"></textarea></div>
-  <div class="pane">${acts.length? acts.map(a=>`<div class="act ${a.state!=='open'?'done':''}" data-id="${a.id}">
+  <div class="pane" style="display:none">${acts.length? acts.map(a=>`<div class="act ${a.state!=='open'?'done':''}" data-id="${a.id}">
       <input type="checkbox" ${a.state==='done'?'checked':''}>
       <div><div class="task">${esc(a.task)}</div>
         <div class="meta">${esc(a.owner_name||'담당 미정')}${a.due?' · '+esc(a.due):''}
@@ -1391,6 +1455,7 @@ function drawMeeting(){
         ${['admin','ceo','exec','manager','dev'].includes(me.role)?`<button class="delx" data-adel="${a.id}" title="잘못 만들어진 항목 지우기">×</button>`:''}
       </div>
     </div>`).join('') : '<div class="empty">액션아이템이 없습니다.</div>'}</div>
+  <div id="series"></div>
   ${edits.length?`<div class="hist"><b>편집 이력</b>${edits.map(e=>
      `<div>${kst(e.at)} · ${esc(e.editor)} · ${e.kind}</div>`).join('')}</div>`:''}
   <div class="bar">
@@ -1409,6 +1474,7 @@ function drawMeeting(){
       ?`<button class="btn ${okd?'':'g'}" id="mok">${okd?'확정 해제':'확정'}</button>`:''}
     <button class="btn p" id="edit">편집</button></div>`;
 
+  drawSeries(m);
   const tabs=[...el.querySelectorAll('.tab')], panes=[...el.querySelectorAll('.pane')];
   tabs.forEach((t,i)=>t.onclick=()=>{tabs.forEach(x=>x.setAttribute('aria-selected','false'));
     panes.forEach(p=>p.classList.remove('on'));t.setAttribute('aria-selected','true');panes[i].classList.add('on');
@@ -3639,7 +3705,7 @@ function renderGuide(){
   ${box('0. 왼쪽 메뉴 보는 법',`<ul>
     <li><b>홈</b> — 로그인하면 처음 보이는 화면. 큰 버튼 3개로 바로 시작합니다</li>
     <li><b>쓰기</b> — 녹음, 업로드. 자료를 넣는 곳입니다</li>
-    <li><b>보기</b> — 일정, 회의록, 폴더, 액션아이템. 들어온 것을 보는 곳입니다</li>
+    <li><b>보기</b> — 일정, 회의록, 폴더. 들어온 것을 보는 곳입니다</li>
       <li><b>일정</b> — 회의실 예약을 월·주·일로 봅니다. 예약을 누르면 바로 녹음하거나 회의록을 엽니다</li>
     <li><b>물어보기</b> — 챗봇에게 묻거나, 단어로 검색합니다</li>
   </ul>`)}
@@ -3670,7 +3736,7 @@ function renderGuide(){
     <p>문서: 워드(docx) · 텍스트 · PDF · PPT · 한글(hwpx)<br>
        <span style="color:#B36B00">옛 한글(.hwp)은 안 됩니다 — 「다른 이름으로 저장 → hwpx」 후 올려주세요</span></p>`)}
   ${box('4. 회의록을 보고 · 고치고 · 옮기려면',`<ul>
-    <li>회의록을 열면 <b>하이라이트 · 전사 · 요약 · 마인드맵 · 액션아이템</b> 탭이 있습니다</li>
+    <li>회의록을 열면 <b>하이라이트 · 전사 · 요약 · 마인드맵</b> 탭이 있습니다</li>
     <li>오른쪽 위 <b>전체 복사</b> — 지금 보는 탭의 글 전체가 복사됩니다 (카톡·메일에 붙여넣기)</li>
     <li><b>편집</b> — 제목·전사·하이라이트·요약·마인드맵을 바로 고칠 수 있습니다 (참석자만)</li>
     <li><b>워드로 내보내기</b> — 한 파일로 내려받습니다</li>
@@ -3713,7 +3779,7 @@ function renderGuide(){
     <li>모든 회의는 경영진이 언제든 열람합니다. 따로 올리는 절차는 없습니다</li>
     <li>회의록을 확인하셨으면 <b>확정</b>을 눌러 표시해 주세요.
         고치신 내용이 있으면 그 자리에서 참석자·팀장에게 다시 보낼 수 있습니다</li>
-    <li>잘못 만들어진 액션아이템은 <b>×</b> 로 지울 수 있습니다</li>
+
     <li>부서원 비밀번호가 막히면 관리자·경영진에게 재설정을 요청하세요</li>
   </ul>`)}`;
 
