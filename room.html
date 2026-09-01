@@ -64,6 +64,21 @@ body{background:#12161C;color:#fff;
 .agn .h{font-size:15px;font-weight:700;color:#7FA6DA;margin-bottom:8px}
 .agn pre{margin:0;white-space:pre-wrap;word-break:break-word;
   font-family:inherit;font-size:17px;line-height:1.7;color:#D7DEE8}
+.rmtag{margin-left:auto;font-size:14px;color:#7FA6DA;border:1px solid #2B3442;
+  border-radius:999px;padding:4px 12px;flex:none}
+.rmbtn{background:transparent;border:1px solid #39414D;color:#A9B3C1;border-radius:999px;
+  font-family:inherit;font-size:14px;padding:5px 14px;margin-left:8px;cursor:pointer}
+.rmbtn:active{background:#232B36}
+.sheet{position:fixed;inset:0;background:rgba(0,0,0,.62);display:flex;
+  align-items:center;justify-content:center;z-index:50;padding:24px}
+.sheet .card{background:#151A21;border:1px solid #2A313C;border-radius:22px;
+  padding:26px 28px;width:100%;max-width:620px;text-align:center}
+.sheet .h{font-size:22px;font-weight:800;margin-bottom:18px}
+.rmopt{display:block;width:100%;margin-bottom:10px;background:#1B2028;
+  border:1px solid #2A313C;color:#E6EBF2;border-radius:16px;font-family:inherit;
+  font-size:21px;font-weight:700;padding:18px 20px;cursor:pointer}
+.rmopt:active{background:#232B36}
+.rmopt.on{border-color:#2F6FED;color:#8FB6F5}
 .who{width:100%;max-width:1000px}
 .who .h{font-size:17px;color:#A9B3C1;margin-bottom:12px}
 .grid{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;
@@ -163,7 +178,7 @@ document.addEventListener('visibilitychange', ()=>{
 
 // ─────────────────────────── 설정 화면
 function setupPage(msgText){
-  const rooms=[...new Set(EVENTS.map(e=>e.room).filter(Boolean))].sort();
+  const rooms=[...new Set(ROOMS.concat(EVENTS.map(e=>e.room).filter(Boolean)))];
   app.innerHTML='<div class="mid"><div class="setup">'
     + '<h1>회의실 태블릿 설정</h1>'
     + '<div class="sub" style="margin-bottom:18px">이 태블릿을 어느 회의실에 둘지만 정하면 됩니다.</div>'
@@ -199,6 +214,10 @@ function setupPage(msgText){
 // ─────────────────────────── 자료 읽기
 // 이름·회의실 이름을 견주기 좋게 다듬습니다 (띄어쓰기·기호 차이 무시)
 const flat = t => String(t||'').replace(/[^0-9A-Za-z가-힣]/g,'').toLowerCase();
+
+// 우리 건물 회의실 — 순서대로 보여줍니다. 늘어나면 여기에 한 줄 더하면 됩니다.
+const ROOMS = ['5F 대회의실','5F 홍석진 대표님 사무실','1F 대회의실',
+               'B1 소회의실','B1 간이 회의실','B1 대회의실'];
 
 // 로그인한 계정이 「회의실 전용 계정」 일 때만 이름 목록에서 뺍니다.
 // 개인 계정으로 로그인해도 그 사람이 사라지지 않게 하려는 것입니다.
@@ -255,7 +274,13 @@ function coFromTitle(t){
 function idlePage(){
   clearInterval(tick);
   const ev=current();
-  const rest=mine().filter(e=>new Date(e.ends_at).getTime()>Date.now());
+  const now=Date.now();
+  // 이 회의실 예약을 먼저, 그다음 다른 회의실 예약.
+  // 소회의실에 잡아놓고 대회의실에서 하는 일이 잦아 전부 고를 수 있게 둡니다.
+  const live=e=>new Date(e.ends_at).getTime()>now;
+  const mineRest=mine().filter(e=>live(e) && e!==ev);
+  const others=EVENTS.filter(e=>live(e) && mine().indexOf(e)<0);
+  const rest=mineRest.concat(others);
   const c=clk();
   app.innerHTML=
     '<div class="top">'
@@ -273,10 +298,14 @@ function idlePage(){
     + '<div class="sub" style="font-size:14px">누르면 바로 녹음이 시작됩니다 · '
     + '참석자는 녹음 중에 이름을 누르시면 됩니다</div>'
     + '</div>'
-    + (rest.length ? '<div class="list"><div class="h">다른 예약으로 시작하기 — 눌러주세요</div>'
-        + rest.slice(0,5).map((e,i)=>'<button class="pick" data-ev="'+i+'">'
+    + (rest.length ? '<div class="list"><div class="h">다른 예약으로 시작하기 — 눌러주세요 · '
+        + '다른 회의실 예약도 여기서 고를 수 있습니다</div>'
+        + rest.slice(0,6).map((e,i)=>'<button class="pick" data-ev="'+i+'">'
           + '<span class="tm">'+hm(e.starts_at)+' ~ '+hm(e.ends_at)+'</span>'
-          + '<b>'+esc(e.title||'회의')+'</b></button>').join('') + '</div>' : '');
+          + '<b>'+esc(e.title||'회의')+'</b>'
+          + (mineRest.indexOf(e)<0 && e.room
+              ? '<span class="rmtag">'+esc(e.room)+'</span>' : '')
+          + '</button>').join('') + '</div>' : '');
 
   tick=setInterval(()=>{
     const c2=clk();
@@ -309,6 +338,7 @@ async function startRec(ev){
   REC.stream=stream; REC.chunks=[]; REC.t0=Date.now(); REC.ev=ev||null;
   REC.title=(ev&&ev.title)||''; REC.who=new Set();
   REC.agenda=((ev&&ev.note)||'').trim();
+  REC.room=cfg.room||'';
   REC.mr = mime ? new MediaRecorder(stream,{mimeType:mime, audioBitsPerSecond:64000})
                 : new MediaRecorder(stream);
   REC.mr.ondataavailable=e=>{ if(e.data&&e.data.size) REC.chunks.push(e.data); };
@@ -344,9 +374,10 @@ function bindGrid(){
 function recPage(){
   clearInterval(tick);
   app.innerHTML=
-    '<div class="top"><div><div class="room">'+esc(cfg.room||'회의실')
+    '<div class="top"><div><div class="room">'+esc(REC.room||cfg.room||'회의실')
     + (cfg.test?'<span class="tflag">시험 모드</span>':'')+'</div>'
-    + '<div class="today">녹음하고 있습니다</div></div>'
+    + '<div class="today">녹음하고 있습니다 · '
+    + '<button class="rmbtn" id="rmch">회의실 바꾸기</button></div></div>'
     + '<div class="clock"><div class="hm" id="ck">'+clk().hm+'</div></div></div>'
     + '<div class="mid">'
     + '<div class="mtitle">'+esc(REC.title||'제목 없이 시작한 회의')+'</div>'
@@ -367,6 +398,29 @@ function recPage(){
   }, 500);
   bindGrid();
   $('#stop').onclick=stopRec;
+  const rb=$('#rmch'); if(rb) rb.onclick=roomPick;
+}
+
+// 녹음 중에 회의실을 바꿉니다 (예약한 곳과 실제 장소가 다를 때)
+function roomPick(){
+  const cur = REC.room || cfg.room || '';
+  const list = [...new Set(ROOMS.concat(cur ? [cur] : []))];
+  const box=document.createElement('div');
+  box.className='sheet';
+  box.innerHTML='<div class="card"><div class="h">어느 회의실에서 하고 계십니까</div>'
+    + list.map((r,i)=>'<button class="rmopt'+(flat(r)===flat(cur)?' on':'')
+        + '" data-rm="'+i+'">'+esc(r)+'</button>').join('')
+    + '<button class="ghost" id="rmx" style="margin-top:14px">닫기</button></div>';
+  document.body.appendChild(box);
+  const close=()=>box.remove();
+  box.querySelector('#rmx').onclick=close;
+  box.onclick=e=>{ if(e.target===box) close(); };
+  box.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{
+    REC.room=list[+b.dataset.rm];
+    close();
+    const t=document.querySelector('.top .room');
+    if(t) t.innerHTML=esc(REC.room)+(cfg.test?'<span class="tflag">시험 모드</span>':'');
+  });
 }
 
 // 소리가 들어오는지 눈으로 보여줍니다 (마이크가 꺼져 있으면 바로 압니다)
@@ -466,7 +520,7 @@ async function upload(){
       audio_path:name, kind:'audio', orig_name:(REC.title||'회의')+'.'+REC.ext,
       device:'회의실 태블릿', created_by:me.id, created_name:cfg.room||'회의실',
       company:company, dept:dept,
-      cal_uid:(REC.ev&&REC.ev.uid)||'', room:cfg.room||'',
+      cal_uid:(REC.ev&&REC.ev.uid)||'', room:REC.room||cfg.room||'',
       agenda_md:(REC.agenda||''),
       started_at:new Date(REC.t0).toISOString(),
       ended_at:new Date(REC.t0+(REC.dur||0)*1000).toISOString(),
