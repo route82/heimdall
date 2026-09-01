@@ -168,6 +168,11 @@ const CFG = {
 let me=null, cfg=CFG.get(), MEMBERS=[], EVENTS=[], tick=null;
 let PICKED=null;                 // 사람이 아래 목록에서 고른 회의
 
+// 시험 모드는 이 계정만 켤 수 있습니다.
+// 다른 분이 모르고 켜두면 회의록이 조용히 안 만들어져 사고가 납니다.
+const TEST_EMAIL='khw@jhhds.co.kr';
+const canTest = () => !!(me && String(me.email||'').trim().toLowerCase()===TEST_EMAIL);
+
 // 시각은 한국 기준으로 고정합니다
 const KST = o => new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',...o});
 const hm  = t => KST({hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(t));
@@ -217,10 +222,12 @@ function setupPage(msgText){
       + '<input id="pw" type="password" placeholder="비밀번호">')
     + '<input id="rm" type="text" placeholder="회의실 이름 (예: 5F 대회의실)" list="rmlist" value="'+esc(cfg.room||'')+'">'
     + '<datalist id="rmlist">'+rooms.map(r=>'<option value="'+esc(r)+'">').join('')+'</datalist>'
-    + '<label class="chk"><input type="checkbox" id="tm" '+(cfg.test?'checked':'')+'>'
-    + '<span>시험 모드 — 화면만 확인하고 <b>올리지 않습니다</b></span></label>'
-    + '<div class="sub" style="margin:6px 0 16px;font-size:14px">설치하면서 확인하실 때 켜두세요. '
-    + '실제로 쓰시기 전에 반드시 끄셔야 합니다.</div>'
+    + (canTest()
+        ? '<label class="chk"><input type="checkbox" id="tm" '+(cfg.test?'checked':'')+'>'
+          + '<span>시험 모드 — 회의록은 만들되 <b>김현우님만 보이게</b> 저장합니다</span></label>'
+          + '<div class="sub" style="margin:6px 0 16px;font-size:14px">'
+          + '슬랙 알림도 나가지 않습니다. 마음껏 시험해 보셔도 됩니다.</div>'
+        : '')
     + '<button class="btn" id="save">저장하고 시작</button>'
     + '<div class="err" id="err">'+esc(msgText||'')+'</div>'
     + '</div></div>';
@@ -236,7 +243,9 @@ function setupPage(msgText){
       if(error){ err.textContent='로그인하지 못했습니다: '+error.message; return; }
       cfg.email=em;
     }
-    cfg.room=room; cfg.test=$('#tm').checked; CFG.set(cfg);
+    cfg.room=room;
+    cfg.test = canTest() ? !!($('#tm') && $('#tm').checked) : false;
+    CFG.set(cfg);
     location.reload();
   };
 }
@@ -315,7 +324,7 @@ function idlePage(){
   app.innerHTML=
     '<div class="top">'
     + '<div><div class="room">'+esc(cfg.room||'회의실')
-    + (cfg.test?'<span class="tflag">시험 모드</span>':'')+'</div>'
+    + (cfg.test?'<span class="tflag">시험 모드 · 나만 보기</span>':'')+'</div>'
     + '<div class="today" id="dy">'+esc(c.day)+'</div></div>'
     + '<div class="clock"><div class="hm" id="ck">'+c.hm+'</div>'
     + '<div class="sec">회의가 끝나면 회의록이 자동으로 만들어집니다</div></div></div>'
@@ -447,7 +456,7 @@ function recPage(){
   clearInterval(tick);
   app.innerHTML=
     '<div class="top"><div><div class="room">'+esc(REC.room||cfg.room||'회의실')
-    + (cfg.test?'<span class="tflag">시험 모드</span>':'')+'</div>'
+    + (cfg.test?'<span class="tflag">시험 모드 · 나만 보기</span>':'')+'</div>'
     + '<div class="today">녹음하고 있습니다 · '
     + '<button class="rmbtn" id="rmch">회의실 바꾸기</button></div></div>'
     + '<div class="clock"><div class="hm" id="ck">'+clk().hm+'</div></div></div>'
@@ -491,7 +500,7 @@ function roomPick(){
     REC.room=list[+b.dataset.rm];
     close();
     const t=document.querySelector('.top .room');
-    if(t) t.innerHTML=esc(REC.room)+(cfg.test?'<span class="tflag">시험 모드</span>':'');
+    if(t) t.innerHTML=esc(REC.room)+(cfg.test?'<span class="tflag">시험 모드 · 나만 보기</span>':'');
   });
 }
 
@@ -572,13 +581,11 @@ async function upload(){
   const dps=[...new Set(picked.filter(m=>m.company===company).map(m=>m.dept).filter(Boolean))];
   const dept = dps.length===1 ? dps[0] : '';
 
-  if(cfg.test){
-    msg('시험 모드라 올리지 않았습니다',
-        '회사 '+(company||'미정')+' · '
-        + (picked.length ? picked.map(m=>m.name).join(', ') : '참석자 없음')
-        + ' · '+el(REC.dur||0));
-    return;
-  }
+  // 시험 모드 — 올리기는 하되 「나만 보기」로 넣습니다.
+  // 계정을 여기서 한 번 더 확인합니다 (설정만 켜둔 채 계정이 바뀌었을 수 있습니다).
+  const testMode = cfg.test && canTest();
+  const testFields = testMode
+    ? {visibility:'private', note_label:'시험 녹음'} : {};
 
   try{
     const name='jobs/'+Date.now()+'_room.'+REC.ext;   // 저장소 파일 이름은 영문·숫자만
@@ -596,13 +603,16 @@ async function upload(){
       agenda_md:(REC.agenda||''),
       started_at:new Date(REC.t0).toISOString(),
       ended_at:new Date(REC.t0+(REC.dur||0)*1000).toISOString(),
+      ...testFields,
     });
     if(ins.error){ msg('기록을 남기지 못했습니다', ins.error.message); return; }
 
-    msg('회의가 끝났습니다',
-      picked.length
-        ? picked.map(m=>m.name).join(', ')+' 님께 회의록이 슬랙으로 갑니다'
-        : '참석자를 누르지 않으셔서 팀장님과 관리자에게만 보입니다');
+    msg(testMode ? '시험 녹음을 올렸습니다' : '회의가 끝났습니다',
+      testMode
+        ? '회의록은 <b>김현우님만</b> 보이게 저장됩니다 · 슬랙 알림은 나가지 않습니다'
+        : (picked.length
+            ? picked.map(m=>m.name).join(', ')+' 님께 회의록이 슬랙으로 갑니다'
+            : '참석자를 누르지 않으셔서 팀장님과 관리자에게만 보입니다'));
   }catch(e){
     msg('올리지 못했습니다', e.message||String(e));
   }
@@ -612,7 +622,7 @@ function msg(head, sub){
   clearInterval(tick);
   app.innerHTML='<div class="mid"><div class="done"><span class="ok">✓</span>'+esc(head)+'</div>'
     + '<div class="sub" style="max-width:640px">'+esc(sub||'')
-    + (cfg.test?'':'<br><br>회의록은 몇 분 뒤 헤임달에 올라옵니다.')+'</div>'
+    + '<br><br>회의록은 몇 분 뒤 헤임달에 올라옵니다.</div>'
     + '<button class="ghost" id="ok">확인</button></div>';
   const back=()=>{ loadEvents().catch(()=>{}).then(idlePage); };
   $('#ok').onclick=back;
@@ -650,6 +660,8 @@ async function boot(){
     const {data}=await SB.from('hd_member').select('*').eq('id',session.user.id).maybeSingle();
     if(data && data.approved && (data.status||'active')==='active') me=data;
   }
+  // 시험 모드가 켜져 있는데 쓸 수 없는 계정이면 조용히 꺼둡니다
+  if(cfg.test && !canTest()){ cfg.test=false; CFG.set(cfg); }
   await loadEvents().catch(()=>{});
   if(!me || !cfg.room){
     setupPage(!me && session ? '이 계정은 아직 승인되지 않았습니다. 관리자에게 요청해주세요.' : '');
