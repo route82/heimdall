@@ -58,6 +58,12 @@ body{background:#12161C;color:#fff;
 .mtitle{font-size:24px;font-weight:700;color:#C6CEDA}
 .lv{font-size:15px;color:#6FD08C;height:22px}
 
+.agn{width:100%;max-width:1000px;margin:0 0 22px;text-align:left;
+  border:1px solid #2B3442;background:#161C25;border-radius:14px;padding:14px 18px;
+  max-height:300px;overflow:auto}
+.agn .h{font-size:15px;font-weight:700;color:#7FA6DA;margin-bottom:8px}
+.agn pre{margin:0;white-space:pre-wrap;word-break:break-word;
+  font-family:inherit;font-size:17px;line-height:1.7;color:#D7DEE8}
 .who{width:100%;max-width:1000px}
 .who .h{font-size:17px;color:#A9B3C1;margin-bottom:12px}
 .grid{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;
@@ -217,7 +223,7 @@ async function loadEvents(){
   const from=new Date(now-2*3600*1000).toISOString();
   const to  =new Date(now+16*3600*1000).toISOString();
   const {data}=await SB.from('hd_cal_event')
-    .select('uid,title,room,starts_at,ends_at,all_day')
+    .select('uid,title,room,starts_at,ends_at,all_day,note')
     .gte('starts_at',from).lte('starts_at',to).order('starts_at');
   EVENTS=(data||[]).filter(e=>!e.all_day);
 }
@@ -302,6 +308,7 @@ async function startRec(ev){
 
   REC.stream=stream; REC.chunks=[]; REC.t0=Date.now(); REC.ev=ev||null;
   REC.title=(ev&&ev.title)||''; REC.who=new Set();
+  REC.agenda=((ev&&ev.note)||'').trim();
   REC.mr = mime ? new MediaRecorder(stream,{mimeType:mime, audioBitsPerSecond:64000})
                 : new MediaRecorder(stream);
   REC.mr.ondataavailable=e=>{ if(e.data&&e.data.size) REC.chunks.push(e.data); };
@@ -345,6 +352,9 @@ function recPage(){
     + '<div class="mtitle">'+esc(REC.title||'제목 없이 시작한 회의')+'</div>'
     + '<div class="elapsed" id="ela">0:00</div>'
     + '<div class="lv" id="lv"></div>'
+    + (REC.agenda
+        ? '<div class="agn"><div class="h">사전 안건</div><pre>'+esc(REC.agenda)+'</pre></div>'
+        : '')
     + '<div class="who"><div class="h">들어오시면 <b>본인 이름</b>을 눌러주세요</div>'
     + '<div class="cnt" id="cnt">아직 아무도 누르지 않았습니다</div>'
     + '<div class="grid">'+grid(REC.who)+'</div></div>'
@@ -457,6 +467,7 @@ async function upload(){
       device:'회의실 태블릿', created_by:me.id, created_name:cfg.room||'회의실',
       company:company, dept:dept,
       cal_uid:(REC.ev&&REC.ev.uid)||'', room:cfg.room||'',
+      agenda_md:(REC.agenda||''),
       started_at:new Date(REC.t0).toISOString(),
       ended_at:new Date(REC.t0+(REC.dur||0)*1000).toISOString(),
     });

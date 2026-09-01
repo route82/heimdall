@@ -800,7 +800,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v16.6</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v16.7</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -1089,6 +1089,7 @@ async function renderCal(){
     if(mid) return openMeeting(mid);
     REC.cal={uid:b.dataset.ev, title:b.dataset.title, room:b.dataset.room};
     REC.preTitle=b.dataset.title;
+    pullAgenda(b.dataset.ev);
     go('rec');
   });
 }
@@ -1207,6 +1208,7 @@ async function drawTodayCal(){
     // 고른 예약을 기억해 두고 녹음 화면으로 갑니다
     REC.cal={uid:b.dataset.cal, title:b.dataset.title, room:b.dataset.room};
     REC.preTitle=b.dataset.title;
+    pullAgenda(b.dataset.cal);
     go('rec');
   });
 }
@@ -1367,7 +1369,13 @@ function drawMeeting(){
     <div id="segs">${segs.map(s=>`<div class="seg"><div class="ts">${hms(s.start_sec)}</div>
       <div>${s.speaker?`<span class="spk ${si(s.speaker)}">${esc(s.speaker)}</span><br>`:''}
       <p data-i="${s.idx}">${esc(s.text)}</p></div></div>`).join('')}</div></div>
-  <div class="pane on wide"><div class="md" id="smview">${mdHtml(m.summary_md||'')}</div>
+  <div class="pane on wide">
+    <div id="agbox" style="border:1px solid #DCE3EC;background:#F7FAFD;border-radius:12px;padding:13px 16px;margin-bottom:16px;${(m.agenda_md||'').trim()?'':'display:none'}">
+      <div style="font-size:13px;font-weight:700;color:#2E5496;margin-bottom:7px">사전 안건</div>
+      <div class="md" id="agview">${mdHtml(m.agenda_md||'')}</div>
+      <textarea id="agedit" class="full" style="display:none;min-height:200px;font-family:ui-monospace,Menlo,monospace;font-size:13.5px"></textarea>
+    </div>
+    <div class="md" id="smview">${mdHtml(m.summary_md||'')}</div>
     <textarea id="smedit" class="full" style="display:none;min-height:520px;font-family:ui-monospace,Menlo,monospace;font-size:13.5px"></textarea></div>
   <div class="pane" id="mmpane">${(m.mindmap_md||'').trim()
     ? '<div class="sub" style="margin-bottom:8px">가지를 누르면 접었다 폈다 할 수 있습니다 · 마우스 휠로 확대</div><svg id="mmv" style="width:100%;height:600px;background:#fff;border:1px solid #E3E6EB;border-radius:12px"></svg>'
@@ -1638,6 +1646,15 @@ function startEdit(){
   }
   $('#smview').style.display='none';
   const ta=$('#smedit'); ta.style.display='block'; ta.value=cur.m.summary_md||'';
+  // 사전 안건 — 비어 있어도 편집 중에는 칸을 열어 둡니다
+  const agb=$('#agbox');
+  if(agb){
+    agb.style.display='';
+    const agv=$('#agview'); if(agv) agv.style.display='none';
+    const agt=$('#agedit');
+    if(agt){ agt.style.display='block'; agt.value=cur.m.agenda_md||'';
+      agt.placeholder='회의 전에 정해둔 안건을 적어주세요. 마크다운을 그대로 씁니다.'; }
+  }
   // 마인드맵 — 그림 대신 글상자를 보여줍니다. # 은 큰 가지, ## 는 작은 가지입니다
   const pane=$('#mmpane');
   if(pane){
@@ -1707,6 +1724,11 @@ async function saveMeeting(){
       await SB.from('hd_meeting').update({title:t.slice(0,300)}).eq('id',id);
       msg.push('제목 수정');
     }
+  }
+  const agt=$('#agedit');
+  if(agt && agt.value!==(cur.m.agenda_md||'')){
+    await SB.from('hd_meeting').update({agenda_md:agt.value}).eq('id',id);
+    msg.push('사전 안건 수정');
   }
   const sm=$('#smedit').value;
   if(sm!==(cur.m.summary_md||'')){
@@ -3186,6 +3208,11 @@ async function renderRec(){
         처럼 <b>날짜 · 회사</b>가 앞에 자동으로 붙습니다</div>
       <div style="font-size:13px;font-weight:700;color:#3A424F;margin-bottom:5px">참석자</div>
       <div id="rc-parts" style="margin-bottom:10px"></div>
+      <div id="rc-ag-box" style="margin-bottom:12px">
+        <div style="font-size:13px;font-weight:700;color:#3A424F;margin-bottom:5px">사전 안건
+          <span class="sub" style="margin:0;font-weight:400;font-size:12px">— 회의 중에도 이 자리에서 계속 보입니다</span></div>
+        <div id="rc-ag"></div>
+      </div>
       <select id="rc-type" style="display:none"><option value="meeting">회의</option></select>
       ${(me.role==='admin' || (me.extra_scopes||[]).length)?`<div class="row" style="margin-bottom:9px" id="rc-scope-row">
         <select id="rc-scope" style="min-width:230px" ${on?'disabled':''}>
@@ -3222,6 +3249,7 @@ async function renderRec(){
       if(ti && REC.preTitle) ti.value=REC.preTitle;
     }
   });
+  drawAgendaBox(on);
   $('#rc-go').onclick = on ? recStop : recStart;
   if(on) recTick();
   loadUploads();
@@ -3230,6 +3258,36 @@ async function renderRec(){
 function recTick(){
   const t=$('#rc-time'); if(!t) return;
   t.textContent = recFmt(Math.floor((Date.now()-REC.t0)/1000));
+}
+
+// 사전 안건 — 녹음 전에는 고쳐 쓸 수 있고, 녹음 중에는 크게 읽기만 합니다
+function drawAgendaBox(recording){
+  const box=$('#rc-ag'); if(!box) return;
+  const v=REC.agenda||'';
+  if(recording){
+    box.innerHTML = v.trim()
+      ? `<div class="md" style="border:1px solid #DCE3EC;background:#F7FAFD;border-radius:12px;
+           padding:14px 16px;max-height:460px;overflow:auto;font-size:15px;line-height:1.75">${mdHtml(v)}</div>`
+      : '<div class="sub" style="margin:0">적어둔 안건이 없습니다.</div>';
+    return;
+  }
+  box.innerHTML = `<textarea id="rc-agt" class="full" style="min-height:130px;
+      font-family:ui-monospace,Menlo,monospace;font-size:13px"
+      placeholder="회의 전에 정해둔 안건을 적어주세요. 예약을 고르면 캘린더 설명이 자동으로 들어옵니다."></textarea>`;
+  const t=$('#rc-agt'); if(t){ t.value=v; t.oninput=()=>{ REC.agenda=t.value; }; }
+}
+
+// 고른 예약의 캘린더 설명을 사전 안건으로 가져옵니다 (이미 적어둔 글은 덮지 않습니다)
+async function pullAgenda(uid){
+  if(!uid) return;
+  if((REC.agenda||'').trim() && REC.agendaFrom!==uid) return;
+  try{
+    const {data}=await SB.from('hd_cal_event').select('note').eq('uid',uid).maybeSingle();
+    const nt=((data&&data.note)||'').trim();
+    if(!nt) return;
+    REC.agenda=nt; REC.agendaFrom=uid;
+    drawAgendaBox(!!(REC.mr && REC.mr.state==='recording'));
+  }catch(e){ /* 안건을 못 가져와도 녹음은 계속됩니다 */ }
 }
 
 // 회의실 예약을 불러와 고를 수 있게 합니다 (구글 회의실 캘린더에서 가져온 것)
@@ -3270,6 +3328,7 @@ async function loadCalPicks(){
     const o=sel.selectedOptions[0]; if(!o||!sel.value){ REC.cal=null; return; }
     REC.cal={uid:sel.value, title:o.dataset.title, room:o.dataset.room};
     const ti=$('#rc-title'); if(ti && !ti.value.trim()) ti.value=o.dataset.title;
+    pullAgenda(sel.value);
   };
 }
 
@@ -3286,7 +3345,7 @@ async function drawRecToday(){
   const done=new Set((mtg.data||[]).map(x=>x.cal_uid).filter(Boolean));
   // 이미 회의록이 만들어진 예약이 골라져 있으면 풀어줍니다
   if(REC.cal && done.has(REC.cal.uid)){
-    REC.cal=null; REC.preTitle='';
+    REC.cal=null; REC.preTitle=''; REC.agenda=''; REC.agendaFrom='';
     const sel=$('#rc-cal'); if(sel) sel.value='';
     const ti=$('#rc-title'); if(ti) ti.value='';
   }
@@ -3309,6 +3368,7 @@ async function drawRecToday(){
     REC.cal={uid:b.dataset.pick, title:b.dataset.title, room:b.dataset.room};
     const ti=$('#rc-title'); if(ti) ti.value=b.dataset.title;
     const sel=$('#rc-cal'); if(sel) sel.value=b.dataset.pick;
+    pullAgenda(b.dataset.pick);
     box.querySelectorAll('[data-pick]').forEach(x=>x.classList.toggle('on', x===b));
   });
 }
@@ -3333,6 +3393,7 @@ async function recStart(){
   REC.attNames = REC.att ? REC.att.value() : [];
   REC.parts = REC.attNames.join(', ');
   REC.scope=($('#rc-scope')||{value:'mine'}).value;
+  const agt0=$('#rc-agt'); if(agt0) REC.agenda=agt0.value;
   const cs=$('#rc-cal');
   if(cs && cs.value){
     const o=cs.selectedOptions[0];
@@ -3436,10 +3497,12 @@ async function recDone(){
       started_at:new Date(REC.t0).toISOString(),
       ended_at:new Date(REC.t0 + (REC.dur||0)*1000).toISOString(),
       cal_uid:(REC.cal&&REC.cal.uid)||'', room:(REC.cal&&REC.cal.room)||'',
+      agenda_md:(REC.agenda||''),
       ...sc, ...extra});
     if(e2){ toast(upErr('row', e2), 9000); renderRec(); return; }
     // 다음 녹음 때 이 예약·참석자가 계속 남아 있지 않도록 비웁니다
     REC.cal=null; REC.preTitle=''; REC.attNames=[];
+    REC.agenda=''; REC.agendaFrom='';
     toast(`<b>${esc(REC.title)}</b> (${recFmt(REC.dur||0)}) 올렸습니다.<br>처리가 끝나면 회의 목록에 나타납니다.`);
   }catch(e){
     toast('올리지 못했습니다: '+esc(e.message||e), 8000);
