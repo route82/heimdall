@@ -3,7 +3,14 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>HEIMDALL</title>
 <link rel="manifest" href="./manifest.webmanifest">
-<meta name="theme-color" content="#12161C">
+<!-- 글꼴 — 파일을 저장소에 넣지 않고 CDN 으로만 부릅니다 (라이선스 안전) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard-dynamic-subset.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&display=swap">
+<meta name="theme-color" content="#080808" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#FBFBFA" media="(prefers-color-scheme: light)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="HEIMDALL">
@@ -12,344 +19,500 @@
 <link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32.png?v=3">
 <link rel="icon" type="image/png" sizes="16x16" href="./icons/favicon-16.png?v=3">
 <link rel="shortcut icon" href="./icons/favicon.ico?v=3">
+<script>
+(function(){
+  // 고른 값은 dark / light / auto 셋 중 하나입니다.
+  // auto 는 기기(윈도우·안드로이드·맥)의 밝기 설정을 따라갑니다.
+  function resolve(t){
+    if(t==='auto'){
+      try{ return matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'; }
+      catch(e){ return 'dark'; }
+    }
+    return (t==='light') ? 'light' : 'dark';
+  }
+  var raw='dark';
+  try{ raw = localStorage.getItem('hd_theme') || 'dark'; }catch(e){}
+  window.HD_THEME_RAW = raw;
+  window.HD_THEME_RESOLVE = resolve;
+  document.documentElement.setAttribute('data-theme', resolve(raw));
+})();
+</script>
 <style>
+/* ═══════════════════════════════════════════════════════════════
+   HEIMDALL v19 — 디자인 토큰
+   더올마이티 / 사운드쓰루 홈페이지의 무채색 에디토리얼 기조를 따릅니다.
+   색은 여기서만 정합니다. 아래 규칙에는 색 값을 직접 쓰지 않습니다.
+   ═══════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#080808;      /* 바탕 */
+  --s1:#0E0E0E;      /* 카드·패널 */
+  --s2:#141414;      /* 올라온 면·마우스 올렸을 때 */
+  --s3:#1B1B1B;      /* 더 올라온 면 */
+  --line:#212121;    /* 기본 선 */
+  --line2:#171717;   /* 흐린 선 */
+  --tx:#F2F2F0;      /* 본문 */
+  --tx2:#9A9A97;     /* 보조 */
+  --tx3:#616160;     /* 흐림 */
+  --ac:#F2F2F0;      /* 액센트 = 흰색 하나 */
+  --acon:#0A0A0A;    /* 액센트 위 글자 */
+  --acbg:#1E1E1E;    /* 액센트 옅은 바탕 */
+  --acln:#3A3A3A;    /* 액센트 선 */
+  --ok:#4ADE80;   --okbg:#0F2016;
+  --warn:#E0B341; --warnbg:#221B0C;
+  --err:#F07570;  --errbg:#241211;
+  --purple:#B79BF0; --teal:#5FD3CE;
+  --mark:#4A4118; --markt:#F5DE7A;
+  --shadow:rgba(0,0,0,.55);
+  --scrim:rgba(0,0,0,.62);
+  --dur:.18s; --ease:cubic-bezier(.32,.72,0,1);
+  --spring:cubic-bezier(.22,1.18,.36,1);
+  --track:.16em;   /* 영문 대문자 자간 */
+  /* 글꼴 — 한글 본문은 Pretendard, 영문 제목·숫자는 Oswald(컨덴스드).
+     CDN 이 막히면 아래 기기 기본 글꼴로 자동으로 내려갑니다. */
+  --f-body:'Pretendard Variable',Pretendard,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+  --f-disp:'Oswald','Pretendard Variable',Pretendard,-apple-system,'Apple SD Gothic Neo',sans-serif;
+  --f-mono:'Oswald',ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+html[data-theme=light]{
+  --bg:#FBFBFA; --s1:#FFFFFF; --s2:#F4F4F2; --s3:#EEEEEB;
+  --line:#E3E3DF; --line2:#EFEFEC;
+  --tx:#0A0A0A; --tx2:#5C5C5A; --tx3:#8C8C89;
+  --ac:#0A0A0A; --acon:#FFFFFF; --acbg:#EFEFEC; --acln:#C9C9C4;
+  --ok:#146B36;   --okbg:#E9F5EC;
+  --warn:#8A6100; --warnbg:#FAF1DB;
+  --err:#B3251F;  --errbg:#FBEAE9;
+  --purple:#5A3699; --teal:#0E6E6B;
+  --mark:#FFF2A8; --markt:#4A3E00;
+  --shadow:rgba(20,20,18,.16);
+  --scrim:rgba(20,20,18,.42);
+  color-scheme:light;
+}
+
 *{box-sizing:border-box}
-body{margin:0;background:#F5F6F8;color:#12161C;line-height:1.7;-webkit-text-size-adjust:100%;word-break:keep-all;overflow-wrap:break-word;
- font-family:-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif}
+body{margin:0;background:var(--bg);color:var(--tx);line-height:1.7;-webkit-text-size-adjust:100%;
+ word-break:keep-all;overflow-wrap:break-word;
+ font-family:var(--f-body);
+ transition:background var(--dur) var(--ease),color var(--dur) var(--ease)}
 a{color:inherit;text-decoration:none}
 button{font-family:inherit}
+::selection{background:var(--tx);color:var(--bg)}
+
+/* 영문 대문자 라벨 — 홈페이지의 WORKS / ABOUT 어법 */
+.eyebrow{font-size:10.5px;font-weight:600;letter-spacing:var(--track);text-transform:uppercase;
+ color:var(--tx3);display:block}
+
 /* ── 왼쪽 사이드바 얼개 */
-.side{position:fixed;left:0;top:0;bottom:0;width:238px;z-index:30;background:#fff;
- border-right:1px solid #E6EAF0;display:flex;flex-direction:column;overflow-y:auto}
+.side{position:fixed;left:0;top:0;bottom:0;width:238px;z-index:30;background:var(--s1);
+ border-right:1px solid var(--line);display:flex;flex-direction:column;overflow-y:auto}
 .main{margin-left:238px;min-height:100vh}
 .mtop{display:none}
 .brand{display:flex;align-items:center;padding:18px 18px 14px}
 .sgroup{padding:6px 12px 2px}
-.sgt{font-size:11px;font-weight:700;letter-spacing:.06em;color:#A8B0BC;
- padding:10px 10px 5px;text-transform:uppercase}
-.sfoot{margin-top:auto;border-top:1px solid #F0F2F5;padding:13px 16px 16px}
+.sgt{font-size:10.5px;font-weight:600;letter-spacing:.075em;color:var(--tx3);
+ padding:12px 10px 6px;text-transform:uppercase}
+.sfoot{margin-top:auto;border-top:1px solid var(--line2);padding:13px 16px 16px}
 .sfoot .who{font-size:13.5px;font-weight:600;display:block;
  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sfoot .frow{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap}
 .sfoot .btn{padding:6px 11px;font-size:12.5px}
 .scrim{display:none}
 .bolt{height:.55em;width:auto;display:block;flex:none}
-/* 로고 — 가이드라인 최소 크기: 인물형 웹 40px, 심볼 24px */
 .lgh{height:42px;width:auto;display:block}
 .lgv{height:132px;width:auto;display:block;margin:0 auto}
-.login .mark{display:flex;justify-content:center;margin-bottom:22px}
-.login h2{margin:0 0 6px;font-size:21px}
-.opts{display:flex;gap:18px;margin:2px 0 14px;font-size:13.5px;color:#5B6472}
-.opts label{display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none}
-.opts input{width:17px;height:17px;margin:0;accent-color:#2B6CB0}
-.nav{appearance:none;border:0;background:none;font-size:14.5px;font-weight:600;color:#4A5464;
+html[data-theme=dark] .lgh,html[data-theme=dark] .lgv,html[data-theme=dark] .bolt{filter:invert(1)}
+
+/* 밝기 전환 단추 */
+.thm{appearance:none;border:1px solid var(--line);background:none;color:var(--tx3);
+ border-radius:8px;width:30px;height:30px;flex:none;cursor:pointer;
+ display:flex;align-items:center;justify-content:center;transition:var(--dur) var(--ease)}
+.thm:hover{color:var(--tx);border-color:var(--acln)}
+.thm svg{width:15px;height:15px}
+
+.nav{appearance:none;border:0;background:none;font-size:14.5px;font-weight:500;color:var(--tx2);
  padding:9px 10px;cursor:pointer;border-radius:9px;width:100%;text-align:left;
- display:flex;align-items:center;gap:10px;line-height:1.4}
-.nav svg{width:17px;height:17px;flex:none;color:#98A0AC}
-.nav:hover{background:#F2F5F9}
-.nav[aria-current=true]{background:#EAF2FD;color:#2B6CB0}
-.nav[aria-current=true] svg{color:#2B6CB0}
-.me{font-size:13px;color:#5C6672;display:flex;align-items:center;gap:8px;
+ display:flex;align-items:center;gap:10px;line-height:1.4;
+ transition:background var(--dur) var(--ease),color var(--dur) var(--ease)}
+.nav svg{width:17px;height:17px;flex:none;color:var(--tx3)}
+.nav:hover{background:var(--s2);color:var(--tx)}
+.nav[aria-current=true]{background:var(--acbg);color:var(--tx);font-weight:600}
+.nav[aria-current=true] svg{color:var(--tx)}
+.me{font-size:13px;color:var(--tx2);display:flex;align-items:center;gap:8px;
  flex:none;white-space:nowrap}
 .me .who{max-width:180px;overflow:hidden;text-overflow:ellipsis}
-.role{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:#EEF2F7;color:#4A5464}
+.role{font-size:10.5px;font-weight:600;letter-spacing:.05em;padding:2px 8px;border-radius:20px;
+ background:var(--s2);color:var(--tx2)}
 .wrap{max-width:1040px;margin:0 auto;padding:28px 30px 90px}
-.page{display:none}.page.on{display:block}
-h1{font-size:23px;margin:0 0 4px;letter-spacing:-.01em}
-.sub{color:#5C6672;font-size:13.5px;margin-bottom:22px}
-.card{display:block;background:#fff;border:1px solid #E6EAF0;border-radius:12px;padding:16px 20px;
- margin-bottom:10px;cursor:pointer;transition:.12s}
-.card:hover{border-color:#2B6CB0;box-shadow:0 3px 14px rgba(43,108,176,.08)}
-.ct{font-size:16.5px;font-weight:700;margin-bottom:4px}
-.shsec{font-size:11.5px;font-weight:700;letter-spacing:.04em;color:#5C6672;
- margin:12px 0 6px;padding-top:8px;border-top:1px solid #F0F2F5}
+.page{display:none}
+.page.on{display:block;animation:pgin .22s var(--ease) both}
+@keyframes pgin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+h1{font-size:23px;margin:0 0 4px;letter-spacing:-.015em;font-weight:600}
+.sub{color:var(--tx2);font-size:13.5px;margin-bottom:22px}
+.card{display:block;background:var(--s1);border:1px solid var(--line);border-radius:12px;
+ padding:16px 20px;margin-bottom:10px;cursor:pointer;
+ transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease)}
+.card:hover{border-color:var(--acln);background:var(--s2)}
+.ct{font-size:16.5px;font-weight:600;margin-bottom:4px}
+.shsec{font-size:10.5px;font-weight:600;letter-spacing:.075em;text-transform:uppercase;
+ color:var(--tx3);margin:14px 0 6px;padding-top:10px;border-top:1px solid var(--line2)}
 .shsec:first-of-type{margin-top:0;padding-top:0;border-top:0}
 .shlb{display:flex;align-items:center;gap:5px;font-size:13.5px}
-.card.locked{cursor:default;background:#FAFBFD;border-style:dashed}
-.box.locked{background:#FAFBFD;border-style:dashed;user-select:none}
-.card.locked:hover{border-color:#DDE2E9;box-shadow:none}
-.card.locked .ct{color:#B6BEC9;letter-spacing:.12em}
-.cm{font-size:13px;color:#5C6672;display:flex;gap:14px;flex-wrap:wrap;align-items:center}
-.ct .mtag{color:#5C6672}
-.csub{margin-top:2px;font-size:13.5px;color:#5C6672;line-height:1.5}
-.bsec{margin:20px 0 10px;padding-top:16px;border-top:1px solid #EEF1F5;
- font-size:14px;font-weight:700;color:#3A424F}
-.bcard{border:1px solid #E6EAF0;border-radius:12px;padding:14px 16px;margin-bottom:10px;background:#FCFDFE}
-.bct{font-size:16px;font-weight:700;line-height:1.4}
-.bct .mtag{color:#5C6672}
-.bone{margin:9px 0 11px;font-size:14px;line-height:1.65;color:#3A424F}
-.csum{margin-top:7px;font-size:13.5px;line-height:1.6;color:#3A424F}
-.csum.none{color:#AEB6C0}
-.tag{font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px}
-.t-draft{background:#EEF1F5;color:#5B6472}.t-review{background:#FFF3D6;color:#8A6100}
-.t-reported{background:#E3F5E9;color:#1B6B36}.t-archived{background:#EDE9F5;color:#5A3699}
-.btn{appearance:none;border:1px solid #DDE2E9;background:#fff;border-radius:9px;padding:9px 16px;
- font-size:14px;font-weight:600;cursor:pointer;color:#3A424F}
-.btn.p{background:#2B6CB0;border-color:#2B6CB0;color:#fff}
-.btn.g{background:#12833F;border-color:#12833F;color:#fff}
-.btn:disabled{opacity:.5;cursor:default}
+.card.locked{cursor:default;background:var(--s1);border-style:dashed}
+.box.locked{background:var(--s1);border-style:dashed;user-select:none}
+.card.locked:hover{border-color:var(--line);background:var(--s1)}
+.card.locked .ct{color:var(--tx3);letter-spacing:.12em}
+.cm{font-size:12.5px;color:var(--tx2);display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.ct .mtag{color:var(--tx2)}
+.csub{margin-top:2px;font-size:13.5px;color:var(--tx2);line-height:1.5}
+.bsec{margin:20px 0 10px;padding-top:16px;border-top:1px solid var(--line2);
+ font-size:10.5px;font-weight:600;letter-spacing:.075em;text-transform:uppercase;color:var(--tx3)}
+.bcard{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:10px;background:var(--s1)}
+.bct{font-size:16px;font-weight:600;line-height:1.4}
+.bct .mtag{color:var(--tx2)}
+.bone{margin:9px 0 11px;font-size:14px;line-height:1.65;color:var(--tx2)}
+.csum{margin-top:7px;font-size:13.5px;line-height:1.6;color:var(--tx2)}
+.csum.none{color:var(--tx3)}
+.tag{font-size:10.5px;font-weight:600;letter-spacing:.04em;padding:2px 9px;border-radius:20px}
+.t-draft{background:var(--s2);color:var(--tx2)}
+.t-review{background:var(--warnbg);color:var(--warn)}
+.t-reported{background:var(--okbg);color:var(--ok)}
+.t-archived{background:var(--s3);color:var(--purple)}
+.btn{appearance:none;border:1px solid var(--line);background:var(--s1);border-radius:9px;
+ padding:9px 16px;font-size:14px;font-weight:500;cursor:pointer;color:var(--tx);
+ transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),transform .08s}
+.btn:hover{border-color:var(--acln);background:var(--s2)}
+.btn:active{transform:scale(.98)}
+.btn.p{background:var(--ac);border-color:var(--ac);color:var(--acon);font-weight:600}
+.btn.p:hover{background:var(--ac);border-color:var(--ac);opacity:.86}
+.btn.g{background:var(--ok);border-color:var(--ok);color:var(--acon);font-weight:600}
+.btn.g:hover{background:var(--ok);border-color:var(--ok);opacity:.86}
+.btn:disabled{opacity:.42;cursor:default}
 .row{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
-input,select,textarea{font-family:inherit;font-size:14.5px;padding:10px 13px;border:1px solid #DDE2E9;
- border-radius:9px;background:#fff}
-input:focus,textarea:focus,select:focus{outline:none;border-color:#2B6CB0}
+input,select,textarea{font-family:inherit;font-size:14.5px;padding:10px 13px;
+ border:1px solid var(--line);border-radius:9px;background:var(--s1);color:var(--tx);
+ transition:border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease)}
+input::placeholder,textarea::placeholder{color:var(--tx3)}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--ac);
+ box-shadow:0 0 0 3px var(--acbg)}
 .full{width:100%}
-.box{background:#fff;border:1px solid #E6EAF0;border-radius:12px;padding:22px 24px;margin-bottom:14px}
-.tabs{display:flex;gap:3px;border-bottom:1px solid #E6EAF0;margin:18px 0 20px}
-.tab{appearance:none;border:0;background:none;font-size:15px;font-weight:600;color:#5C6672;
- padding:11px 15px;cursor:pointer;border-bottom:2.5px solid transparent}
-.tab[aria-selected=true]{color:#2B6CB0;border-bottom-color:#2B6CB0}
-.pane{display:none}.pane.on{display:block}
+.box{background:var(--s1);border:1px solid var(--line);border-radius:12px;padding:22px 24px;margin-bottom:14px}
+.tabs{display:flex;gap:3px;border-bottom:1px solid var(--line);margin:18px 0 20px}
+.tab{appearance:none;border:0;background:none;font-size:14px;font-weight:500;color:var(--tx3);
+ padding:11px 15px;cursor:pointer;border-bottom:1.5px solid transparent;
+ transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease)}
+.tab:hover{color:var(--tx2)}
+.tab[aria-selected=true]{color:var(--tx);border-bottom-color:var(--ac);font-weight:600}
+.pane{display:none}
+.pane.on{display:block;animation:pgin .2s var(--ease) both}
 .pane.wide .md{font-size:15.5px;line-height:1.82}
-.mttl{font-size:26px;line-height:1.34;margin:0 0 4px;letter-spacing:-.2px}
-.mttl .mtag{color:#5C6672;font-weight:700}
-.msub{font-size:15px;color:#3A424F;margin:0 0 8px;line-height:1.5}
+.mttl{font-size:27px;line-height:1.32;margin:0 0 4px;letter-spacing:-.022em;font-weight:600}
+.mttl .mtag{color:var(--tx2);font-weight:500}
+.msub{font-size:15px;color:var(--tx2);margin:0 0 8px;line-height:1.5}
 .mhead{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
 .mhead .atd{max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
- background:#F4F6F9;border-radius:7px;padding:2px 9px;font-size:12.5px;cursor:default}
+ background:var(--s2);border-radius:7px;padding:2px 9px;font-size:12.5px;cursor:default;color:var(--tx2)}
 .seg{display:grid;grid-template-columns:70px 1fr;gap:14px;padding:7px 0}
-.seg:hover{background:#FAFBFD}
-.ts{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:#98A0AC;padding-top:3px;
- word-break:normal}
-.spk{display:inline-block;font-size:12px;font-weight:700;padding:2px 9px;border-radius:20px;margin-bottom:3px}
-.s0{background:#E4EEFC;color:#1F5286}.s1{background:#E7F4E8;color:#1F6B33}
-.s2{background:#FBEBE2;color:#9B4A15}.s3{background:#F0E9FA;color:#5A3699}
-.s4{background:#FCE9EF;color:#95214A}.s5{background:#E6F2F4;color:#14615F}
+.seg:hover{background:var(--s1)}
+.ts{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--tx3);padding-top:3px;
+ word-break:normal;letter-spacing:.02em}
+.spk{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 9px;border-radius:20px;margin-bottom:3px}
+.s0{background:var(--s3);color:#9EC5F5}.s1{background:var(--s3);color:#8FDCA6}
+.s2{background:var(--s3);color:#F0B183}.s3{background:var(--s3);color:#C3A9F2}
+.s4{background:var(--s3);color:#F2A2BE}.s5{background:var(--s3);color:#7ED4D0}
+html[data-theme=light] .s0{background:#E4EEFC;color:#1F5286}
+html[data-theme=light] .s1{background:#E7F4E8;color:#1F6B33}
+html[data-theme=light] .s2{background:#FBEBE2;color:#9B4A15}
+html[data-theme=light] .s3{background:#F0E9FA;color:#5A3699}
+html[data-theme=light] .s4{background:#FCE9EF;color:#95214A}
+html[data-theme=light] .s5{background:#E6F2F4;color:#14615F}
 .seg p{margin:0}
-[contenteditable=true]{outline:1px dashed #C7D3E4;border-radius:6px;padding:3px 7px;background:#FCFDFF}
-[contenteditable=true]:focus{outline:2px solid #2B6CB0;background:#fff}
-.hl{border-left:3px solid #2B6CB0;padding:2px 0 2px 18px;margin-bottom:24px}
+[contenteditable=true]{outline:1px dashed var(--acln);border-radius:6px;padding:3px 7px;background:var(--s2)}
+[contenteditable=true]:focus{outline:2px solid var(--ac);background:var(--s1)}
+.hl{border-left:2px solid var(--ac);padding:2px 0 2px 18px;margin-bottom:24px}
 .hl .ts{margin-bottom:4px}
-.hl h3{font-size:17.5px;margin:0 0 8px;line-height:1.5}
-.hl ul{margin:0;padding-left:18px;color:#3A424F}.hl li{margin:5px 0;font-size:15px}
+.hl h3{font-size:17.5px;margin:0 0 8px;line-height:1.5;font-weight:600}
+.hl ul{margin:0;padding-left:18px;color:var(--tx2)}
+.hl li{margin:5px 0;font-size:15px}
 table{border-collapse:collapse;width:100%;font-size:14px;margin:10px 0}
-th,td{border:1px solid #E6EAF0;padding:9px 11px;text-align:left;vertical-align:top}
-th{background:#F5F7FA;font-weight:600}
-.md h1{font-size:21px}.md h2{font-size:17.5px;margin:26px 0 10px;padding-bottom:7px;border-bottom:1px solid #EEF1F5}
+th,td{border:1px solid var(--line);padding:9px 11px;text-align:left;vertical-align:top}
+th{background:var(--s2);font-weight:600}
+.md h1{font-size:21px;font-weight:600}
+.md h2{font-size:17.5px;margin:26px 0 10px;padding-bottom:7px;border-bottom:1px solid var(--line2);font-weight:600}
 .md ul{padding-left:19px}
+.md a{color:var(--tx);text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--acln)}
 .act{display:grid;grid-template-columns:26px 1fr auto;gap:12px;align-items:start;
- padding:12px 0;border-top:1px solid #F0F2F5}
-.act input[type=checkbox]{width:19px;height:19px;margin-top:3px}
-.act .meta{font-size:12.5px;color:#98A0AC;margin-top:2px}
-.act.done .task{text-decoration:line-through;color:#A8B0BA}
-.hit{background:#fff;border:1px solid #E6EAF0;border-radius:10px;padding:13px 16px;margin-bottom:8px;cursor:pointer}
-.hit:hover{border-color:#2B6CB0}
-.hit .h{font-size:12.5px;color:#5C6672;margin-bottom:3px}
-mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
-.empty{padding:52px;text-align:center;color:#98A0AC;background:#fff;border:1px dashed #DDE2E9;border-radius:12px}
-.login{max-width:400px;margin:14vh auto;background:#fff;border:1px solid #E6EAF0;border-radius:14px;padding:34px}
-.login h2{margin:0 0 6px;font-size:21px}
-.opts{display:flex;gap:18px;margin:2px 0 14px;font-size:13.5px;color:#5B6472}
+ padding:12px 0;border-top:1px solid var(--line2)}
+.act input[type=checkbox]{width:19px;height:19px;margin-top:3px;accent-color:var(--ac)}
+.act .meta{font-size:12.5px;color:var(--tx3);margin-top:2px}
+.act.done .task{text-decoration:line-through;color:var(--tx3)}
+.hit{background:var(--s1);border:1px solid var(--line);border-radius:10px;padding:13px 16px;
+ margin-bottom:8px;cursor:pointer;transition:border-color var(--dur) var(--ease)}
+.hit:hover{border-color:var(--acln)}
+.hit .h{font-size:12.5px;color:var(--tx2);margin-bottom:3px}
+mark{background:var(--mark);color:var(--markt);padding:1px 3px;border-radius:3px}
+.empty{padding:52px;text-align:center;color:var(--tx3);background:var(--s1);
+ border:1px dashed var(--line);border-radius:12px}
+
+/* ── 로그인 ─────────────────────────────────────────
+   홈페이지처럼 순수 검정 위에 워드마크만 두고, 아래에 폼을 붙입니다. */
+.login{max-width:400px;margin:13vh auto;background:var(--s1);border:1px solid var(--line);
+ border-radius:14px;padding:34px;animation:lgin .5s var(--ease) both}
+@keyframes lgin{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.login .mark{display:flex;justify-content:center;margin-bottom:22px}
+.login h2{margin:0 0 6px;font-size:20px;font-weight:600}
+.login p{margin:0 0 20px;color:var(--tx2);font-size:14px}
+.opts{display:flex;gap:18px;margin:2px 0 14px;font-size:13.5px;color:var(--tx2)}
 .opts label{display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none}
-.opts input{width:17px;height:17px;margin:0;accent-color:#2B6CB0}.login p{margin:0 0 20px;color:#5C6672;font-size:14px}
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:26px;background:#12161C;color:#fff;
- padding:13px 20px;border-radius:10px;font-size:14px;z-index:80;box-shadow:0 6px 22px rgba(0,0,0,.25)}
+.opts input{width:17px;height:17px;margin:0;accent-color:var(--ac)}
+/* HEIMDALL 워드마크 — 들어올 때 자간이 한 번 벌어집니다 */
+.wm{text-align:center;margin-bottom:26px}
+.wm .kr{font-size:9.5px;letter-spacing:.13em;color:var(--tx3);
+ text-transform:uppercase;font-weight:600;margin-bottom:12px;
+ white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wm .nm{font-size:29px;line-height:1;font-weight:600;color:var(--tx);
+ letter-spacing:.02em;animation:wmin .9s var(--ease) both}
+.wm .nm sup{font-size:11px;vertical-align:super;color:var(--tx3);letter-spacing:0}
+.wm .tl{font-size:12.5px;color:var(--tx2);margin-top:10px;letter-spacing:0}
+@keyframes wmin{from{opacity:0;letter-spacing:.26em}to{opacity:1;letter-spacing:.02em}}
+
+/* ── 불러오는 중 / 처리 중 화면 */
+.boot{min-height:100vh;display:flex;flex-direction:column;align-items:center;
+ justify-content:center;gap:20px;padding:24px}
+.boot .nm{font-size:22px;font-weight:600;letter-spacing:.13em;color:var(--tx)}
+.boot .lb{font-size:10.5px;letter-spacing:var(--track);text-transform:uppercase;color:var(--tx3)}
+.boot .tr{width:min(230px,64vw);height:2px;background:var(--line);border-radius:2px;overflow:hidden}
+.boot .tr i{display:block;height:100%;width:34%;background:var(--ac);
+ animation:btrk 1.5s var(--ease) infinite}
+@keyframes btrk{0%{transform:translateX(-105%)}100%{transform:translateX(320%)}}
+
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:26px;background:var(--tx);
+ color:var(--bg);padding:13px 20px;border-radius:10px;font-size:14px;z-index:80;
+ box-shadow:0 6px 22px var(--shadow);animation:tsin .28s var(--spring) both}
+@keyframes tsin{from{opacity:0;transform:translate(-50%,14px)}to{opacity:1;transform:translate(-50%,0)}}
 .bar{position:fixed;right:22px;bottom:22px;display:flex;gap:9px;z-index:50}
-.bar .btn{box-shadow:0 4px 16px rgba(0,0,0,.16);padding:12px 20px;border-radius:24px}
-.hist{margin-top:26px;font-size:12.5px;color:#98A0AC}
-.hist div{padding:4px 0;border-top:1px solid #F2F4F7}
+.bar .btn{box-shadow:0 4px 16px var(--shadow);padding:12px 20px;border-radius:24px}
+.hist{margin-top:26px;font-size:12.5px;color:var(--tx3)}
+.hist div{padding:4px 0;border-top:1px solid var(--line2)}
 .chatwrap{display:flex;gap:18px;align-items:flex-start}
-.rooms{width:230px;flex:none;background:#fff;border:1px solid #E6EAF0;border-radius:12px;
+.rooms{width:230px;flex:none;background:var(--s1);border:1px solid var(--line);border-radius:12px;
  padding:10px;position:sticky;top:22px;max-height:78vh;overflow-y:auto}
 .rooms .newbtn{width:100%;margin-bottom:8px}
 .room{display:flex;align-items:center;gap:6px;padding:9px 10px;border-radius:8px;cursor:pointer;
- font-size:13.5px;color:#3A424F}
-.room:hover{background:#F5F7FA}
-.room.on{background:#EAF2FE;color:#2B6CB0;font-weight:600}
+ font-size:13.5px;color:var(--tx2);transition:background var(--dur) var(--ease)}
+.room:hover{background:var(--s2)}
+.room.on{background:var(--acbg);color:var(--tx);font-weight:600}
 .room .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .room .ic{appearance:none;border:0;background:none;cursor:pointer;font-size:13px;
- color:#B6BEC9;padding:2px 3px;flex:none}
-.room .ic:hover{color:#2B6CB0}
-.room .ic.pin.on{color:#E0A800}
+ color:var(--tx3);padding:2px 3px;flex:none}
+.room .ic:hover{color:var(--tx)}
+.room .ic.pin.on{color:var(--warn)}
 .chatmain{flex:1;min-width:0}
 .chat{display:flex;flex-direction:column;gap:14px;margin-bottom:20px}
-.msg{max-width:88%;padding:13px 16px;border-radius:14px;font-size:15px;line-height:1.72}
-.msg.q{align-self:flex-end;background:#2B6CB0;color:#fff;border-bottom-right-radius:5px}
-.msg.a{align-self:flex-start;background:#fff;border:1px solid #E6EAF0;border-bottom-left-radius:5px}
-.msg.a .md h1{font-size:17px}.msg.a .md h2{font-size:15.5px;margin:14px 0 6px;border:0;padding:0}
+.msg{max-width:88%;padding:13px 16px;border-radius:14px;font-size:15px;line-height:1.72;
+ animation:pgin .22s var(--ease) both}
+.msg.q{align-self:flex-end;background:var(--ac);color:var(--acon);border-bottom-right-radius:5px}
+.msg.a{align-self:flex-start;background:var(--s1);border:1px solid var(--line);border-bottom-left-radius:5px}
+.msg.a .md h1{font-size:17px}
+.msg.a .md h2{font-size:15.5px;margin:14px 0 6px;border:0;padding:0}
 .msg.a .md p{margin:6px 0}.msg.a .md ul{padding-left:18px;margin:6px 0}
-.msg .src{margin-top:9px;padding-top:8px;border-top:1px solid #EEF1F5;
- font-size:12px;color:#98A0AC}
-.msg.wait{color:#5C6672;background:#F2F4F7;border:0}
-.ask{display:flex;gap:8px;position:sticky;bottom:0;background:#F5F6F8;padding:10px 0 4px}
+.msg .src{margin-top:9px;padding-top:8px;border-top:1px solid var(--line2);
+ font-size:12px;color:var(--tx3)}
+.msg.wait{color:var(--tx2);background:var(--s2);border:0}
+.ask{display:flex;gap:8px;position:sticky;bottom:0;background:var(--bg);padding:10px 0 4px}
 .ask textarea{flex:1;resize:none;min-height:46px;max-height:120px;font-size:15px}
 .stree{margin:1px 0 3px}
 .st{display:flex;align-items:center;gap:6px;width:100%;border:0;background:none;text-align:left;
- font-family:inherit;font-size:13px;color:#4A5464;padding:5px 8px;border-radius:8px;cursor:pointer;line-height:1.4}
-.st:hover{background:#F2F5F9}
-.st.sel{background:#EAF2FD;color:#2B6CB0;font-weight:600}
-.st .fi{width:14px;height:14px;flex:none;color:#98A0AC}
-.st.sel .fi{color:#2B6CB0}
-.st .cr{width:12px;height:12px;flex:none;color:#98A0AC;transition:transform .12s}
+ font-family:inherit;font-size:13px;color:var(--tx2);padding:5px 8px;border-radius:8px;
+ cursor:pointer;line-height:1.4;transition:background var(--dur) var(--ease)}
+.st:hover{background:var(--s2)}
+.st.sel{background:var(--acbg);color:var(--tx);font-weight:600}
+.st .fi{width:14px;height:14px;flex:none;color:var(--tx3)}
+.st.sel .fi{color:var(--tx)}
+.st .cr{width:12px;height:12px;flex:none;color:var(--tx3);transition:transform var(--dur) var(--ease)}
 .st .cr.o{transform:rotate(90deg)}
 .st .stw{width:14px;flex:none;display:flex;align-items:center;justify-content:center}
 .st .stt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.st .stc{font-size:11px;color:#98A0AC;flex:none}
+.st .stc{font-size:11px;color:var(--tx3);flex:none}
 .st .pdot{width:9px;height:9px;border-radius:3px;flex:none}
 .cgrid{display:grid;grid-template-columns:repeat(7,1fr);
- grid-template-rows:auto repeat(6,128px);gap:1px;background:#E6EAF0;
- border:1px solid #E6EAF0;border-radius:12px;overflow:hidden}
-.cgh{background:#F7F9FC;padding:8px 6px;text-align:center;font-size:12.5px;color:#5C6672;font-weight:600}
-.cday{background:#fff;padding:6px 6px 8px;overflow:hidden;min-width:0}
-.cday.out{background:#FAFBFC}
-.cday .dn{font-size:12px;color:#98A0AC;margin-bottom:4px}
-.cday.today .dn{color:#2B6CB0;font-weight:700}
-.cev{display:block;width:100%;text-align:left;border:0;background:#EAF2FD;color:#2B6CB0;
+ grid-template-rows:auto repeat(6,128px);gap:1px;background:var(--line);
+ border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.cgh{background:var(--s2);padding:8px 6px;text-align:center;font-size:10.5px;
+ letter-spacing:.075em;text-transform:uppercase;color:var(--tx3);font-weight:600}
+.cday{background:var(--s1);padding:6px 6px 8px;overflow:hidden;min-width:0}
+.cday.out{background:var(--bg)}
+.cday .dn{font-size:12px;color:var(--tx3);margin-bottom:4px}
+.cday.today .dn{color:var(--tx);font-weight:700}
+.cev{display:block;width:100%;text-align:left;border:0;background:var(--acbg);color:var(--tx);
  border-radius:6px;padding:3px 6px;font-size:11.5px;margin-bottom:3px;cursor:pointer;
  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:inherit}
-.cev.done{background:#E9F6EE;color:#1E7A46}
-.cev.miss{background:#FDECEA;color:#C0392B}
+.cev.done{background:var(--okbg);color:var(--ok)}
+.cev.miss{background:var(--errbg);color:var(--err)}
 .clist .card{margin-bottom:9px}
-/* 참석자 입력 — 이름을 하나씩 넣는 칸 */
-.atin{display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:#fff;
- border:1px solid #DDE2E9;border-radius:10px;padding:6px 8px;min-height:44px}
-.atin:focus-within{border-color:#2B6CB0;box-shadow:0 0 0 3px rgba(43,108,176,.10)}
+/* 회의록 목록 — 네모 카드 대신 선으로 나눈 행 (홈페이지의 목록 어법) */
+#p-list .card{background:none;border:0;border-top:1px solid var(--line2);border-radius:0;
+ padding:15px 12px;margin:0 -12px}
+#p-list .card:hover{background:var(--s1);border-top-color:var(--line)}
+#p-list .card.locked{background:none;border-top-style:dashed}
+#p-list .card .ct{font-weight:500;font-size:16px}
+#p-list .card .cm{font-size:12px;color:var(--tx3);letter-spacing:.01em}
+.atin{display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:var(--s1);
+ border:1px solid var(--line);border-radius:10px;padding:6px 8px;min-height:44px}
+.atin:focus-within{border-color:var(--ac);box-shadow:0 0 0 3px var(--acbg)}
 .atin input{border:0;outline:0;flex:1;min-width:130px;font-size:14.5px;
- padding:4px 2px;background:transparent;font-family:inherit}
-.atc{display:inline-flex;align-items:center;gap:4px;background:#EEF2F7;color:#2C3542;
- border-radius:999px;padding:3px 5px 3px 11px;font-size:13.5px;font-weight:600}
-.atc.out{background:#FDECEA;color:#C0392B}
+ padding:4px 2px;background:transparent;font-family:inherit;box-shadow:none}
+.atc{display:inline-flex;align-items:center;gap:4px;background:var(--s3);color:var(--tx);
+ border-radius:999px;padding:3px 5px 3px 11px;font-size:13.5px;font-weight:500}
+.atc.out{background:var(--errbg);color:var(--err)}
 .atc button{border:0;background:transparent;color:inherit;cursor:pointer;
  font-size:15px;line-height:1;padding:0 4px;opacity:.55;font-family:inherit}
 .atc button:hover{opacity:1}
 .steps{display:flex;flex-wrap:wrap;gap:6px 10px;margin-top:8px}
-.step{display:flex;align-items:center;gap:5px;font-size:12px;color:#98A0AC}
-.step .sd{width:14px;height:14px;border-radius:50%;border:2px solid #DDE2E9;flex:none;
- display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff}
-.step.ok{color:#1E7A46}
-.step.ok .sd{background:#1E7A46;border-color:#1E7A46}
-.step.now{color:#2B6CB0;font-weight:700}
-.step.now .sd{border-color:#2B6CB0;background:#2B6CB0;animation:blink 1.1s ease-in-out infinite}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+.step{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--tx3)}
+.step .sd{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--line);flex:none;
+ display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--acon)}
+.step.ok{color:var(--ok)}
+.step.ok .sd{background:var(--ok);border-color:var(--ok)}
+.step.now{color:var(--tx);font-weight:600}
+.step.now .sd{border-color:var(--ac);background:var(--ac);animation:blink 1.6s var(--ease) infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
 .hcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:13px;margin:18px 0 26px}
-.hcard{background:#fff;border:1px solid #E6EAF0;border-radius:14px;padding:22px 20px;cursor:pointer;
- text-align:left;font-family:inherit;transition:box-shadow .15s,border-color .15s}
-.hcard:hover{border-color:#2B6CB0;box-shadow:0 3px 14px rgba(43,108,176,.13)}
-.hcard .hic{width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;margin-bottom:13px}
+.hcard{background:var(--s1);border:1px solid var(--line);border-radius:14px;padding:22px 20px;
+ cursor:pointer;text-align:left;font-family:inherit;color:var(--tx);
+ transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),transform var(--dur) var(--ease)}
+.hcard:hover{border-color:var(--acln);background:var(--s2);transform:translateY(-2px)}
+.hcard .hic{width:42px;height:42px;border-radius:11px;display:flex;align-items:center;
+ justify-content:center;margin-bottom:13px}
 .hcard .hic svg{width:22px;height:22px}
-.hcard h2{font-size:16.5px;margin:0 0 5px}
-.hcard p{font-size:13px;color:#5C6672;margin:0;line-height:1.55}
+.hcard h2{font-size:16.5px;margin:0 0 5px;font-weight:600}
+.hcard p{font-size:13px;color:var(--tx2);margin:0;line-height:1.55}
 .hrec .card{margin-bottom:9px}
 .chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
-.chip{appearance:none;border:1px solid #DDE2E9;background:#fff;border-radius:20px;
- padding:7px 13px;font-size:13px;color:#3A424F;cursor:pointer;font-family:inherit}
-.chip:hover{border-color:#2B6CB0;color:#2B6CB0}
-.chip.on{background:#2B6CB0;border-color:#2B6CB0;color:#fff;font-weight:600}
+.chip{appearance:none;border:1px solid var(--line);background:var(--s1);border-radius:20px;
+ padding:7px 13px;font-size:13px;color:var(--tx2);cursor:pointer;font-family:inherit;
+ transition:var(--dur) var(--ease)}
+.chip:hover{border-color:var(--acln);color:var(--tx)}
+.chip.on{background:var(--ac);border-color:var(--ac);color:var(--acon);font-weight:600}
 .pj{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:11px}
-.pjc{background:#fff;border:1px solid #E6EAF0;border-radius:12px;padding:16px 18px;cursor:pointer}
-.pjop{border:none;background:none;color:#98A0AC;font-size:15px;cursor:pointer;padding:2px 5px;border-radius:6px}
-.delx{border:none;background:none;color:#C0C6CF;font-size:16px;cursor:pointer;padding:2px 7px;border-radius:6px}
-.delx:hover{background:#FDECEC;color:#C0392B}
-.pjop:hover{background:#EEF2F7;color:#12161C}
-.pjc:hover{border-color:#2B6CB0}
-.pjc .n{font-size:16px;font-weight:700;margin-bottom:3px}
-.pjc .d{font-size:12.5px;color:#98A0AC}
-.pjbar{width:34px;height:4px;border-radius:4px;margin-bottom:10px;background:#2B6CB0}
-.pjbtn{appearance:none;border:1px solid #DDE2E9;background:#fff;border-radius:9px;
- padding:8px 12px;font-size:13.5px;font-family:inherit;cursor:pointer;color:#3A424F;
+.pjc{background:var(--s1);border:1px solid var(--line);border-radius:12px;padding:16px 18px;
+ cursor:pointer;transition:border-color var(--dur) var(--ease)}
+.pjop{border:none;background:none;color:var(--tx3);font-size:15px;cursor:pointer;padding:2px 5px;border-radius:6px}
+.delx{border:none;background:none;color:var(--tx3);font-size:16px;cursor:pointer;padding:2px 7px;border-radius:6px}
+.delx:hover{background:var(--errbg);color:var(--err)}
+.pjop:hover{background:var(--s2);color:var(--tx)}
+.pjc:hover{border-color:var(--acln)}
+.pjc .n{font-size:16px;font-weight:600;margin-bottom:3px}
+.pjc .d{font-size:12.5px;color:var(--tx3)}
+.pjbar{width:34px;height:3px;border-radius:4px;margin-bottom:10px;background:var(--ac)}
+.pjbtn{appearance:none;border:1px solid var(--line);background:var(--s1);border-radius:9px;
+ padding:8px 12px;font-size:13.5px;font-family:inherit;cursor:pointer;color:var(--tx2);
  max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:none}
-.pjbtn:hover{border-color:#2B6CB0;color:#2B6CB0}
-/* ── 프로젝트 폴더 나무 */
-.tree{background:#fff;border:1px solid #E6EAF0;border-radius:12px;padding:8px 8px}
+.pjbtn:hover{border-color:var(--acln);color:var(--tx)}
+.tree{background:var(--s1);border:1px solid var(--line);border-radius:12px;padding:8px 8px}
 .tb{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:9px;
- cursor:pointer;font-size:14.5px;color:#3A424F}
-.tb:hover{background:#F2F5F9}
-.tb.sel{background:#EAF2FD;color:#2B6CB0;font-weight:700}
-.tb .fi{width:17px;height:17px;flex:none;color:#2B6CB0}
-.tb.sel .fi{color:#2B6CB0}
+ cursor:pointer;font-size:14.5px;color:var(--tx2);transition:background var(--dur) var(--ease)}
+.tb:hover{background:var(--s2)}
+.tb.sel{background:var(--acbg);color:var(--tx);font-weight:600}
+.tb .fi{width:17px;height:17px;flex:none;color:var(--tx3)}
+.tb.sel .fi{color:var(--tx)}
 .tb .tt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tb .tc{font-size:12px;color:#98A0AC;background:#F2F5F9;border-radius:20px;
- padding:1px 9px;flex:none;font-weight:600}
-.tb.sel .tc{background:#D9E8FB;color:#2B6CB0}
+.tb .tc{font-size:12px;color:var(--tx3);background:var(--s2);border-radius:20px;
+ padding:1px 9px;flex:none;font-weight:500}
+.tb.sel .tc{background:var(--s3);color:var(--tx)}
 .tw{width:18px;height:18px;flex:none;display:flex;align-items:center;justify-content:center;
- border-radius:5px;color:#A8B0BC;cursor:pointer}
-.tw:hover{background:#E4E9F0;color:#3A424F}
-.cr{width:14px;height:14px;transition:transform .15s}
+ border-radius:5px;color:var(--tx3);cursor:pointer}
+.tw:hover{background:var(--s3);color:var(--tx)}
+.cr{width:14px;height:14px;transition:transform var(--dur) var(--ease)}
 .cr.o{transform:rotate(90deg)}
-.pdot{width:9px;height:9px;border-radius:9px;flex:none;margin:0 4px;background:#2B6CB0}
-/* 프로젝트 색 고르기 — 색 이름 대신 색 네모를 직접 누릅니다 */
+.pdot{width:9px;height:9px;border-radius:9px;flex:none;margin:0 4px;background:var(--tx2)}
 .swatch{display:flex;gap:6px;align-items:center}
 .sw{width:30px;height:30px;border-radius:8px;border:2px solid transparent;
- cursor:pointer;padding:0;appearance:none;box-shadow:inset 0 0 0 1px rgba(0,0,0,.06)}
+ cursor:pointer;padding:0;appearance:none;box-shadow:inset 0 0 0 1px var(--line);
+ transition:transform var(--dur) var(--spring)}
 .sw:hover{transform:scale(1.08)}
-.sw.on{border-color:#12161C;box-shadow:0 0 0 2px #fff inset}
-.tk{margin-left:19px;border-left:1px solid #EDF0F4;padding-left:6px}
-.pdot.c-blue{background:#2B6CB0}
-.pdot.c-green{background:#12833F}
-.pdot.c-orange{background:#D97706}
-.pdot.c-purple{background:#6D3FD1}
-.pdot.c-red{background:#C0392B}
-.pdot.c-teal{background:#0E8A8A}
+.sw.on{border-color:var(--tx);box-shadow:0 0 0 2px var(--s1) inset}
+.tk{margin-left:19px;border-left:1px solid var(--line2);padding-left:6px}
+.pdot.c-blue{background:#6FA8E8}.pdot.c-green{background:#6BC98A}
+.pdot.c-orange{background:#E0A05A}.pdot.c-purple{background:#A98BE8}
+.pdot.c-red{background:#E8756E}.pdot.c-teal{background:#5FC4C0}
+html[data-theme=light] .pdot.c-blue{background:#2B6CB0}
+html[data-theme=light] .pdot.c-green{background:#12833F}
+html[data-theme=light] .pdot.c-orange{background:#D97706}
+html[data-theme=light] .pdot.c-purple{background:#6D3FD1}
+html[data-theme=light] .pdot.c-red{background:#C0392B}
+html[data-theme=light] .pdot.c-teal{background:#0E8A8A}
 .tops{opacity:.55;flex:none;white-space:nowrap}
 .tb:hover .tops{opacity:1}
-.pjbtn.none{color:#98A0AC}
-.mask{position:fixed;inset:0;background:rgba(20,26,35,.45);z-index:100;
- display:flex;align-items:flex-start;justify-content:center;padding:8vh 16px}
-.pick{background:#fff;border-radius:14px;width:100%;max-width:460px;max-height:78vh;
- display:flex;flex-direction:column;overflow:hidden;box-shadow:0 18px 50px rgba(0,0,0,.28)}
-.pick .hd{padding:18px 20px 12px;border-bottom:1px solid #EEF1F5}
-.pick .hd h3{margin:0 0 10px;font-size:17px}
+.pjbtn.none{color:var(--tx3)}
+.mask{position:fixed;inset:0;background:var(--scrim);z-index:100;
+ display:flex;align-items:flex-start;justify-content:center;padding:8vh 16px;
+ animation:mkin .18s var(--ease) both;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+@keyframes mkin{from{opacity:0}to{opacity:1}}
+.pick{background:var(--s1);border:1px solid var(--line);border-radius:14px;width:100%;
+ max-width:460px;max-height:78vh;display:flex;flex-direction:column;overflow:hidden;
+ box-shadow:0 18px 50px var(--shadow);animation:pkin .34s var(--spring) both}
+@keyframes pkin{from{opacity:0;transform:translateY(18px) scale(.97)}to{opacity:1;transform:none}}
+.pick .hd{padding:18px 20px 12px;border-bottom:1px solid var(--line2)}
+.pick .hd h3{margin:0 0 10px;font-size:17px;font-weight:600}
 .pick .hd input{width:100%}
 .pick .bd{overflow-y:auto;padding:8px 0}
 .pick .it{display:flex;align-items:center;gap:10px;padding:11px 20px;cursor:pointer;font-size:15px}
-.pick .it:hover,.pick .it.on{background:#F2F7FE}
-.pick .it .fi{width:14px;height:14px;color:#98A0AC;flex:none}
+.pick .it:hover,.pick .it.on{background:var(--s2)}
+.pick .it .fi{width:14px;height:14px;color:var(--tx3);flex:none}
 .pick .it .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pick .it .cnt{font-size:12px;color:#98A0AC;flex:none}
-.pick .it.cur{font-weight:700;color:#2B6CB0}
-.pick .ft{padding:12px 20px;border-top:1px solid #EEF1F5;display:flex;gap:8px}
-.pick .none{color:#98A0AC;padding:26px 20px;text-align:center;font-size:14px}
-.pick .sec{padding:9px 20px 4px;font-size:11.5px;font-weight:700;color:#A8B0BA;letter-spacing:.03em}
-.c-blue{background:#2B6CB0}.c-green{background:#12833F}.c-orange{background:#C2620F}
-.c-purple{background:#6B3FB5}.c-red{background:#B32E4B}.c-teal{background:#0E6E6B}
-.install{appearance:none;border:1px solid #DDE2E9;background:#fff;border-radius:8px;
- padding:5px 11px;font-size:12.5px;font-weight:600;color:#2B6CB0;cursor:pointer}
-.upd{position:fixed;left:50%;transform:translateX(-50%);bottom:26px;background:#2B6CB0;color:#fff;
- padding:11px 18px;border-radius:10px;font-size:14px;z-index:90;cursor:pointer;
- box-shadow:0 6px 22px rgba(43,108,176,.35)}
+.pick .it .cnt{font-size:12px;color:var(--tx3);flex:none}
+.pick .it.cur{font-weight:600;color:var(--tx)}
+.pick .ft{padding:12px 20px;border-top:1px solid var(--line2);display:flex;gap:8px}
+.pick .none{color:var(--tx3);padding:26px 20px;text-align:center;font-size:14px}
+.pick .sec{padding:9px 20px 4px;font-size:10.5px;font-weight:600;color:var(--tx3);
+ letter-spacing:.075em;text-transform:uppercase}
+.c-blue{background:#4C86C6}.c-green{background:#37955C}.c-orange{background:#B9762C}
+.c-purple{background:#7A57C4}.c-red{background:#BF5148}.c-teal{background:#2E8C88}
+.install{appearance:none;border:1px solid var(--line);background:var(--s1);border-radius:8px;
+ padding:5px 11px;font-size:12.5px;font-weight:500;color:var(--tx);cursor:pointer}
+.install:hover{border-color:var(--acln)}
+.upd{position:fixed;left:50%;transform:translateX(-50%);bottom:26px;background:var(--ac);
+ color:var(--acon);padding:11px 18px;border-radius:10px;font-size:14px;z-index:90;cursor:pointer;
+ font-weight:600;box-shadow:0 6px 22px var(--shadow);animation:tsin .3s var(--spring) both}
 
 /* ── 좁은 화면 ─────────────────────────────────────── */
 @media(max-width:900px){
   .cgrid{grid-template-rows:auto repeat(6,92px)}
-  .cgh{padding:6px 3px;font-size:11.5px}
+  .cgh{padding:6px 3px;font-size:10px}
   .cday{padding:4px 4px 6px}
   .cev{font-size:10.5px;padding:2px 4px;margin-bottom:2px}
-  /* 좁은 화면에서는 사이드바를 서랍으로 숨깁니다 */
-  .side{transform:translateX(-100%);transition:transform .22s ease;width:262px;
+  .side{transform:translateX(-100%);transition:transform .26s var(--ease);width:262px;
    box-shadow:0 0 0 rgba(0,0,0,0)}
-  body.snav .side{transform:none;box-shadow:0 12px 40px rgba(0,0,0,.18)}
-  body.snav .scrim{display:block;position:fixed;inset:0;z-index:25;background:rgba(20,24,31,.38)}
+  body.snav .side{transform:none;box-shadow:0 12px 40px var(--shadow)}
+  body.snav .scrim{display:block;position:fixed;inset:0;z-index:25;background:var(--scrim)}
   .main{margin-left:0}
-  .mtop{display:flex;position:sticky;top:0;z-index:20;background:#fff;
-   border-bottom:1px solid #E6EAF0;align-items:center;gap:10px;padding:0 14px}
+  .mtop{display:flex;position:sticky;top:0;z-index:20;background:var(--s1);
+   border-bottom:1px solid var(--line);align-items:center;gap:10px;padding:0 14px}
   .mtop .brand{padding:9px 0;margin-right:auto}
   .mtop .brand .lgh{height:34px}
-  .burger{appearance:none;border:1px solid #DDE2E9;background:#fff;border-radius:9px;
+  .burger{appearance:none;border:1px solid var(--line);background:var(--s1);border-radius:9px;
    width:36px;height:36px;display:flex;align-items:center;justify-content:center;
-   cursor:pointer;color:#3A424F;flex:none}
+   cursor:pointer;color:var(--tx);flex:none}
   .mtop .me{font-size:12px;gap:6px}
   .mtop .me .who{max-width:96px}
   .mtop .me .btn{padding:4px 9px;font-size:12px}
-  .role{font-size:10.5px;padding:2px 6px}
+  .role{font-size:10px;padding:2px 6px}
   .nav{padding:11px 11px;font-size:15px}
-
   .wrap{padding:16px 14px 132px}
-
-  /* 회의 화면 아래 단추들 — 좁은 화면에서는 바닥에 붙여 반듯한 격자로 놓습니다 */
   .bar{left:0;right:0;bottom:0;
    padding:10px 12px calc(10px + env(safe-area-inset-bottom));
-   background:rgba(255,255,255,.96);backdrop-filter:saturate(160%) blur(8px);
-   border-top:1px solid #E6EAF0;box-shadow:0 -8px 22px rgba(20,26,35,.07);
+   background:var(--s1);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+   border-top:1px solid var(--line);box-shadow:0 -8px 22px var(--shadow);
    display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
    max-height:40vh;overflow-y:auto}
   .bar .btn{width:100%;height:44px;padding:0 8px;border-radius:11px;
-   font-size:13.5px;font-weight:600;letter-spacing:-.2px;
+   font-size:13.5px;font-weight:500;letter-spacing:-.2px;
    display:flex;align-items:center;justify-content:center;text-align:center;
-   border:1px solid #E3E8EF;background:#fff;color:#3A424F;box-shadow:none;
+   border:1px solid var(--line);background:var(--s2);color:var(--tx);box-shadow:none;
    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .bar .btn:active{background:#F2F5F9}
-  /* 가장 많이 쓰는 「편집」 은 한 줄을 다 차지하게 두어 누르기 쉽게 합니다 */
-  .bar .btn.p{grid-column:1 / -1;background:#2B6CB0;border-color:#2B6CB0;color:#fff}
-  .bar .btn.g{background:#1E7A46;border-color:#1E7A46;color:#fff}
+  .bar .btn:active{background:var(--s3)}
+  .bar .btn.p{grid-column:1 / -1;background:var(--ac);border-color:var(--ac);color:var(--acon)}
+  .bar .btn.g{background:var(--ok);border-color:var(--ok);color:var(--acon)}
   h1{font-size:20px} .sub{font-size:12.5px;margin-bottom:16px}
   .card{padding:14px 16px;border-radius:11px}
   .ct{font-size:15.5px} .cm{font-size:12px;gap:8px}
@@ -357,30 +520,25 @@ mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
   .tabs{margin:14px 0 16px;overflow-x:auto;scrollbar-width:none}
   .tabs::-webkit-scrollbar{display:none}
   .tab{font-size:14px;padding:10px 12px;white-space:nowrap;flex:none}
-
-  /* 전사: 시각을 위에 두고 본문을 넓게 */
-  .seg{grid-template-columns:1fr;gap:2px;padding:10px 0;border-top:1px solid #F5F7FA}
+  .mttl{font-size:22px}
+  .seg{grid-template-columns:1fr;gap:2px;padding:10px 0;border-top:1px solid var(--line2)}
   .seg .ts{font-size:11.5px;padding-top:0}
   .seg p{font-size:15.5px}
-
   .hl{padding-left:14px;margin-bottom:20px}
   .hl h3{font-size:16px} .hl li{font-size:14.5px}
-
-  /* 표는 가로로 밀어서 봅니다 */
   .md{overflow-x:auto;-webkit-overflow-scrolling:touch}
   table{font-size:13px;min-width:520px}
   th,td{padding:8px 9px}
-
   .act{grid-template-columns:24px 1fr;gap:10px}
   .act .tag{grid-column:2;justify-self:start;margin-top:4px}
   .act input[type=checkbox]{width:22px;height:22px}
-
   .row{gap:7px}
-  input,select,textarea{font-size:16px;padding:11px 12px}   /* 16px 미만이면 아이폰이 확대합니다 */
+  input,select,textarea{font-size:16px;padding:11px 12px}
   .btn{padding:11px 15px}
   .bar{right:14px;bottom:14px}
   .bar .btn{padding:13px 20px;font-size:15px}
   .login{margin:6vh auto;padding:26px 22px;width:94%}
+  .wm .nm{font-size:25px}
   .opts{gap:14px;font-size:13px}
   .toast{bottom:74px;font-size:13.5px;padding:12px 16px}
   .hit{padding:12px 14px}
@@ -389,7 +547,7 @@ mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
    padding:8px;scrollbar-width:none}
   .rooms::-webkit-scrollbar{display:none}
   .rooms .newbtn{width:auto;margin:0;flex:none;padding:8px 12px;font-size:13px}
-  .room{flex:none;max-width:180px;border:1px solid #E6EAF0}
+  .room{flex:none;max-width:180px;border:1px solid var(--line)}
   .msg{max-width:94%;font-size:14.5px;padding:12px 14px}
   .ask{padding:8px 0 4px}
   .ask textarea{font-size:16px}
@@ -399,10 +557,33 @@ mark{background:#FFF2A8;padding:1px 2px;border-radius:3px}
 @media(max-width:400px){
   .mtop .me .who{display:none}
 }
+
+/* ── 글꼴 배정 ────────────────────────────────────────
+   Oswald 는 한글 글자가 없습니다. 그래서 아래 규칙을 걸어도
+   한글은 자동으로 Pretendard 로 그려지고, 영문·숫자만 길쭉해집니다.
+   본문(회의록 내용·전사문)에는 절대 걸지 않습니다 — 읽기 어려워집니다. */
+.wm .nm,.wm .kr,.boot .nm,.boot .lb,.eyebrow{font-family:var(--f-disp)}
+.wm .nm{font-weight:600}
+.boot .nm{font-weight:600}
+.sgt,.shsec,.bsec,.pick .sec,.cgh{font-family:var(--f-disp);font-weight:500}
+.ts,.hist,.cm,.csub,.act .meta,.step,.pjc .d,.st .stc,.tb .tc,.pick .it .cnt,
+.hcard p,.msg .src,.hit .h,.cday .dn{font-family:var(--f-disp)}
+.ts{font-weight:400;font-variant-numeric:tabular-nums;letter-spacing:.04em}
+.role,.tag,.chip{font-family:var(--f-disp)}
+.brand .lgh{font-family:var(--f-disp)}
+/* 제목과 본문은 Pretendard 그대로 — 한글 가독성이 우선입니다 */
+h1,.mttl,.ct,.bct,.pjc .n,.hcard h2,.login h2,.pick .hd h3,.md,.seg p,.hl,
+.msg,.sub,.msub,.bone,.csum,.empty,input,select,textarea,.btn,.nav,.tab,
+.room,.st,.tb,.atc,.pick .it .nm{font-family:var(--f-body)}
+
+/* 움직임을 줄이는 설정을 켠 기기에서는 전부 끕니다 */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;
+   transition-duration:.001ms !important;scroll-behavior:auto !important}
+}
 </style></head><body>
 
-<div id="app"><div class="login"><div class="mark"><img src="./assets/logo-vertical.svg" alt="HEIMDALL" class="lgv"></div>
-<p>불러오는 중…</p></div></div>
+<div id="app"><div class="boot"><div class="nm">HEIMDALL</div><div class="tr"><i></i></div><div class="lb">Loading</div></div></div>
 
 <script type="module">
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -532,6 +713,52 @@ const isAdminish = r => ['admin','dev'].includes(r);
 const isTop = r => ['admin','ceo'].includes(r);
 let me=null, view='list', cur=null, editing=false;
 
+// ─────────────────────────── 화면 밝기 (어둡게 / 밝게 / 기기 설정 따름)
+// 고른 값은 ① 서버(hd_member.theme) 에 계정별로 남고
+//          ② 이 기기(localStorage) 에도 남습니다.
+// ② 는 로그인하기 전, 화면이 그려지는 순간에 바로 쓰기 위한 것입니다.
+// 서버 값이 있으면 서버 값이 이깁니다 — 다른 컴퓨터에서 로그인해도 따라옵니다.
+const THEMES = [['dark','어둡게'],['light','밝게'],['auto','기기 설정 따름']];
+let THEME_RAW = (window.HD_THEME_RAW || 'dark');
+
+function applyTheme(raw, save){
+  if(!THEMES.some(t=>t[0]===raw)) raw='dark';
+  THEME_RAW = raw;
+  document.documentElement.setAttribute('data-theme', window.HD_THEME_RESOLVE(raw));
+  if(save!==false){ try{ localStorage.setItem('hd_theme', raw); }catch(e){} }
+  paintTheme();
+}
+
+// 「기기 설정 따름」 일 때, 기기 설정이 바뀌면 바로 따라갑니다
+try{
+  matchMedia('(prefers-color-scheme: light)').addEventListener('change', ()=>{
+    if(THEME_RAW==='auto') applyTheme('auto');
+  });
+}catch(e){}
+
+async function saveTheme(raw){
+  applyTheme(raw);
+  if(!me) return;
+  me.theme = raw;
+  const {error} = await SB.from('hd_member').update({theme:raw}).eq('id', me.id);
+  // 저장에 실패해도 화면은 이미 바뀌어 있습니다. 이 기기에서는 계속 유지됩니다.
+  if(error) toast('이 기기에만 적용했습니다 (계정에 저장하지 못함): '+esc(error.message), 6000);
+}
+
+const ICO_SUN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"'
+  +' stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2'
+  +'M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2.6 12h2.2M19.2 12h2.2M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6"/></svg>';
+const ICO_MOON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"'
+  +' stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.2 8.2 0 0 1 9.5 4'
+  +' a8.4 8.4 0 1 0 10.5 10.5z"/></svg>';
+function paintTheme(){
+  const b = document.getElementById('thm');
+  if(!b) return;
+  const now = document.documentElement.getAttribute('data-theme');
+  b.innerHTML = (now==='dark') ? ICO_SUN : ICO_MOON;
+  b.title = (now==='dark') ? '밝게 보기' : '어둡게 보기';
+}
+
 function toast(html,ms=3600){const t=document.createElement('div');t.className='toast';t.innerHTML=html;
   document.body.appendChild(t);setTimeout(()=>t.remove(),ms);}
 
@@ -570,7 +797,7 @@ const authErr = m => AUTH_MSG[m] || m;
 function loginPage(mode='in', msg=''){
   const isUp = mode==='up';
   $('#app').innerHTML = `<div class="login">
-    <div class="mark"><img src="./assets/logo-vertical.svg" alt="HEIMDALL" class="lgv"></div>
+    <div class="wm"><div class="kr">The Almighty Creative Group</div><div class="nm">HEIMDALL<sup>™</sup></div><div class="tl">회의를 기록으로 바꿉니다</div></div>
     <div class="tabs" style="margin:4px 0 20px">
       <button class="tab" data-m="in" ${!isUp?'aria-selected="true"':''}>로그인</button>
       <button class="tab" data-m="up" ${isUp?'aria-selected="true"':''}>가입</button>
@@ -593,9 +820,9 @@ function loginPage(mode='in', msg=''){
       <label><input type="checkbox" id="auto" ${localStorage.getItem('hd_auto')==='1'?'checked':''}> 자동 로그인</label>
     </div>`:''}
     <button class="btn p full" id="go">${isUp?'가입하고 시작하기':'로그인'}</button>
-    ${!isUp?'<button class="btn full" id="reset" style="margin-top:9px;border:0;color:#5C6672;font-size:13px">비밀번호를 잊으셨나요?</button>':''}
-    <p style="margin-top:14px;font-size:13px;color:${msg.startsWith('!')?'#C0392B':'#98A0AC'}">${esc(msg.replace(/^!/,''))}</p>
-    ${isUp?'<p style="font-size:12.5px;color:#98A0AC;margin:0">가입 신청 후 관리자 승인이 있어야 이용하실 수 있습니다.</p>':''}
+    ${!isUp?'<button class="btn full" id="reset" style="margin-top:9px;border:0;color:var(--tx2);font-size:13px">비밀번호를 잊으셨나요?</button>':''}
+    <p style="margin-top:14px;font-size:13px;color:${msg.startsWith('!')?'var(--err)':'var(--tx3)'}">${esc(msg.replace(/^!/,''))}</p>
+    ${isUp?'<p style="font-size:12.5px;color:var(--tx3);margin:0">가입 신청 후 관리자 승인이 있어야 이용하실 수 있습니다.</p>':''}
   </div>`;
 
   document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>loginPage(t.dataset.m));
@@ -642,7 +869,7 @@ function loginPage(mode='in', msg=''){
 // 메일 링크로 들어오신 분께 새 비밀번호를 받는 화면
 function recoveryPage(msg){
   $('#app').innerHTML = `<div class="login">
-    <div class="mark"><img src="./assets/logo-vertical.svg" alt="HEIMDALL" class="lgv"></div>
+    <div class="wm"><div class="kr">The Almighty Creative Group</div><div class="nm">HEIMDALL<sup>™</sup></div><div class="tl">회의를 기록으로 바꿉니다</div></div>
     <h2 style="font-size:19px;margin:0 0 6px">새 비밀번호를 정해주세요</h2>
     <p class="sub" style="margin:0 0 16px">메일 링크로 들어오셨습니다.
       비밀번호를 새로 정하시면 바로 쓰실 수 있습니다.</p>
@@ -651,9 +878,9 @@ function recoveryPage(msg){
     <input class="full" id="np2" type="password" placeholder="새 비밀번호 다시 한번"
       style="margin-bottom:14px">
     <button class="btn p full" id="npgo">비밀번호 정하기</button>
-    <p style="margin-top:12px;font-size:13px;color:#C0392B">${esc(msg||'')}</p>
+    <p style="margin-top:12px;font-size:13px;color:var(--err)">${esc(msg||'')}</p>
     <button class="btn full" id="npskip"
-      style="margin-top:6px;border:0;color:#5C6672;font-size:13px">나중에 하기</button>
+      style="margin-top:6px;border:0;color:var(--tx2);font-size:13px">나중에 하기</button>
   </div>`;
   const done=()=>{ RECOVERY=false;
     history.replaceState(null,'',location.pathname+location.search); boot(); };
@@ -676,18 +903,18 @@ const ADMIN_MAILS = ['seokinho@gmail.com','Kdamian2025@gmail.com',
   'zeus@thealmighty.co.kr','khw@jhhds.co.kr','route82biz@gmail.com'];
 function pendingPage(row){
   $('#app').innerHTML = `<div class="login">
-    <div class="mark"><img src="./assets/logo-vertical.svg" alt="HEIMDALL" class="lgv"></div>
+    <div class="wm"><div class="kr">The Almighty Creative Group</div><div class="nm">HEIMDALL<sup>™</sup></div><div class="tl">회의를 기록으로 바꿉니다</div></div>
     <h2>가입 승인 대기</h2>
     <p><b>${esc(row.name)}</b> 님, 가입 신청이 접수되었습니다.<br>
        관리자가 승인해야 회의를 보실 수 있습니다.</p>
-    <div class="box" style="margin:0 0 16px;padding:14px 16px;font-size:13.5px;color:#5B6472">
+    <div class="box" style="margin:0 0 16px;padding:14px 16px;font-size:13.5px;color:var(--tx2)">
       ${esc(row.company||'')} ${esc(row.dept||'')}<br>${esc(row.email)}
     </div>
-    <p style="font-size:13px;color:#5C6672;margin-bottom:16px">
+    <p style="font-size:13px;color:var(--tx2);margin-bottom:16px">
       승인 권한이 있는 분<br>${ADMIN_MAILS.map(m=>esc(m)).join('<br>')}
     </p>
     <button class="btn p full" id="again">승인됐는지 확인</button>
-    <button class="btn full" id="out3" style="margin-top:8px;border:0;color:#5C6672;font-size:13px">로그아웃</button>
+    <button class="btn full" id="out3" style="margin-top:8px;border:0;color:var(--tx2);font-size:13px">로그아웃</button>
   </div>`;
   $('#again').onclick=()=>boot();
   $('#out3').onclick=async()=>{await SB.auth.signOut(); loginPage();};
@@ -696,7 +923,7 @@ function pendingPage(row){
 // 가입 정보가 비어 있으면 채우게 합니다 (예전 계정 대응)
 function profilePage(row, msg=''){
   $('#app').innerHTML = `<div class="login">
-    <div class="mark"><img src="./assets/logo-vertical.svg" alt="HEIMDALL" class="lgv"></div>
+    <div class="wm"><div class="kr">The Almighty Creative Group</div><div class="nm">HEIMDALL<sup>™</sup></div><div class="tl">회의를 기록으로 바꿉니다</div></div>
     <h2>프로필 확인</h2>
     <p>직함은 넣지 마세요. 이름만 적으시면 됩니다.</p>
     <input class="full" id="nm" placeholder="이름 (예: 김현우)" value="${esc(row.name||'')}" style="margin-bottom:10px">
@@ -712,14 +939,14 @@ function profilePage(row, msg=''){
       아래는 <b>모두 선택</b>입니다. 지금 비워두셔도 되고, 나중에
       왼쪽 아래 <b>내 정보</b> 에서 넣으셔도 됩니다.</div>
 
-    <div style="text-align:left;font-size:13px;font-weight:700;color:#3A424F">구글 캘린더 계정</div>
+    <div style="text-align:left;font-size:13px;font-weight:700;color:var(--tx2)">구글 캘린더 계정</div>
     <div class="sub" style="text-align:left;margin:2px 0 6px;font-size:12px">
       회의실 예약을 내 것으로 알아봅니다</div>
     <input class="full" id="gml" type="email" placeholder="${esc(row.email||'')}"
       value="${esc(row.google_email||'')}" style="margin-bottom:12px">
 
     ${SLACK_WS.map((w,i)=>`
-      <div style="text-align:left;font-size:13px;font-weight:700;color:#3A424F">${esc(w.name)}</div>
+      <div style="text-align:left;font-size:13px;font-weight:700;color:var(--tx2)">${esc(w.name)}</div>
       <div class="sub" style="text-align:left;margin:2px 0 6px;font-size:12px">
         ${esc(w.name)}을 쓰시는 분만 넣으시면 됩니다</div>
       <input class="full sml" type="text" data-k="${esc(w.key)}"
@@ -727,8 +954,8 @@ function profilePage(row, msg=''){
         value="${esc(row[w.key]||'')}" style="margin-bottom:12px">`).join('')}
 
     <button class="btn p full" id="save">저장하고 시작하기</button>
-    <p style="margin-top:12px;font-size:13px;color:#C0392B">${esc(msg)}</p>
-    <button class="btn full" id="out2" style="margin-top:6px;border:0;color:#5C6672;font-size:13px">다른 계정으로 로그인</button>
+    <p style="margin-top:12px;font-size:13px;color:var(--err)">${esc(msg)}</p>
+    <button class="btn full" id="out2" style="margin-top:6px;border:0;color:var(--tx2);font-size:13px">다른 계정으로 로그인</button>
   </div>`;
   bindOrgSelects('co','dp', row.dept||'');
   $('#save').onclick = async () => {
@@ -800,11 +1027,12 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v18.0</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v19.2</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
          <button class="install" id="inst" style="display:none">앱으로 설치</button>
+         <button class="thm" id="thm" aria-label="밝게/어둡게" title="밝게 / 어둡게"></button>
        </div>
      </div>
    </aside>
@@ -837,6 +1065,15 @@ function shell(){
   const bg=$('#burger'); if(bg) bg.onclick=()=>document.body.classList.toggle('snav');
   const sc=$('#scrim'); if(sc) sc.onclick=closeNav;
 
+  // ── 밝기 단추 — 한 번 누르면 어둡게 ↔ 밝게 (계정에 저장됩니다)
+  //    「기기 설정 따름」 은 「내 정보」 안에서 고릅니다
+  const tb=$('#thm');
+  if(tb) tb.onclick = () => {
+    const now = document.documentElement.getAttribute('data-theme');
+    saveTheme(now==='dark' ? 'light' : 'dark');
+  };
+  paintTheme();
+
   const logout = async()=>{
     localStorage.setItem('hd_auto','0'); sessionStorage.removeItem('hd_live');
     await SB.auth.signOut(); location.reload();};
@@ -846,8 +1083,8 @@ function shell(){
     const ex=$('#selfbox'); if(ex) return ex.remove();
     const d=document.createElement('div'); d.id='selfbox';
     d.style.cssText='position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:80;'
-      +'background:#fff;border:1px solid #DDE2E9;border-radius:14px;padding:22px 24px;'
-      +'box-shadow:0 10px 40px rgba(0,0,0,.18);width:min(92vw,380px);'
+      +'background:var(--s1);border:1px solid var(--line);border-radius:14px;padding:22px 24px;'
+      +'box-shadow:0 10px 40px var(--shadow);width:min(92vw,380px);'
       +'max-height:88vh;overflow-y:auto;-webkit-overflow-scrolling:touch';
     d.innerHTML=`<h1 style="font-size:16px;margin:0 0 6px">내 정보</h1>
       <div class="sub" style="margin:0 0 12px">로그인 아이디 <b>${esc(me.email)}</b><br>
@@ -860,13 +1097,20 @@ function shell(){
       <button class="btn full" id="acsave-g" style="margin-bottom:6px">구글 캘린더 계정 저장</button>
       ${SLACK_WS.map((w,i)=>`
         <div style="margin-top:10px">
-          <div style="font-size:13px;font-weight:700;color:#3A424F">${esc(w.name)}</div>
+          <div style="font-size:13px;font-weight:700;color:var(--tx2)">${esc(w.name)}</div>
           <div class="sub" style="margin:2px 0 6px;font-size:11.5px">${esc(w.note)}</div>
           <div id="mysl${i}"></div>
           <button class="btn full" type="button" data-mysladd="${i}"
             style="font-size:13px;margin-bottom:4px">+ 이메일 추가</button>
         </div>`).join('')}
       <button class="btn full" id="acsave" style="margin:10px 0 14px">슬랙 계정 저장</button>
+      <div class="shsec">화면 밝기</div>
+      <div class="sub" style="margin:2px 0 8px;font-size:11.5px">이 계정의 기본값입니다.
+        다른 컴퓨터에서 로그인해도 그대로 따라옵니다</div>
+      <div class="chips" id="thmpick" style="margin:0 0 14px">
+        ${THEMES.map(([k,l])=>`<button class="chip${THEME_RAW===k?' on':''}"
+          type="button" data-thm="${k}">${l}</button>`).join('')}
+      </div>
       <div class="shsec">비밀번호</div>
       <input id="pw1" type="password" placeholder="새 비밀번호 (8자 이상)" class="full" style="margin:8px 0 8px">
       <input id="pw2" type="password" placeholder="새 비밀번호 다시 한번" class="full" style="margin-bottom:12px">
@@ -874,6 +1118,12 @@ function shell(){
         <button class="btn" id="pwclose">닫기</button></div>`;
     document.body.appendChild(d);
     $('#pwclose').onclick=()=>d.remove();
+    d.querySelectorAll('[data-thm]').forEach(b=>b.onclick=async()=>{
+      await saveTheme(b.dataset.thm);
+      d.querySelectorAll('[data-thm]').forEach(x=>
+        x.classList.toggle('on', x.dataset.thm===THEME_RAW));
+      toast('화면 밝기를 「'+(THEMES.find(t=>t[0]===THEME_RAW)||['',''])[1]+'」 로 정했습니다');
+    });
     // ── 슬랙 계정 — 워크스페이스마다 칸이 따로 있습니다
     const myEd = SLACK_WS.map((w,i)=>
       emRows(d.querySelector('#mysl'+i), splitEm(me[w.key]), me.email));
@@ -980,13 +1230,13 @@ async function renderHome(){
     <div class="sub">무엇을 하시겠어요?</div>
     <div class="hcards">
       <button class="hcard" data-go="rec">
-        <div class="hic" style="background:#FDEBEC;color:#C0392B">${svgIco('rec')}</div>
+        <div class="hic" style="background:var(--errbg);color:var(--err)">${svgIco('rec')}</div>
         <h2>녹음하기</h2><p>회의나 아이디어를 바로 녹음합니다.<br>회의록은 자동으로 만들어집니다</p></button>
       <button class="hcard" data-go="list">
-        <div class="hic" style="background:#EAF2FD;color:#2B6CB0">${svgIco('list')}</div>
+        <div class="hic" style="background:var(--acbg);color:var(--ac)">${svgIco('list')}</div>
         <h2>회의록 보기</h2><p>내 권한으로 볼 수 있는 회의록과<br>내 노트를 확인합니다</p></button>
       <button class="hcard" data-go="chat">
-        <div class="hic" style="background:#EAF7EF;color:#1E7A46">${svgIco('chat')}</div>
+        <div class="hic" style="background:var(--okbg);color:var(--ok)">${svgIco('chat')}</div>
         <h2>물어보기</h2><p>"지난주 홍 대표님이 뭐라고 하셨지?"<br>회의 내용을 AI에게 질문합니다</p></button>
     </div>
     <div id="h-cal"></div>
@@ -1008,7 +1258,7 @@ async function renderHome(){
         <div class="ct"><span class="mtag">${esc(tp.tag)}</span> ${esc(tp.name)}</div>
         <div class="cm">
           ${(m.status==='confirmed'||m.status==='reported')?'<span class="tag t-reported">✓ 확정</span>':''}
-          ${m.visibility==='private'?'<span style="color:#C2620F">나만 보기</span>':''}
+          ${m.visibility==='private'?'<span style="color:var(--warn)">나만 보기</span>':''}
           ${m.dept?`<span>${esc(m.dept)}</span>`:''}</div>
       </div>`;}).join('')
       : '<div class="empty">아직 회의가 없습니다. 위의 「녹음하기」로 시작해보세요.</div>'}`;
@@ -1149,8 +1399,8 @@ function listHtml(s0,e0,evs,done){
           <div class="ct">${esc(e.title)}</div>
           <div class="cm"><span>${hmOf(e.starts_at)} ~ ${hmOf(e.ends_at)}</span>
             ${e.room?`<span>${esc(e.room)}</span>`:''}
-            ${mid?'<span style="color:#1E7A46">회의록 있음</span>'
-                 :(past?'<span style="color:#C0392B">회의록 없음</span>':'')}</div>
+            ${mid?'<span style="color:var(--ok)">회의록 있음</span>'
+                 :(past?'<span style="color:var(--err)">회의록 없음</span>':'')}</div>
         </div>
         <button class="btn${mid?'':' p'}" data-ev="${esc(e.uid)}" data-mid="${mid}"
           data-title="${esc(e.title)}" data-room="${esc(e.room||'')}"
@@ -1195,8 +1445,8 @@ async function drawTodayCal(){
           <div class="ct">${esc(e.title)}</div>
           <div class="cm"><span>${hm(e.starts_at)} ~ ${hm(e.ends_at)}</span>
             ${e.room?`<span>${esc(e.room)}</span>`:''}
-            ${ok?'<span style="color:#1E7A46">회의록 있음</span>'
-               :(past?'<span style="color:#C0392B">회의록 없음</span>':'')}</div>
+            ${ok?'<span style="color:var(--ok)">회의록 있음</span>'
+               :(past?'<span style="color:var(--err)">회의록 없음</span>':'')}</div>
         </div>
         ${ok?'':`<button class="btn p" data-cal="${esc(e.uid)}"
             data-title="${esc(e.title)}" data-room="${esc(e.room||'')}"
@@ -1237,7 +1487,7 @@ async function upcomingHtml(){
   const T = t => new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',
       hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(t));
   return `<div class="box" style="margin-bottom:18px;padding:14px 16px">
-    <div class="sub" style="margin:0 0 9px;font-size:12.5px;font-weight:700;color:#2E5496">
+    <div class="sub" style="margin:0 0 9px;font-size:12.5px;font-weight:700;color:var(--ac)">
       앞으로 잡힌 회의 ${evs.length}건 — 아직 녹음하지 않은 예약입니다</div>
     ${evs.map(e=>`<div class="row" style="gap:12px;padding:6px 0;align-items:baseline">
       <span class="sub" style="margin:0;min-width:112px;font-variant-numeric:tabular-nums">
@@ -1294,7 +1544,7 @@ async function renderList(){
       ${FILS.map(([k,l])=>`<button class="chip${mfil===k?' on':''}" data-fil="${k}">${l}</button>`).join('')}
     </div>`
    + (locked?`<div class="card locked"><div class="ct">■■■■■■■■■■</div>
-        <div class="cm"><span class="tag" style="background:#EEF1F5;color:#5B6472">열람 권한 없음</span>
+        <div class="cm"><span class="tag" style="background:var(--line2);color:var(--tx2)">열람 권한 없음</span>
           <span>그룹 · 전사 경영진 회의 ${locked}건</span>
           <span>개발자 권한으로는 열 수 없습니다</span></div></div>`:'')
    + (shown.length? shown.map(m=>{const tp=titleParts(m); const sb2=subTitle(m.summary_md);
@@ -1304,12 +1554,12 @@ async function renderList(){
         <div class="cm">
           ${(m.status==='confirmed'||m.status==='reported')?'<span class="tag t-reported">✓ 확정</span>':''}
           ${m.status==='archived'?'<span class="tag t-draft">보관</span>':''}
-          ${m.source?`<span class="tag" style="background:#FFF0E0;color:#B36B00">${esc(m.source)}</span>`:''}
-          ${PJ[m.project_id]?`<span class="tag" style="background:#EEF2F7;color:#3A424F">${esc(PJ[m.project_id].name)}</span>`:''}
+          ${m.source?`<span class="tag" style="background:var(--warnbg);color:var(--warn)">${esc(m.source)}</span>`:''}
+          ${PJ[m.project_id]?`<span class="tag" style="background:var(--acbg);color:var(--tx2)">${esc(PJ[m.project_id].name)}</span>`:''}
           ${timeText(m)?`<span>${esc(timeText(m))}</span>`:''}
           <span>${esc(attLine((ATT[m.id]||[]).map(a=>a.name)))}</span>
           ${m.dept?`<span>${esc(m.dept)}</span>`:''}
-          ${m.visibility==='private'?'<span style="color:#C2620F">나만 보기</span>':''}</div>
+          ${m.visibility==='private'?'<span style="color:var(--warn)">나만 보기</span>':''}</div>
         ${m.summary_md
           ? `<div class="csum">${esc(oneLine(m.summary_md))}</div>`
           : '<div class="csum none">요약 없음</div>'}</div>`;}).join('')
@@ -1369,14 +1619,14 @@ async function drawSeries(m){
   const {data} = await q;
   const rows = (data||[]).filter(x=>seriesKey(x)===key).slice(0,6);
   if(!rows.length) return;
-  box.innerHTML = `<div class="hist" style="border-color:#DCE3EC">
+  box.innerHTML = `<div class="hist" style="border-color:var(--line)">
     <b>같은 회의의 지난 기록 ${rows.length}건</b>
     ${rows.map(x=>`<div class="srow" data-sid="${x.id}"
         style="display:flex;gap:12px;align-items:baseline;padding:5px 0;cursor:pointer">
       <span style="min-width:86px;font-variant-numeric:tabular-nums">${esc(x.held_on||'')}</span>
       <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
         ${esc(subTitle(x.summary_md) || titleParts(x).name)}</span>
-      ${(x.status==='confirmed'||x.status==='reported')?'<span style="color:#2E7D32">확정</span>':''}
+      ${(x.status==='confirmed'||x.status==='reported')?'<span style="color:var(--ok)">확정</span>':''}
     </div>`).join('')}</div>`;
   box.querySelectorAll('[data-sid]').forEach(r=>r.onclick=()=>openMeeting(r.dataset.sid));
 }
@@ -1407,16 +1657,16 @@ function drawMeeting(){
   el.innerHTML = `
   <div class="row" style="margin-bottom:12px"><button class="btn" id="back">← 목록</button>
     ${okd?'<span class="tag t-reported">✓ 확정</span>':''}
-    ${m.source?`<span class="tag" style="background:#FFF0E0;color:#B36B00">${esc(m.source)} 사용 회의</span>`:''}
+    ${m.source?`<span class="tag" style="background:var(--warnbg);color:var(--warn)">${esc(m.source)} 사용 회의</span>`:''}
     ${m.status==='archived'?'<span class="tag t-draft">보관</span>':''}
-    ${m.visibility==='private'?'<span class="tag" style="background:#FDECEA;color:#C2620F">나만 보기</span>':''}</div>
+    ${m.visibility==='private'?'<span class="tag" style="background:var(--errbg);color:var(--warn)">나만 보기</span>':''}</div>
   <h1 class="mttl"><span class="mtag">${esc(tp.tag)}</span> <span id="mtitle">${esc(tp.name)}</span></h1>
   ${sub?`<div class="msub">${esc(sub)}</div>`:''}
   <div class="sub mhead">${timeText(m, cur.ev)?`<span>${esc(timeText(m, cur.ev))}</span>`:''}
     <span class="atd" title="${att.length?esc(att.join(', ')):'참석자 미기재'}">${esc(attLine(att))}</span>
     ${m.dept?`<span>${esc(m.dept)}</span>`:''}</div>
   <div class="row" style="margin-bottom:6px">
-    <span style="font-size:13px;color:#5C6672">프로젝트</span>
+    <span style="font-size:13px;color:var(--tx2)">프로젝트</span>
     <button class="pjbtn none" id="pjsel">분류 안 됨</button>
   </div>
   <div class="tabs">
@@ -1434,15 +1684,15 @@ function drawMeeting(){
       <div>${s.speaker?`<span class="spk ${si(s.speaker)}">${esc(s.speaker)}</span><br>`:''}
       <p data-i="${s.idx}">${esc(s.text)}</p></div></div>`).join('')}</div></div>
   <div class="pane on wide">
-    <div id="agbox" style="border:1px solid #DCE3EC;background:#F7FAFD;border-radius:12px;padding:13px 16px;margin-bottom:16px;${(m.agenda_md||'').trim()?'':'display:none'}">
-      <div style="font-size:13px;font-weight:700;color:#2E5496;margin-bottom:7px">사전 안건</div>
+    <div id="agbox" style="border:1px solid var(--line);background:var(--s2);border-radius:12px;padding:13px 16px;margin-bottom:16px;${(m.agenda_md||'').trim()?'':'display:none'}">
+      <div style="font-size:13px;font-weight:700;color:var(--ac);margin-bottom:7px">사전 안건</div>
       <div class="md" id="agview">${mdHtml(m.agenda_md||'')}</div>
       <textarea id="agedit" class="full" style="display:none;min-height:200px;font-family:ui-monospace,Menlo,monospace;font-size:13.5px"></textarea>
     </div>
     <div class="md" id="smview">${mdHtml(m.summary_md||'')}</div>
     <textarea id="smedit" class="full" style="display:none;min-height:520px;font-family:ui-monospace,Menlo,monospace;font-size:13.5px"></textarea></div>
   <div class="pane" id="mmpane">${(m.mindmap_md||'').trim()
-    ? '<div class="sub" style="margin-bottom:8px">가지를 누르면 접었다 폈다 할 수 있습니다 · 마우스 휠로 확대</div><svg id="mmv" style="width:100%;height:600px;background:#fff;border:1px solid #E3E6EB;border-radius:12px"></svg>'
+    ? '<div class="sub" style="margin-bottom:8px">가지를 누르면 접었다 폈다 할 수 있습니다 · 마우스 휠로 확대</div><svg id="mmv" style="width:100%;height:600px;background:var(--s1);border:1px solid var(--line);border-radius:12px"></svg>'
     : '<div class="empty">마인드맵이 없습니다.<br>이 기능이 생기기 전에 만들어진 회의입니다.</div>'}
     <textarea id="mmedit" class="full" style="display:none;min-height:520px;font-family:ui-monospace,Menlo,monospace;font-size:13.5px"></textarea></div>
   <div class="pane" style="display:none">${acts.length? acts.map(a=>`<div class="act ${a.state!=='open'?'done':''}" data-id="${a.id}">
@@ -1467,7 +1717,7 @@ function drawMeeting(){
           + '<button class="btn g" id="pub">팀에 공개</button>' : ''}
     ${((m.visibility==='private'&&m.owner_id===me.id)
        ||(m.visibility!=='private'&&isAdm))
-      ?'<button class="btn" id="mdel" style="color:#C0392B">삭제</button>':''}
+      ?'<button class="btn" id="mdel" style="color:var(--err)">삭제</button>':''}
     <button class="btn" id="expdoc">워드로 내보내기</button>
     <button class="btn" id="cancel" style="display:none">취소</button>
     ${m.visibility!=='private'
@@ -1700,13 +1950,13 @@ function startEdit(){
   el.querySelectorAll('#segs p, .hl h3, .hl li').forEach(e=>{e.contentEditable='true';e.spellcheck=false;});
   const mt=$('#mtitle');
   if(mt){ mt.contentEditable='true'; mt.spellcheck=false; mt.style.outline='none';
-    mt.style.borderBottom='2px dashed #C7D2E0'; }
+    mt.style.borderBottom='2px dashed var(--line)'; }
   // 참석자도 함께 고칠 수 있게 (녹음할 때 못 적었던 분들을 여기서 넣습니다)
   const sub=el.querySelector('.sub');
   if(sub && !$('#mparts')){
     sub.insertAdjacentHTML('afterend',
       '<div style="margin:10px 0;max-width:640px">'
-      + '<div style="font-size:13px;font-weight:700;color:#3A424F;margin-bottom:5px">참석자</div>'
+      + '<div style="font-size:13px;font-weight:700;color:var(--tx2);margin-bottom:5px">참석자</div>'
       + '<div id="mparts"></div></div>');
     MATT = attInput($('#mparts'), cur.att);
   }
@@ -1871,7 +2121,7 @@ async function renderActions(){
        ${canDel?`<button class="delx" data-del="${a.id}" title="잘못 만들어진 항목 지우기">×</button>`:''}
      </div></div>`;
   el.innerHTML=`<h1>액션아이템</h1><div class="sub">진행 ${open.length}건 · 완료 ${done.length}건</div>
-    <div class="box">${open.length?open.map(card).join(''):'<div style="color:#98A0AC">진행 중인 항목이 없습니다.</div>'}</div>
+    <div class="box">${open.length?open.map(card).join(''):'<div style="color:var(--tx3)">진행 중인 항목이 없습니다.</div>'}</div>
     ${done.length?`<h1 style="font-size:17px;margin-top:26px">완료</h1><div class="box">${done.map(card).join('')}</div>`:''}`;
   el.querySelectorAll('.act input').forEach(cb=>cb.onchange=async()=>{
     const id=cb.closest('.act').dataset.id;
@@ -1901,7 +2151,7 @@ async function renderBrief(){
       <div class="sub">날짜별로 그날 회의를 모아 봅니다</div>
       <div class="box locked">
         <div class="sub" style="margin:0 0 10px">${bar(10)}</div>
-        <div class="md" style="color:#C0C6CF;letter-spacing:.1em;line-height:2.2">
+        <div class="md" style="color:var(--tx3);letter-spacing:.1em;line-height:2.2">
           ${bar(6)}<br>${bar(22)}<br>${bar(17)}<br>${bar(25)}<br><br>
           ${bar(8)}<br>${bar(20)}<br>${bar(14)}</div>
       </div>
@@ -1967,7 +2217,7 @@ async function drawBriefTo(){
   const box=$('#bto-box'); if(!box) return;
   await loadOrg();
   const {data,error}=await SB.from('hd_brief_to').select('*').order('name');
-  if(error) return box.innerHTML=`<div class="sub" style="margin:0;color:#B36B00">
+  if(error) return box.innerHTML=`<div class="sub" style="margin:0;color:var(--warn)">
     받는 분 명단을 읽지 못했습니다 · ${esc(error.message)}<br>
     「브리핑_받는분.sql」 을 아직 실행하지 않으셨다면 먼저 실행해주세요.</div>`;
   const rows=data||[];
@@ -1988,7 +2238,7 @@ async function drawBriefTo(){
           <input class="bt-name" value="${esc(r.name||'')}" placeholder="이름"
             style="max-width:150px;font-weight:700">
           <label class="shlb"><input type="checkbox" class="bt-on" ${r.active?'checked':''}> 보냄</label>
-          <button class="btn" data-btdel="${r.id}" style="margin-left:auto;color:#C0392B">삭제</button>
+          <button class="btn" data-btdel="${r.id}" style="margin-left:auto;color:var(--err)">삭제</button>
         </div>
         <div class="row" style="flex-wrap:wrap;margin-bottom:8px">
           <input class="bt-s1" value="${esc(r.slack_email||'')}"
@@ -2095,7 +2345,7 @@ async function renderMembers(){
         <div class="row">${sel(m)}
           <button class="btn g ap" data-id="${m.id}">승인</button>
           <button class="btn rj" data-id="${m.id}">거절</button></div></div>`).join('')}
-      </div>`:'<div class="box" style="color:#98A0AC">승인을 기다리는 신청이 없습니다.</div>'}
+      </div>`:'<div class="box" style="color:var(--tx3)">승인을 기다리는 신청이 없습니다.</div>'}
     <h1 style="font-size:16px;margin-top:26px">사용 중</h1>
     <div class="box">${ok.map(m=>`<div class="act" data-id="${m.id}" style="grid-template-columns:1fr auto">
         <div><div class="task">${esc(m.name)}${m.id===me.id?' (나)':''}</div>
@@ -2110,7 +2360,7 @@ async function renderMembers(){
             <input type="checkbox" class="alld" data-id="${m.id}" ${m.all_dept?'checked':''}
               style="width:16px;height:16px;margin:0"> 회사 전체 회의 열람 (부서 무관)</label>
           ${(m.extra_scopes||[]).length?`<div class="meta" style="margin-top:5px">
-            <span class="tag" style="background:#EAF2FD;color:#2B6CB0;margin-right:4px">겸직</span>
+            <span class="tag" style="background:var(--acbg);color:var(--ac);margin-right:4px">겸직</span>
             ${m.extra_scopes.map(x=>esc(x.endsWith('|')?x.slice(0,-1)+' 전체':x.replace('|',' '))).join(' · ')}</div>`:''}</div>
         <div class="row"><button class="btn det" data-id="${m.id}">상세</button>${sel(m)}<button class="btn sv" data-id="${m.id}">저장</button>
           ${m.id!==me.id?`<button class="btn lv" data-id="${m.id}" title="모든 권한을 한 번에 없앱니다">퇴사</button>`:''}</div></div>`).join('')}</div>
@@ -2121,7 +2371,7 @@ async function renderMembers(){
           <div class="meta">${esc(m.email)} · ${esc(m.company||'')} ${esc(m.dept||'')} · 모든 권한 없음 · 남긴 자료는 보존됩니다</div></div>
         <div class="row">
           <button class="btn bk" data-id="${m.id}">복직</button>
-          <button class="btn del2" data-id="${m.id}" style="color:#C0392B">삭제</button></div></div>`).join('')}</div>`:''}`;
+          <button class="btn del2" data-id="${m.id}" style="color:var(--err)">삭제</button></div></div>`).join('')}</div>`:''}`;
 
   bindOrgSelects('iv-co','iv-dept','');
   el.querySelectorAll('.mco').forEach(x=>x.onchange=()=>{
@@ -2167,7 +2417,7 @@ async function renderMembers(){
       SB.from('hd_project_board').select('id,name,company,companies').order('created_at'),
       SB.from('hd_project_acl').select('project_id,allow').eq('member_id',id)]);
     const box=$('#mdet'); if(!box) return;
-    if(pj.error) return box.innerHTML='<div class="sub" style="margin:0;color:#C0392B">'
+    if(pj.error) return box.innerHTML='<div class="sub" style="margin:0;color:var(--err)">'
       +esc(pj.error.message)+'<br>구성원_상세.sql 을 아직 실행하지 않으셨다면 먼저 실행해주세요.</div>';
     const A=Object.fromEntries((acl.data||[]).map(x=>[x.project_id,x.allow]));
     const cosOf=p=>(p.companies&&p.companies.length)?p.companies:(p.company?[p.company]:[]);
@@ -2194,7 +2444,7 @@ async function renderMembers(){
         비워두면 로그인 이메일(${esc(m.email)})로 찾습니다.</div>
       ${SLACK_WS.map((w,i)=>`
         <div style="margin-top:12px">
-          <div style="font-size:13.5px;font-weight:700;color:#3A424F">${esc(w.name)}</div>
+          <div style="font-size:13.5px;font-weight:700;color:var(--tx2)">${esc(w.name)}</div>
           <div class="sub" style="margin:2px 0 6px;font-size:12px">${esc(w.note)}</div>
           <div id="mdet-sl${i}"></div>
           <button class="btn" type="button" data-sladd="${i}" style="font-size:13px">+ 이메일 추가</button>
@@ -2212,7 +2462,7 @@ async function renderMembers(){
           if(own && !ds.length) return '';
           return `
           <div class="row" style="flex-wrap:wrap;gap:6px 14px;margin-top:6px">
-            <span style="font-size:13px;color:#5C6672;min-width:96px">${esc(co)}${own?' <span style="font-size:11px;color:#98A0AC">(본 소속)</span>':''}</span>
+            <span style="font-size:13px;color:var(--tx2);min-width:96px">${esc(co)}${own?' <span style="font-size:11px;color:var(--tx3)">(본 소속)</span>':''}</span>
             ${own?'':`<label class="shlb"><input type="checkbox" class="mxs" value="${esc(co)}|"
               ${(m.extra_scopes||[]).includes(co+'|')?'checked':''}> <b>회사 전체</b></label>`}
             ${ds.map(d=>{const v=co+'|'+d;
@@ -2427,7 +2677,7 @@ function drawRooms(){
       <button class="ic pin ${r.pinned?'on':''}" data-id="${r.id}" title="${r.pinned?'고정 해제':'위에 고정'}">${r.pinned?'★':'☆'}</button>
       <button class="ic del" data-id="${r.id}" title="삭제">×</button>
     </div>`;}).join('')
-    :'<div style="padding:12px;font-size:12.5px;color:#98A0AC">질문을 보내면 대화가 여기에 쌓입니다</div>');
+    :'<div style="padding:12px;font-size:12.5px;color:var(--tx3)">질문을 보내면 대화가 여기에 쌓입니다</div>');
 
   $('#newroom').onclick=()=>{curRoom=null; drawRooms(); $('#chatlog').innerHTML=''; $('#qq').focus();};
   box.querySelectorAll('.room').forEach(r=>r.onclick=e=>{
@@ -2486,7 +2736,7 @@ function drawMsg(c){
     a.className='msg a'; a.innerHTML=`<div class="md">${mdHtml(c.answer)}</div>${src}`;
   }else if(c.status==='failed'){
     a.className='msg a'; a.innerHTML=`<div class="md"><p>답을 만들지 못했습니다.</p>
-      <p style="color:#98A0AC;font-size:13px">${esc(c.error||'')}</p></div>`;
+      <p style="color:var(--tx3);font-size:13px">${esc(c.error||'')}</p></div>`;
   }else{
     a.className='msg wait'; a.textContent='회의 기록을 찾아보고 있습니다…';
   }
@@ -2577,7 +2827,7 @@ function pickProject(projects, curId, title='프로젝트 고르기'){
       const rest=hit.filter(p=>!rec.some(r=>r.id===p.id)).slice(0,60);
       rows=[{id:'',name:'분류 안 됨',color:'gray'}, ...rec, ...rest];
       let html=`<div class="it ${curId===''?'cur':''}" data-i="0">
-        <span class="dot" style="background:#C9D0DA"></span><span class="nm">분류 안 됨</span></div>`;
+        <span class="dot" style="background:var(--line)"></span><span class="nm">분류 안 됨</span></div>`;
       let i=1;
       if(rec.length){ html+=`<div class="sec">최근 사용</div>`;
         rec.forEach(p=>{html+=item(p,i++);}); html+=`<div class="sec">전체</div>`; }
@@ -2656,7 +2906,7 @@ async function loadSideTree(force){
       SB.from('hd_meeting').select('id,project_id,company,dept,visibility,owner_id,source')
         .neq('status','archived')]);
     if(pj.error||ms.error){
-      el.innerHTML='<div style="font-size:11.5px;color:#C0392B;padding:4px 10px">폴더를 못 읽었습니다: '
+      el.innerHTML='<div style="font-size:11.5px;color:var(--err);padding:4px 10px">폴더를 못 읽었습니다: '
         +esc((pj.error||ms.error).message)+'</div>';
       return;
     }
@@ -2865,7 +3115,7 @@ async function renderProjects(){
         <button class="btn p" id="pj-add">만들기</button>
       </div>
       <div class="row" style="margin-top:10px;flex-wrap:wrap;gap:6px 14px">
-        <span style="font-size:13px;color:#5C6672">함께하는 회사</span>
+        <span style="font-size:13px;color:var(--tx2)">함께하는 회사</span>
         ${groupCompanies().map(c=>`<label style="display:flex;align-items:center;gap:5px;font-size:13.5px">
           <input type="checkbox" class="pj-cos" value="${c}"
             ${c===sc?'checked':''}
@@ -2904,7 +3154,7 @@ async function renderProjects(){
     box.innerHTML = cosSel.map(co=>{
       const ds=deptsOf(co); if(!ds.length) return '';
       return `<div class="row" style="margin-top:8px;flex-wrap:wrap;gap:6px 14px">
-        <span style="font-size:13px;color:#5C6672;min-width:96px">${esc(co)} 부서</span>
+        <span style="font-size:13px;color:var(--tx2);min-width:96px">${esc(co)} 부서</span>
         ${ds.map(d=>{const v=co+'|'+d;
           return `<label style="display:flex;align-items:center;gap:5px;font-size:13.5px">
             <input type="checkbox" class="pj-dp" value="${esc(v)}"
@@ -3133,7 +3383,7 @@ function attInput(host, initial){
       placeholder="이름을 적고 Enter (예: 김현우)"></div>
     <div class="sub" style="margin:5px 0 0;font-size:12px">
       이름을 적고 <b>Enter</b> 를 누르면 하나씩 추가됩니다 ·
-      <span style="color:#C0392B">빨간 이름</span>은 헤임달에 없는 분이라
+      <span style="color:var(--err)">빨간 이름</span>은 헤임달에 없는 분이라
       슬랙 알림이 가지 않습니다 (외부 참석자도 그대로 적어두시면 됩니다)</div>`;
   const box=host.querySelector('.atin'), inp=host.querySelector('input');
   let vals=(initial||[]).map(x=>(x||'').trim()).filter(Boolean);
@@ -3259,7 +3509,7 @@ async function renderRec(){
     <div class="box">
       <div id="rc-today"></div>
       <div id="rc-cal-row" style="margin-bottom:12px">
-        <div style="font-size:13px;font-weight:700;color:#3A424F;margin-bottom:5px">회의실 예약에서 고르기</div>
+        <div style="font-size:13px;font-weight:700;color:var(--tx2);margin-bottom:5px">회의실 예약에서 고르기</div>
         <select id="rc-cal" class="full" style="max-width:640px" ${on?'disabled':''}>
           <option value="">불러오는 중…</option>
         </select>
@@ -3272,10 +3522,10 @@ async function renderRec(){
       <div class="sub" style="margin:0 0 10px;font-size:12px">제목은
         <b>[${esc(ymd6())}, ${esc(me.company||'')}] 회의 내용</b>
         처럼 <b>날짜 · 회사</b>가 앞에 자동으로 붙습니다</div>
-      <div style="font-size:13px;font-weight:700;color:#3A424F;margin-bottom:5px">참석자</div>
+      <div style="font-size:13px;font-weight:700;color:var(--tx2);margin-bottom:5px">참석자</div>
       <div id="rc-parts" style="margin-bottom:10px"></div>
       <div id="rc-ag-box" style="margin-bottom:12px">
-        <div style="font-size:13px;font-weight:700;color:#3A424F;margin-bottom:5px">사전 안건
+        <div style="font-size:13px;font-weight:700;color:var(--tx2);margin-bottom:5px">사전 안건
           <span class="sub" style="margin:0;font-weight:400;font-size:12px">— 회의 중에도 이 자리에서 계속 보입니다</span></div>
         <div id="rc-ag"></div>
       </div>
@@ -3299,11 +3549,11 @@ async function renderRec(){
       <div class="sub" style="margin:12px 0 0">
         녹음 중에는 화면이 꺼지지 않게 잡아둡니다. 다른 탭으로 옮겨도 계속 녹음됩니다.<br>
         폰으로 녹음하실 때는 <b>다른 앱으로 나가지 마세요</b> (녹음이 멈출 수 있습니다).<br>
-        <span style="color:#B36B00">브라우저가 마이크 사용을 물어보면 「허용」 을 눌러주세요.</span>
+        <span style="color:var(--warn)">브라우저가 마이크 사용을 물어보면 「허용」 을 눌러주세요.</span>
       </div>
     </div>
     <h1 style="font-size:16px;margin-top:24px">최근 올린 것</h1>
-    <div id="up-list" class="box" style="color:#98A0AC">불러오는 중…</div>`;
+    <div id="up-list" class="box" style="color:var(--tx3)">불러오는 중…</div>`;
   drawRecToday();
   // 참석자 칸 — 녹음 중에도 늦게 오신 분을 추가할 수 있습니다
   REC.att = attInput($('#rc-parts'), on ? (REC.attNames||[]) : []);
@@ -3332,7 +3582,7 @@ function drawAgendaBox(recording){
   const v=REC.agenda||'';
   if(recording){
     box.innerHTML = v.trim()
-      ? `<div class="md" style="border:1px solid #DCE3EC;background:#F7FAFD;border-radius:12px;
+      ? `<div class="md" style="border:1px solid var(--line);background:var(--s2);border-radius:12px;
            padding:14px 16px;max-height:460px;overflow:auto;font-size:15px;line-height:1.75">${mdHtml(v)}</div>`
       : '<div class="sub" style="margin:0">적어둔 안건이 없습니다.</div>';
     return;
@@ -3370,7 +3620,7 @@ async function loadCalPicks(){
   if(error){
     sel.innerHTML='<option value="">예약을 불러오지 못했습니다</option>';
     sel.disabled=true;
-    if(hint) hint.innerHTML='<span style="color:#B36B00">'+esc(error.message)+'</span>';
+    if(hint) hint.innerHTML='<span style="color:var(--warn)">'+esc(error.message)+'</span>';
     return;
   }
   if(!data || !data.length){
@@ -3590,7 +3840,7 @@ async function renderUpload(){
       <div class="row" style="margin-bottom:10px">
         <input id="up-title" placeholder="무슨 회의인가요 (비우면 파일 이름을 씁니다)" style="flex:1;min-width:220px">
       </div>
-      <div style="font-size:13px;font-weight:700;color:#3A424F;margin-bottom:5px">참석자</div>
+      <div style="font-size:13px;font-weight:700;color:var(--tx2);margin-bottom:5px">참석자</div>
       <div id="up-parts" style="margin-bottom:10px"></div>
       ${me.role==='admin'?`<div class="row" style="margin-bottom:9px">
         <select id="up-scope" style="min-width:230px">
@@ -3606,12 +3856,12 @@ async function renderUpload(){
       <div class="sub" style="margin:12px 0 0">
         음성: ${AUDIO_EXT.join(' · ')}<br>
         문서: 워드(docx) · 텍스트(txt) · PDF · PPT(pptx) · 한글(hwpx)<br>
-        <span style="color:#B36B00">옛 한글(.hwp)은 읽지 못합니다 —
+        <span style="color:var(--warn)">옛 한글(.hwp)은 읽지 못합니다 —
         한글 프로그램에서 「다른 이름으로 저장 → hwpx」 후 올려주세요</span>
       </div>
     </div>
     <h1 style="font-size:16px;margin-top:24px">최근 올린 것</h1>
-    <div id="up-list" class="box" style="color:#98A0AC">불러오는 중…</div>`;
+    <div id="up-list" class="box" style="color:var(--tx3)">불러오는 중…</div>`;
   UPATT = attInput($('#up-parts'), []);
   $('#up-go').onclick=doUpload;
   loadUploads();
@@ -3734,7 +3984,7 @@ function renderGuide(){
   ${box('3. 이미 있는 파일을 올리려면',`
     <p><b>업로드</b> 탭에서 음성 파일이나 문서를 올리면 똑같이 회의록이 만들어집니다.</p>
     <p>문서: 워드(docx) · 텍스트 · PDF · PPT · 한글(hwpx)<br>
-       <span style="color:#B36B00">옛 한글(.hwp)은 안 됩니다 — 「다른 이름으로 저장 → hwpx」 후 올려주세요</span></p>`)}
+       <span style="color:var(--warn)">옛 한글(.hwp)은 안 됩니다 — 「다른 이름으로 저장 → hwpx」 후 올려주세요</span></p>`)}
   ${box('4. 회의록을 보고 · 고치고 · 옮기려면',`<ul>
     <li>회의록을 열면 <b>하이라이트 · 전사 · 요약 · 마인드맵</b> 탭이 있습니다</li>
     <li>오른쪽 위 <b>전체 복사</b> — 지금 보는 탭의 글 전체가 복사됩니다 (카톡·메일에 붙여넣기)</li>
@@ -3867,7 +4117,7 @@ async function renderUsage(){
       return `<div class="box">
         <div class="row" style="align-items:baseline;gap:10px;margin-bottom:10px">
           <b style="font-size:17px">${ym}</b>
-          <span style="font-size:19px;font-weight:800;color:#2B6CB0">$${tot.toFixed(2)}</span>
+          <span style="font-size:19px;font-weight:800;color:var(--ac)">$${tot.toFixed(2)}</span>
           <span class="sub" style="margin:0">${won(tot)} · 호출 ${calls.toLocaleString()}회</span>
         </div>
         <table><tr><th>회사</th><th>부서</th><th style="text-align:right">호출</th>
@@ -3957,7 +4207,7 @@ async function renderServer(){
     </div>
     <h1 style="font-size:16px;margin-top:22px">결과</h1>
     <div class="box"><pre id="sv-out" style="margin:0;white-space:pre-wrap;
-      font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:#3A424F">명령을 눌러주세요.</pre></div>`;
+      font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:var(--tx2)">명령을 눌러주세요.</pre></div>`;
 
   el.querySelectorAll('[data-cmd]').forEach(b=>b.onclick=()=>{
     // 「다시 만들기」는 같은 plaud 명령에 redo 표시만 붙여 보냅니다
@@ -3976,7 +4226,7 @@ async function renderServer(){
 async function loadAgent(){
   const box=$('#sv-state'); if(!box) return;
   const {data,error}=await SB.from('hd_agent').select('*').eq('id','worker').maybeSingle();
-  if(error||!data) return box.innerHTML='<span style="color:#B36B00">아직 상태를 받지 못했습니다. '
+  if(error||!data) return box.innerHTML='<span style="color:var(--warn)">아직 상태를 받지 못했습니다. '
     +'처리 서버가 최신 버전인지 확인해주세요.</span>';
   const age=(Date.now()-new Date(data.beat_at).getTime())/1000;
   const live=age<180;
@@ -4023,13 +4273,13 @@ async function sendCmd(kind, args, btn){
 function exportDoc(){
   if(!cur) return;
   const {m,segs,hls,acts,att}=cur;
-  const S=`body{font-family:'맑은 고딕',sans-serif;font-size:10.5pt;line-height:1.7;color:#12161C}
-    h1{font-size:18pt;margin:0 0 6pt} h2{font-size:13pt;color:#2B6CB0;border-bottom:1.5pt solid #2B6CB0;
+  const S=`body{font-family:'맑은 고딕',sans-serif;font-size:10.5pt;line-height:1.7;color:var(--tx)}
+    h1{font-size:18pt;margin:0 0 6pt} h2{font-size:13pt;color:var(--ac);border-bottom:1.5pt solid var(--ac);
     padding-bottom:3pt;margin:18pt 0 8pt} table{border-collapse:collapse;width:100%;font-size:9.5pt}
-    td,th{border:1pt solid #C9D1DC;padding:4pt 7pt;vertical-align:top} th{background:#EEF2F7}
-    .ts{color:#5C6672;font-size:8.5pt} .spk{font-weight:bold;color:#2B6CB0}
+    td,th{border:1pt solid var(--line);padding:4pt 7pt;vertical-align:top} th{background:var(--acbg)}
+    .ts{color:var(--tx2);font-size:8.5pt} .spk{font-weight:bold;color:var(--ac)}
     .hl{margin:0 0 10pt} .hl h3{font-size:11pt;margin:0 0 3pt} .hl ul{margin:2pt 0 0 14pt}
-    .meta{color:#5A6472;font-size:9.5pt;margin-bottom:14pt}`;
+    .meta{color:var(--tx2);font-size:9.5pt;margin-bottom:14pt}`;
   const esc2=t=>String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   let h='<h1>'+esc2(m.title)+'</h1>';
   h+='<div class="meta">'+m.held_on+' · '+hms(m.duration_sec)
@@ -4221,7 +4471,10 @@ async function boot(){
     return;
   }
   if(!data.approved) return pendingPage(data);
-  me=data; shell(); checkPending();
+  me=data;
+  // 계정에 저장된 밝기가 있으면 그것이 이깁니다 (다른 컴퓨터에서도 같게 보입니다)
+  if(data.theme) applyTheme(data.theme);
+  shell(); checkPending();
   if(!openFromHash()) go('home');
 }
 

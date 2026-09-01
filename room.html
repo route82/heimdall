@@ -3,10 +3,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <title>HEIMDALL 회의실</title>
-<meta name="theme-color" content="#12161C">
+<meta name="theme-color" content="#080808">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="icon" href="./icons/favicon.ico?v=3" sizes="any">
 <link rel="manifest" href="./heimdall.webmanifest?v=2">
+<!-- 글꼴 — 파일을 저장소에 넣지 않고 CDN 으로만 부릅니다 (라이선스 안전) -->
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard-dynamic-subset.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&display=swap">
 <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -24,16 +29,20 @@
    · 태블릿은 가로가 넓습니다. 녹음 중에는 좌우 두 단으로 나눕니다.
    ───────────────────────────────────────────────────────────── */
 :root{
-  --bg:#0D1117; --s1:#161B22; --s2:#1C222C; --line:#252C37; --line2:#323B49;
-  --tx:#E9EEF5; --mut:#8A94A6; --dim:#5F6979;
-  --blue:#3B82F6; --blue-s:#8FB8FA; --red:#E5484D; --green:#3DD68C; --amber:#D9A441;
+  --bg:#080808; --s1:#0E0E0E; --s2:#161616; --line:#212121; --line2:#2C2C2C;
+  --tx:#F2F2F0; --mut:#9A9A97; --dim:#616160;
+  /* 글꼴 — 한글은 Pretendard, 영문·숫자는 Oswald.
+     CDN 이 막히면 기기 기본 글꼴로 자동으로 내려갑니다. */
+  --f-body:'Pretendard Variable',Pretendard,-apple-system,'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif;
+  --f-disp:'Oswald','Pretendard Variable',Pretendard,-apple-system,'Apple SD Gothic Neo',sans-serif;
+  --blue:#F2F2F0; --blue-s:#F2F2F0; --red:#F07570; --green:#4ADE80; --amber:#E0B341;
   --r1:14px; --r2:20px; --r3:26px;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;width:100%;max-width:100vw;margin:0;overflow:hidden;
  overscroll-behavior:none;touch-action:manipulation}
 body{background:var(--bg);color:var(--tx);
- font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif;
+ font-family:var(--f-body);
  user-select:none;-webkit-user-select:none;
  font-size:clamp(15px,1.35vh,18px);line-height:1.5;
  -webkit-font-smoothing:antialiased}
@@ -54,11 +63,12 @@ button{font-family:inherit}
 .today{font-size:clamp(13px,1.5vh,16px);color:var(--mut);margin-top:5px;
  display:flex;align-items:center;gap:9px;flex-wrap:wrap}
 .clock{margin-left:auto;text-align:right;flex:none}
-.clock .hm{font-size:clamp(34px,5.4vh,52px);font-weight:800;line-height:1;
- letter-spacing:-1.5px;font-variant-numeric:tabular-nums}
-.clock .sec{font-size:clamp(12px,1.4vh,14px);color:var(--dim);margin-top:6px}
-.tflag{background:rgba(217,164,65,.14);color:var(--amber);
- border:1px solid rgba(217,164,65,.3);border-radius:999px;
+.clock .hm{font-size:clamp(34px,5.4vh,52px);font-weight:600;line-height:1;
+ letter-spacing:-.5px;font-variant-numeric:tabular-nums;font-family:var(--f-disp)}
+.clock .sec{font-size:clamp(12px,1.4vh,14px);color:var(--dim);margin-top:6px;font-family:var(--f-disp)}
+.today,.next .lb,.tflag{font-family:var(--f-disp)}
+.tflag{background:rgba(224,179,65,.14);color:var(--amber);
+ border:1px solid rgba(224,179,65,.30);border-radius:999px;
  font-size:clamp(11px,1.25vh,13px);font-weight:700;padding:4px 11px;white-space:nowrap}
 
 /* ── 대기 화면 예약 카드 */
@@ -67,10 +77,10 @@ button{font-family:inherit}
  border-radius:var(--r3);padding:clamp(16px,2.4vh,24px) clamp(26px,3vw,40px) clamp(16px,2.2vh,22px);
  max-width:100%;
  transition:border-color .35s ease, box-shadow .35s ease, background .35s ease}
-.next.on{background:#131C29;border-color:var(--blue);animation:halo 3.6s ease-in-out infinite}
+.next.on{background:#141414;border-color:var(--blue);animation:halo 3.6s ease-in-out infinite}
 @keyframes halo{
-  0%,100%{box-shadow:0 0 0 0 rgba(59,130,246,.24), 0 12px 34px rgba(0,0,0,.34)}
-  50%    {box-shadow:0 0 0 9px rgba(59,130,246,.04), 0 12px 34px rgba(0,0,0,.34)}}
+  0%,100%{box-shadow:0 0 0 0 rgba(242,242,240,.22), 0 12px 34px rgba(0,0,0,.34)}
+  50%    {box-shadow:0 0 0 9px rgba(242,242,240,.035), 0 12px 34px rgba(0,0,0,.34)}}
 .next .lb{display:inline-flex;align-items:center;gap:8px;
  font-size:clamp(12px,1.45vh,14px);color:var(--blue-s);font-weight:700;letter-spacing:.05em}
 .next .lb i{width:8px;height:8px;border-radius:50%;background:var(--blue);flex:none;
@@ -84,9 +94,9 @@ button{font-family:inherit}
  width:0;transition:width .9s ease}
 .barlb{margin-top:7px;font-size:clamp(11px,1.35vh,13px);color:var(--dim)}
 .tether{position:relative;width:2px;height:clamp(24px,4vh,44px);border-radius:2px;
- background:linear-gradient(rgba(59,130,246,.22),rgba(59,130,246,.05));overflow:hidden;flex:none}
+ background:linear-gradient(rgba(242,242,240,.20),rgba(242,242,240,.045));overflow:hidden;flex:none}
 .tether i{position:absolute;left:-2px;width:6px;height:6px;border-radius:50%;
- background:var(--blue);box-shadow:0 0 10px rgba(59,130,246,.7);
+ background:var(--blue);box-shadow:0 0 10px rgba(242,242,240,.62);
  animation:flow 2.4s cubic-bezier(.4,0,.6,1) infinite}
 @keyframes flow{0%{top:-8px;opacity:0}18%{opacity:1}82%{opacity:1}100%{top:100%;opacity:0}}
 
@@ -103,11 +113,11 @@ button{font-family:inherit}
 .rec .dot{animation:bl 1.4s infinite}
 @keyframes bl{0%,100%{opacity:1}50%{opacity:.25}}
 .lbwrap{display:flex;flex-direction:column;align-items:flex-start;line-height:1.15;min-width:0}
-.sub2{display:block;font-size:clamp(13px,1.6vh,16px);font-weight:600;color:#D6E4FF;
+.sub2{display:block;font-size:clamp(13px,1.6vh,16px);font-weight:600;color:#EDEDEA;
  margin-top:6px;letter-spacing:0;max-width:min(460px,42vw);
  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sub{font-size:clamp(13px,1.6vh,16px);color:var(--mut);line-height:1.65}
-.ghost{background:transparent;border:1px solid var(--line2);color:#C3CCDA;
+.ghost{background:transparent;border:1px solid var(--line2);color:var(--tx);
  border-radius:var(--r1);font-size:clamp(14px,1.7vh,17px);
  padding:14px 26px;cursor:pointer}
 .ghost:active{background:var(--s2)}
@@ -142,20 +152,20 @@ button{font-family:inherit}
 .card .body{min-height:0;overflow:auto;-webkit-overflow-scrolling:touch}
 
 .timer{align-items:center;text-align:center;gap:4px;flex:none}
-.mtitle{font-size:clamp(15px,1.9vh,20px);font-weight:700;color:#B9C4D4;
+.mtitle{font-size:clamp(15px,1.9vh,20px);font-weight:700;color:#C9C9C6;
  max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.elapsed{font-size:clamp(46px,8.4vh,84px);font-weight:800;line-height:1;
+.elapsed{font-size:clamp(46px,8.4vh,84px);font-weight:600;line-height:1;font-family:var(--f-disp);
  font-variant-numeric:tabular-nums;letter-spacing:-2px;margin:6px 0 4px}
 .lv{font-size:clamp(12px,1.5vh,15px);color:var(--green);height:20px;
  display:flex;align-items:center;justify-content:center;gap:7px}
 .lv i{width:8px;height:8px;border-radius:50%;background:var(--green);flex:none}
 
 .agn pre{margin:0;white-space:pre-wrap;word-break:break-word;font-family:inherit;
- font-size:clamp(14px,1.85vh,18px);line-height:1.75;color:#CDD7E4}
+ font-size:clamp(14px,1.85vh,18px);line-height:1.75;color:#DADAD7}
 .cnt{font-size:clamp(13px,1.6vh,16px);font-weight:700;color:var(--blue-s);
  margin-bottom:10px;flex:none;min-height:20px}
 .grid{display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start}
-.nm{background:var(--s2);border:2px solid var(--line);color:#C3CCDA;border-radius:var(--r1);
+.nm{background:var(--s2);border:2px solid var(--line);color:var(--tx);border-radius:var(--r1);
  font-size:clamp(15px,2vh,20px);font-weight:700;padding:12px 18px;cursor:pointer;
  min-width:104px;transition:background .15s ease,border-color .15s ease,color .15s ease}
 .nm.on{background:var(--blue);border-color:var(--blue);color:#fff}
@@ -166,7 +176,7 @@ button{font-family:inherit}
 .ftr .hint{font-size:clamp(12px,1.45vh,14px);color:var(--dim)}
 
 /* ── 회의실 고르기 */
-.sheet{position:fixed;inset:0;background:rgba(6,9,13,.72);display:flex;
+.sheet{position:fixed;inset:0;background:rgba(6,6,6,.74);display:flex;
  align-items:center;justify-content:center;z-index:50;padding:24px;
  backdrop-filter:blur(3px)}
 .sheetcard{background:var(--s1);border:1px solid var(--line2);border-radius:var(--r3);
@@ -176,8 +186,8 @@ button{font-family:inherit}
 .rmopt{display:block;width:100%;margin-bottom:9px;background:var(--s2);
  border:1px solid var(--line);color:var(--tx);border-radius:var(--r1);
  font-size:clamp(16px,2.2vh,21px);font-weight:700;padding:16px 20px;cursor:pointer}
-.rmopt:active{background:#232B36}
-.rmopt.on{border-color:var(--blue);color:var(--blue-s);background:#131C29}
+.rmopt:active{background:#242424}
+.rmopt.on{border-color:var(--blue);color:var(--blue-s);background:#141414}
 
 /* ── 끝났습니다 */
 .done{font-size:clamp(24px,3.6vh,34px);font-weight:800;letter-spacing:-.5px}
@@ -194,8 +204,8 @@ button{font-family:inherit}
  font-size:clamp(16px,2vh,19px);padding:15px 17px;margin-bottom:11px}
 .setup .btn{width:100%;background:var(--blue);border:0;color:#fff;border-radius:var(--r1);
  font-family:inherit;font-size:clamp(17px,2.2vh,20px);font-weight:700;padding:17px;cursor:pointer}
-.err{color:#FF9A93;font-size:clamp(13px,1.6vh,15px);min-height:22px;margin-top:8px}
-.chk{display:flex;align-items:center;gap:11px;font-size:clamp(14px,1.7vh,16px);color:#C3CCDA;
+.err{color:#F5908B;font-size:clamp(13px,1.6vh,15px);min-height:22px;margin-top:8px}
+.chk{display:flex;align-items:center;gap:11px;font-size:clamp(14px,1.7vh,16px);color:var(--tx);
  background:var(--s2);border:1px solid var(--line2);border-radius:var(--r1);
  padding:15px 17px;margin-bottom:6px}
 .chk input{width:21px;height:21px;margin:0;flex:none}
@@ -294,7 +304,7 @@ function setupPage(msgText){
         : '')
     + '<button class="btn" id="save">저장하고 시작</button>'
     + '<div class="sub" style="margin:14px 0 0;font-size:14px;line-height:1.7">'
-    + '<b style="color:#C3CCDA">태블릿 바탕화면에 앱으로 두는 법</b><br>'
+    + '<b style="color:var(--tx)">태블릿 바탕화면에 앱으로 두는 법</b><br>'
     + '크롬 오른쪽 위 <b>⋮</b> → <b>홈 화면에 추가</b> → <b>설치</b><br>'
     + '설치하면 바탕화면에 <b>HEIMDALL</b> 로 생기고, 주소창 없이 전체 화면으로 열립니다.</div>'
     + '<div class="err" id="err">'+esc(msgText||'')+'</div>'
