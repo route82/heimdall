@@ -1027,7 +1027,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v19.10</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v19.11</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -3602,18 +3602,34 @@ function drawAgendaBox(recording){
   if(recording){
     box.innerHTML = v.trim()
       ? `<div class="md" style="border:1px solid var(--line);background:var(--s2);border-radius:12px;
-           padding:14px 16px;max-height:460px;overflow:auto;font-size:15px;line-height:1.75">${mdHtml(v)}</div>`
+           padding:14px 16px;max-height:min(70vh,760px);overflow:auto;font-size:15px;line-height:1.75">${mdHtml(v)}</div>`
       : '<div class="sub" style="margin:0">적어둔 안건이 없습니다.</div>';
     return;
   }
-  box.innerHTML = `<textarea id="rc-agt" class="full" style="min-height:150px;
+  box.innerHTML = `<textarea id="rc-agt" class="full" style="min-height:170px;
       font-family:var(--f-body);font-size:14.5px;line-height:1.7;white-space:pre-wrap"
-      placeholder="회의 전에 정해둔 안건을 적어주세요. 예약을 고르면 캘린더 설명이 자동으로 들어옵니다."></textarea>`;
+      placeholder="회의 전에 정해둔 안건을 적어주세요. 예약을 고르면 캘린더 설명이 자동으로 들어옵니다."></textarea>
+    <div class="sub" id="rc-agn" style="margin:5px 0 0;font-size:12px"></div>`;
   const t=$('#rc-agt');
   if(t){
     t.value=v;
-    const fit=autoGrow(t, 520);
-    t.oninput=()=>{ REC.agenda=t.value; };
+    // 화면 높이의 3분의 2까지 늘어납니다. 그 뒤로는 칸 안에서 스크롤합니다.
+    const cap = () => Math.max(240, Math.round(window.innerHeight * 0.66));
+    const fit = autoGrow(t, cap());
+    window.addEventListener('resize', ()=>{ t.style.maxHeight=cap()+'px'; fit && fit(); });
+    // 몇 줄 · 몇 자인지 보여줍니다. 잘렸는지 눈으로 알 수 있어야 합니다.
+    const note=$('#rc-agn');
+    const paint=()=>{
+      if(!note) return;
+      const s2=t.value;
+      if(!s2.trim()){ note.textContent=''; return; }
+      const lines=s2.split('\n').length, chars=s2.length;
+      note.textContent = lines+'줄 · '+chars.toLocaleString()+'자'
+        + (chars>=20000 ? '  ⚠ 20,000자에서 잘렸습니다 — 캘린더 설명이 너무 깁니다' : '');
+      note.style.color = (chars>=20000) ? 'var(--warn)' : 'var(--tx3)';
+    };
+    t.oninput=()=>{ REC.agenda=t.value; paint(); };
+    paint();
   }
 }
 
