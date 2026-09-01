@@ -800,7 +800,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v16.7</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v16.8</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -3881,6 +3881,8 @@ async function renderServer(){
           <option value="SLACK2_CHANNEL">2번 슬랙 기본 채널 (# 없이)</option>
           <option value="SLACK2_CHANNEL_MAP">2번 슬랙 회사별 채널 (회사=채널, 회사=채널)</option>
           <option value="BRIEF_SLACK">일일 브리핑을 슬랙으로 보낼지 (1 · 0)</option>
+          <option value="GCAL_TITLES">회의실 예약 제목 낱말 더하기 (쉼표 구분)</option>
+          <option value="GCAL_EVERY_MIN">회의실 예약 확인 주기 (분)</option>
           <option value="HD_BOOT_SYSTEM">로그인 없이 부팅할 때 시작 (1 · 0 · 확인 후 사용)</option>
         </select>
         <input id="sv-val" placeholder="예: large-v3 · claude-sonnet-5 · 7" style="flex:1;min-width:200px">
