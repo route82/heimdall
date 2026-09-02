@@ -576,6 +576,16 @@ h1,.mttl,.ct,.bct,.pjc .n,.hcard h2,.login h2,.pick .hd h3,.md,.seg p,.hl,
 .msg,.sub,.msub,.bone,.csum,.empty,input,select,textarea,.btn,.nav,.tab,
 .room,.st,.tb,.atc,.pick .it .nm{font-family:var(--f-body)}
 
+/* 오래 걸리는 작업을 기다릴 때 — 점 세 개가 차례로 뜁니다.
+   멈춘 것처럼 보이지 않게 하는 것이 목적입니다. */
+.ldots{display:inline-flex;gap:4px;margin-left:7px;vertical-align:middle}
+.ldots i{width:4px;height:4px;border-radius:50%;background:currentColor;
+ opacity:.25;animation:ldot 1.2s ease-in-out infinite}
+.ldots i:nth-child(2){animation-delay:.18s}
+.ldots i:nth-child(3){animation-delay:.36s}
+@keyframes ldot{0%,60%,100%{opacity:.25;transform:translateY(0)}
+                30%{opacity:1;transform:translateY(-3px)}}
+
 /* 움직임을 줄이는 설정을 켠 기기에서는 전부 끕니다 */
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;
@@ -1027,7 +1037,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v19.13</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v19.15</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -1741,31 +1751,98 @@ function drawMeeting(){
 
   // 요약이 비었을 때 다시 만들기 — 전사는 그대로 두고 요약만 새로 만듭니다.
   // 사무실 PC 가 실제 작업을 하므로, 어느 기기에서 눌러도 됩니다.
+  // ── 회의록 다시 만들기 ─────────────────────────────────
+  // 사무실 PC 가 실제 작업을 합니다. 어느 기기에서 눌러도 됩니다.
+  // 새로고침하거나 다른 탭에 갔다 와도 진행 상황이 이어집니다.
   const rmk=$('#remake');
-  if(rmk) rmk.onclick=async()=>{
-    if(!confirm('회의록을 다시 만듭니다.\n\n'
-      +'전사문은 그대로 두고 요약·하이라이트·마인드맵만 새로 만듭니다.\n'
-      +'AI 사용료가 한 번 더 나옵니다. 진행할까요?')) return;
-    rmk.disabled=true; rmk.textContent='만드는 중… (몇 분 걸립니다)';
-    const {data,error}=await SB.from('hd_cmd').insert({
-      kind:'remake', args:{meeting:m.id}, asked_by:me.id, asked_name:me.name})
-      .select('id').single();
-    if(error){ rmk.disabled=false; rmk.textContent='회의록 다시 만들기';
-      return toast('보내지 못했습니다: '+esc(error.message), 6000); }
-    for(let i=0;i<150;i++){                     // 최대 5분
-      await new Promise(r=>setTimeout(r,2000));
-      const {data:d}=await SB.from('hd_cmd')
-        .select('status,result').eq('id',data.id).maybeSingle();
-      if(!d) continue;
-      if(d.status==='done'){ toast('회의록을 다시 만들었습니다'); openMeeting(m.id); return; }
-      if(d.status==='failed'){
-        rmk.disabled=false; rmk.textContent='회의록 다시 만들기';
-        return toast('만들지 못했습니다: '+esc((d.result||'').slice(0,300)), 9000);
+  if(rmk){
+    const DOTS='<span class="ldots"><i></i><i></i><i></i></span>';
+    let timer=null, watching=false;
+
+    const idle=()=>{ if(timer) clearInterval(timer); timer=null; watching=false;
+      rmk.disabled=false; rmk.textContent='회의록 다시 만들기'; };
+
+    const busy=(t0)=>{
+      if(timer) clearInterval(timer);
+      rmk.disabled=true;
+      const tick=()=>{
+        const s2=Math.max(0, Math.round((Date.now()-t0)/1000));
+        const ago = s2<60 ? s2+'초' : Math.floor(s2/60)+'분 '+(s2%60)+'초';
+        rmk.innerHTML='회의록 만드는 중 · '+ago+DOTS;
+      };
+      tick(); timer=setInterval(tick,1000);
+    };
+
+    // 이 회의가 정말 다 만들어졌는지 회의 자체를 봅니다.
+    // 명령 기록을 못 읽는 상황에서도 이것 하나로 판정할 수 있습니다.
+    const doneYet=async()=>{
+      const {data}=await SB.from('hd_meeting')
+        .select('summary_md').eq('id',m.id).maybeSingle();
+      return !!(data && (data.summary_md||'').trim());
+    };
+
+    const finish=()=>{ idle();
+      toast('회의록 재생성이 완료되었습니다', 6000); openMeeting(m.id); };
+
+    // 끝날 때까지 지켜봅니다 (최대 20분).
+    // 다른 탭에 있으면 브라우저가 이 주기를 늦추므로, 돌아왔을 때 즉시 한 번 더 봅니다.
+    async function watch(cmdId, t0){
+      if(watching) return;
+      watching=true; busy(t0);
+      const back=()=>{ if(!document.hidden && watching) look(); };
+      document.addEventListener('visibilitychange', back);
+      const off=()=>document.removeEventListener('visibilitychange', back);
+
+      let stopped=false;
+      async function look(){
+        if(stopped) return true;
+        if(cmdId){
+          const {data:d}=await SB.from('hd_cmd')
+            .select('status,result').eq('id',cmdId).maybeSingle();
+          if(d && d.status==='done'){ stopped=true; off(); finish(); return true; }
+          if(d && d.status==='failed'){
+            stopped=true; off(); idle();
+            toast('만들지 못했습니다: '+esc((d.result||'').slice(0,300)), 9000);
+            return true;
+          }
+        }
+        if(await doneYet()){ stopped=true; off(); finish(); return true; }
+        return false;
       }
+
+      for(let n=0; n<600; n++){          // 2초 × 600 = 20분
+        await new Promise(r=>setTimeout(r,2000));
+        if(await look()) return;
+      }
+      stopped=true; off(); idle();
+      toast('20분이 지나도 끝나지 않았습니다. 처리 서버 화면에서 상태를 확인해주세요.', 9000);
     }
-    rmk.disabled=false; rmk.textContent='회의록 다시 만들기';
-    toast('처리 서버가 응답하지 않습니다. 켜져 있는지 확인해주세요.', 8000);
-  };
+
+    // 화면을 열 때 — 이미 만들고 있는 중이면 이어서 보여줍니다
+    (async()=>{
+      const {data:running}=await SB.from('hd_cmd')
+        .select('id,created_at,status')
+        .eq('kind','remake').in('status',['queued','working'])
+        .order('created_at',{ascending:false}).limit(5);
+      const mine=(running||[]).find(c=>true);   // 진행 중인 것이 있으면 이어붙입니다
+      if(mine) watch(mine.id, new Date(mine.created_at).getTime());
+    })().catch(()=>{});
+
+    rmk.onclick=async()=>{
+      if(watching) return;
+      if(!confirm('회의록을 다시 만듭니다.\n\n'
+        +'전사문은 그대로 두고 요약·하이라이트·마인드맵만 새로 만듭니다.\n'
+        +'5분쯤 걸리고, AI 사용료가 한 번 더 나옵니다. 진행할까요?')) return;
+      const t0=Date.now();
+      busy(t0);
+      const {data,error}=await SB.from('hd_cmd').insert({
+        kind:'remake', args:{meeting:m.id}, asked_by:me.id, asked_name:me.name})
+        .select('id').single();
+      if(error){ idle();
+        return toast('보내지 못했습니다: '+esc(error.message), 6000); }
+      watch(data.id, t0);
+    };
+  }
 
   // 지금 보고 있는 탭의 글 전체를 복사합니다
   const cp=$('#cpy');
