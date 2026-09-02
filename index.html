@@ -1027,7 +1027,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v19.11</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v19.12</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -1670,11 +1670,19 @@ function drawMeeting(){
     <button class="pjbtn none" id="pjsel">분류 안 됨</button>
   </div>
   <div class="tabs">
+    <button class="tab">안건</button>
     <button class="tab">하이라이트</button>
     <button class="tab">전사</button><button class="tab" aria-selected="true">요약</button>
     <button class="tab">마인드맵</button>
     <button class="btn" id="cpy" style="margin-left:auto;align-self:center;flex:none">전체 복사</button>
   </div>
+  <div class="pane wide" id="agpane">
+    <div class="sub" style="margin:0 0 12px">회의 전에 정해둔 안건입니다.
+      구글 캘린더 예약의 「설명」란에 적으시면 자동으로 들어옵니다</div>
+    <div class="md" id="agview">${(m.agenda_md||'').trim()
+      ? mdHtml(m.agenda_md) : '<div class="empty">적어둔 안건이 없습니다.</div>'}</div>
+    <textarea id="agedit" class="full" style="display:none;min-height:320px;
+      font-family:var(--f-body);font-size:14.5px;line-height:1.7"></textarea></div>
   <div class="pane">${hls.length? hls.map((h,i)=>`<div class="hl" data-i="${i}">
       <div class="ts">${hms(h.start_sec)}</div><h3>${esc(h.headline)}</h3>
       ${(h.points||[]).length?`<ul>${h.points.map(p=>`<li>${esc(p)}</li>`).join('')}</ul>`:''}</div>`).join('')
@@ -1684,12 +1692,10 @@ function drawMeeting(){
       <div>${s.speaker?`<span class="spk ${si(s.speaker)}">${esc(s.speaker)}</span><br>`:''}
       <p data-i="${s.idx}">${esc(s.text)}</p></div></div>`).join('')}</div></div>
   <div class="pane on wide">
-    <div id="agbox" style="border:1px solid var(--line);background:var(--s2);border-radius:12px;padding:13px 16px;margin-bottom:16px;${(m.agenda_md||'').trim()?'':'display:none'}">
-      <div style="font-size:13px;font-weight:700;color:var(--ac);margin-bottom:7px">사전 안건</div>
-      <div class="md" id="agview">${mdHtml(m.agenda_md||'')}</div>
-      <textarea id="agedit" class="full" style="display:none;min-height:200px;font-family:var(--f-body);font-size:14.5px;line-height:1.7"></textarea>
-    </div>
-    <div class="md" id="smview">${mdHtml(m.summary_md||'')}</div>
+    <div class="md" id="smview">${(m.summary_md||'').trim()
+      ? mdHtml(m.summary_md)
+      : '<div class="empty">회의록이 아직 없습니다.<br>'
+        + '전사는 「전사」 탭에서 보실 수 있습니다.</div>'}</div>
     <textarea id="smedit" class="full" style="display:none;min-height:520px;font-family:ui-monospace,Menlo,monospace;font-size:13.5px"></textarea></div>
   <div class="pane" id="mmpane">${(m.mindmap_md||'').trim()
     ? '<div class="sub" style="margin-bottom:8px">가지를 누르면 접었다 폈다 할 수 있습니다 · 마우스 휠로 확대</div><svg id="mmv" style="width:100%;height:600px;background:var(--s1);border:1px solid var(--line);border-radius:12px"></svg>'
@@ -1962,16 +1968,12 @@ function startEdit(){
   }
   $('#smview').style.display='none';
   const ta=$('#smedit'); ta.style.display='block'; ta.value=cur.m.summary_md||'';
-  // 사전 안건 — 비어 있어도 편집 중에는 칸을 열어 둡니다
-  const agb=$('#agbox');
-  if(agb){
-    agb.style.display='';
-    const agv=$('#agview'); if(agv) agv.style.display='none';
-    const agt=$('#agedit');
-    if(agt){ agt.style.display='block'; agt.value=cur.m.agenda_md||'';
-      agt.placeholder='회의 전에 정해둔 안건을 적어주세요. 마크다운을 그대로 씁니다.';
-      autoGrow(agt, 620); }
-  }
+  // 사전 안건 — 「안건」 탭에서 고칩니다 (2026-09-02 요약 탭에서 분리)
+  const agv=$('#agview'); if(agv) agv.style.display='none';
+  const agt=$('#agedit');
+  if(agt){ agt.style.display='block'; agt.value=cur.m.agenda_md||'';
+    agt.placeholder='회의 전에 정해둔 안건을 적어주세요. 마크다운을 그대로 씁니다.';
+    autoGrow(agt, 620); }
   // 마인드맵 — 그림 대신 글상자를 보여줍니다. # 은 큰 가지, ## 는 작은 가지입니다
   const pane=$('#mmpane');
   if(pane){
@@ -4026,9 +4028,9 @@ function renderGuide(){
     <p>문서: 워드(docx) · 텍스트 · PDF · PPT · 한글(hwpx)<br>
        <span style="color:var(--warn)">옛 한글(.hwp)은 안 됩니다 — 「다른 이름으로 저장 → hwpx」 후 올려주세요</span></p>`)}
   ${box('4. 회의록을 보고 · 고치고 · 옮기려면',`<ul>
-    <li>회의록을 열면 <b>하이라이트 · 전사 · 요약 · 마인드맵</b> 탭이 있습니다</li>
+    <li>회의록을 열면 <b>안건 · 하이라이트 · 전사 · 요약 · 마인드맵</b> 탭이 있습니다</li>
     <li>오른쪽 위 <b>전체 복사</b> — 지금 보는 탭의 글 전체가 복사됩니다 (카톡·메일에 붙여넣기)</li>
-    <li><b>편집</b> — 제목·전사·하이라이트·요약·마인드맵을 바로 고칠 수 있습니다 (참석자만)</li>
+    <li><b>편집</b> — 제목·안건·전사·하이라이트·요약·마인드맵을 바로 고칠 수 있습니다 (참석자만)</li>
     <li><b>워드로 내보내기</b> — 한 파일로 내려받습니다</li>
     <li>회의록이 만들어지면 <b>참석자와 그 팀 팀장에게 슬랙 1:1 메시지</b>가 자동으로 갑니다.
         헤임달 안에 따로 알림은 만들지 않습니다</li>
