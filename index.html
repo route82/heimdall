@@ -1027,7 +1027,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v19.12</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v19.13</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -1724,6 +1724,8 @@ function drawMeeting(){
     ${((m.visibility==='private'&&m.owner_id===me.id)
        ||(m.visibility!=='private'&&isAdm))
       ?'<button class="btn" id="mdel" style="color:var(--err)">삭제</button>':''}
+    ${!(m.summary_md||'').trim() && m.local_id
+      ? '<button class="btn" id="remake">회의록 다시 만들기</button>' : ''}
     <button class="btn" id="expdoc">워드로 내보내기</button>
     <button class="btn" id="cancel" style="display:none">취소</button>
     ${m.visibility!=='private'
@@ -1736,6 +1738,34 @@ function drawMeeting(){
     panes.forEach(p=>p.classList.remove('on'));t.setAttribute('aria-selected','true');panes[i].classList.add('on');
     if(t.textContent.trim()==='마인드맵') drawMindmap(m);});
   $('#back').onclick=()=>go('list');
+
+  // 요약이 비었을 때 다시 만들기 — 전사는 그대로 두고 요약만 새로 만듭니다.
+  // 사무실 PC 가 실제 작업을 하므로, 어느 기기에서 눌러도 됩니다.
+  const rmk=$('#remake');
+  if(rmk) rmk.onclick=async()=>{
+    if(!confirm('회의록을 다시 만듭니다.\n\n'
+      +'전사문은 그대로 두고 요약·하이라이트·마인드맵만 새로 만듭니다.\n'
+      +'AI 사용료가 한 번 더 나옵니다. 진행할까요?')) return;
+    rmk.disabled=true; rmk.textContent='만드는 중… (몇 분 걸립니다)';
+    const {data,error}=await SB.from('hd_cmd').insert({
+      kind:'remake', args:{meeting:m.id}, asked_by:me.id, asked_name:me.name})
+      .select('id').single();
+    if(error){ rmk.disabled=false; rmk.textContent='회의록 다시 만들기';
+      return toast('보내지 못했습니다: '+esc(error.message), 6000); }
+    for(let i=0;i<150;i++){                     // 최대 5분
+      await new Promise(r=>setTimeout(r,2000));
+      const {data:d}=await SB.from('hd_cmd')
+        .select('status,result').eq('id',data.id).maybeSingle();
+      if(!d) continue;
+      if(d.status==='done'){ toast('회의록을 다시 만들었습니다'); openMeeting(m.id); return; }
+      if(d.status==='failed'){
+        rmk.disabled=false; rmk.textContent='회의록 다시 만들기';
+        return toast('만들지 못했습니다: '+esc((d.result||'').slice(0,300)), 9000);
+      }
+    }
+    rmk.disabled=false; rmk.textContent='회의록 다시 만들기';
+    toast('처리 서버가 응답하지 않습니다. 켜져 있는지 확인해주세요.', 8000);
+  };
 
   // 지금 보고 있는 탭의 글 전체를 복사합니다
   const cp=$('#cpy');
