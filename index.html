@@ -289,8 +289,44 @@ mark{background:var(--mark);color:var(--markt);padding:1px 3px;border-radius:3px
  color:var(--bg);padding:13px 20px;border-radius:10px;font-size:14px;z-index:80;
  box-shadow:0 6px 22px var(--shadow);animation:tsin .28s var(--spring) both}
 @keyframes tsin{from{opacity:0;transform:translate(-50%,14px)}to{opacity:1;transform:translate(-50%,0)}}
-.bar{position:fixed;right:22px;bottom:22px;display:flex;gap:9px;z-index:50}
-.bar .btn{box-shadow:0 4px 16px var(--shadow);padding:12px 20px;border-radius:24px}
+/* 아래 단추 묶음 — 판을 깔아 글 위에 겹쳐 보이지 않게 합니다 (2026-09-09 대표님 지적)
+   같이: 회의 화면 아래에 여백을 줘서 단추가 내용을 가리지 않습니다 */
+.bar{position:fixed;right:22px;bottom:22px;display:flex;gap:7px;z-index:50;align-items:center;
+ background:var(--s1);border:1px solid var(--line);border-radius:30px;padding:7px 8px;
+ box-shadow:0 12px 34px var(--shadow)}
+.bar .btn{box-shadow:none;padding:10px 17px;border-radius:22px}
+.bar .sep{width:1px;height:22px;background:var(--line);margin:0 2px}
+.barmore{position:absolute;right:6px;bottom:calc(100% + 9px);display:flex;flex-direction:column;
+ gap:6px;background:var(--s1);border:1px solid var(--line);border-radius:16px;padding:8px;
+ box-shadow:0 14px 38px var(--shadow);min-width:186px}
+.barmore .btn{width:100%;justify-content:flex-start;border-radius:11px;padding:10px 13px}
+#p-meeting{padding-bottom:104px}
+@media(max-width:760px){
+  .bar{left:12px;right:12px;bottom:12px;justify-content:flex-end;flex-wrap:wrap}
+  #p-meeting{padding-bottom:132px}
+}
+/* 녹음 화면 — 칸마다 판을 나눠 무엇을 적는 자리인지 보이게 합니다 (2026-09-09) */
+.fld{background:var(--s2);border:1px solid var(--line);border-radius:13px;
+ padding:14px 16px;margin-bottom:11px}
+.fldh{display:flex;align-items:center;gap:8px;margin:0 0 7px;flex-wrap:wrap}
+.fldh b{font-size:13.5px;font-weight:800;color:var(--tx);letter-spacing:.01em}
+.fldh .opt{font-size:11px;font-weight:700;color:var(--tx3);border:1px solid var(--line);
+ border-radius:999px;padding:2px 8px;line-height:1.4;white-space:nowrap}
+.fldh .req{color:var(--acon);background:var(--ac);border-color:var(--ac)}
+.fldh .hint{font-size:12px;color:var(--tx3);font-weight:400}
+.recgo{background:var(--s3);border:1px solid var(--acln);border-radius:14px;
+ padding:15px 16px;margin-top:14px}
+.recnote{background:var(--acbg);border:1px solid var(--line);border-radius:12px;
+ padding:12px 15px;margin-bottom:14px;font-size:13.5px;line-height:1.7;color:var(--tx2)}
+.recnote b{color:var(--tx)}
+/* 요약 — 보던 화면에서 바로 고칩니다 (2026-09-09 대표님 지적) */
+.md[contenteditable=true]{outline:none;border:1.5px dashed var(--acln);border-radius:12px;
+ padding:14px 16px;background:var(--s1)}
+.md[contenteditable=true]:focus{border-color:var(--ac)}
+.edhint{display:flex;align-items:center;gap:9px;margin-bottom:10px;font-size:12.5px;
+ color:var(--tx3)}
+.edhint .btn{padding:5px 11px;font-size:12px;border-radius:9px}
+#smview.canedit{cursor:text}
 .hist{margin-top:26px;font-size:12.5px;color:var(--tx3)}
 .hist div{padding:4px 0;border-top:1px solid var(--line2)}
 .chatwrap{display:flex;gap:18px;align-items:flex-start}
@@ -722,6 +758,7 @@ const isAdminish = r => ['admin','dev'].includes(r);
 // 사람·브리핑까지 보는 최고 권한 (관리자 · 공동대표)
 const isTop = r => ['admin','ceo'].includes(r);
 let me=null, view='list', cur=null, editing=false;
+let SM_RAW=false;   // 요약을 마크다운 원문으로 보고 있는지 (2026-09-09)
 
 // ─────────────────────────── 화면 밝기 (어둡게 / 밝게 / 기기 설정 따름)
 // 고른 값은 ① 서버(hd_member.theme) 에 계정별로 남고
@@ -1037,7 +1074,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v19.15</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v19.16</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -1592,7 +1629,7 @@ async function renderList(){
 
 // ─────────────────────────── 회의 상세
 async function openMeeting(id){
-  editing=false;
+  editing=false; SM_RAW=false;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   const el=$('#p-meeting'); el.classList.add('on'); el.innerHTML='<div class="sub">불러오는 중…</div>';
   const [m,segs,hls,acts,edits,att] = await Promise.all([
@@ -1702,6 +1739,9 @@ function drawMeeting(){
       <div>${s.speaker?`<span class="spk ${si(s.speaker)}">${esc(s.speaker)}</span><br>`:''}
       <p data-i="${s.idx}">${esc(s.text)}</p></div></div>`).join('')}</div></div>
   <div class="pane on wide">
+    <div class="edhint" id="smhint" style="display:none">
+      <span id="smhintt">보시던 화면 그대로 고치시면 됩니다. 글자를 누르고 바로 쓰세요.</span>
+      <button class="btn" id="smraw">마크다운 원문으로</button></div>
     <div class="md" id="smview">${(m.summary_md||'').trim()
       ? mdHtml(m.summary_md)
       : '<div class="empty">회의록이 아직 없습니다.<br>'
@@ -1725,22 +1765,40 @@ function drawMeeting(){
   ${edits.length?`<div class="hist"><b>편집 이력</b>${edits.map(e=>
      `<div>${kst(e.at)} · ${esc(e.editor)} · ${e.kind}</div>`).join('')}</div>`:''}
   <div class="bar">
-    ${isAdm ? (m.status==='archived'
-       ? '<button class="btn" id="arch">보관 해제</button>'
-       : '<button class="btn" id="arch">보관</button>') : ''}
-    ${(m.visibility==='private' && m.owner_id===me.id)
-        ? '<button class="btn" id="shr">공유 대상 바꾸기</button>'
-          + '<button class="btn g" id="pub">팀에 공개</button>' : ''}
-    ${((m.visibility==='private'&&m.owner_id===me.id)
-       ||(m.visibility!=='private'&&isAdm))
-      ?'<button class="btn" id="mdel" style="color:var(--err)">삭제</button>':''}
-    ${!(m.summary_md||'').trim() && m.local_id
-      ? '<button class="btn" id="remake">회의록 다시 만들기</button>' : ''}
-    <button class="btn" id="expdoc">워드로 내보내기</button>
+    <div class="barmore" id="barmore" style="display:none">
+      ${isAdm ? (m.status==='archived'
+         ? '<button class="btn" id="arch">보관 해제</button>'
+         : '<button class="btn" id="arch">보관</button>') : ''}
+      ${(m.visibility==='private' && m.owner_id===me.id)
+          ? '<button class="btn" id="shr">공유 대상 바꾸기</button>'
+            + '<button class="btn g" id="pub">팀에 공개</button>' : ''}
+      ${!(m.summary_md||'').trim() && m.local_id
+        ? '<button class="btn" id="remake">회의록 다시 만들기</button>' : ''}
+      <button class="btn" id="expdoc">워드로 내보내기</button>
+      ${((m.visibility==='private'&&m.owner_id===me.id)
+         ||(m.visibility!=='private'&&isAdm))
+        ?'<button class="btn" id="mdel" style="color:var(--err)">삭제</button>':''}
+    </div>
+    <button class="btn" id="barmoreb" title="보관 · 내보내기 · 삭제">⋯ 더보기</button>
+    <span class="sep"></span>
     <button class="btn" id="cancel" style="display:none">취소</button>
     ${m.visibility!=='private'
       ?`<button class="btn ${okd?'':'g'}" id="mok">${okd?'확정 해제':'확정'}</button>`:''}
     <button class="btn p" id="edit">편집</button></div>`;
+
+  // 「더보기」 — 자주 쓰지 않는 단추는 접어 둡니다 (2026-09-09 대표님 지적)
+  (function(){
+    const b=$('#barmoreb'), pop=$('#barmore'); if(!b||!pop) return;
+    const shut=()=>{pop.style.display='none'; document.removeEventListener('click', away, true);};
+    const away=e=>{ if(!pop.contains(e.target) && e.target!==b) shut(); };
+    b.onclick=e=>{
+      e.stopPropagation();
+      if(pop.style.display==='none'){ pop.style.display='flex';
+        setTimeout(()=>document.addEventListener('click', away, true),0); }
+      else shut();
+    };
+    pop.querySelectorAll('.btn').forEach(x=>x.addEventListener('click', shut));
+  })();
 
   drawSeries(m);
   const tabs=[...el.querySelectorAll('.tab')], panes=[...el.querySelectorAll('.pane')];
@@ -1748,6 +1806,16 @@ function drawMeeting(){
     panes.forEach(p=>p.classList.remove('on'));t.setAttribute('aria-selected','true');panes[i].classList.add('on');
     if(t.textContent.trim()==='마인드맵') drawMindmap(m);});
   $('#back').onclick=()=>go('list');
+
+  // 요약을 누르면 바로 편집으로 들어갑니다 — 아래 「편집」 을 찾지 않아도 됩니다
+  // (2026-09-09 대표님 지적: 보다가 바로 고칠 수 있어야 한다)
+  (function(){
+    const sv=$('#smview'); if(!sv) return;
+    if(!canEditMeeting().ok) return;
+    sv.classList.add('canedit');
+    sv.title='눌러서 바로 고치기';
+    sv.addEventListener('mousedown', ()=>{ if(!editing) setTimeout(startEdit, 0); });
+  })();
 
   // 요약이 비었을 때 다시 만들기 — 전사는 그대로 두고 요약만 새로 만듭니다.
   // 사무실 PC 가 실제 작업을 하므로, 어느 기기에서 눌러도 됩니다.
@@ -2047,18 +2115,26 @@ function drawMeeting(){
   })();
 }
 
-function startEdit(){
-  const el=$('#p-meeting');
+// 이 회의를 고칠 수 있는 사람인지 — 편집 단추와 「눌러서 고치기」 양쪽에서 씁니다
+function canEditMeeting(){
+  if(!cur || !cur.m) return {ok:false, why:''};
   const nm = s => (s||'').replace(/\s/g,'');
   const same = (a,b) => nm(a).length>1 && nm(b).length>1 && (nm(a).includes(nm(b)) || nm(b).includes(nm(a)));
+  const boss = ['manager','admin','ceo','dev'].includes(me.role);
   const mine = cur.m.created_by === me.id;      // 이 회의를 올린 본인
-  const allowed = mine || ['manager','admin','ceo','dev'].includes(me.role)
-                  || cur.att.some(a=>same(a, me.name));
-  if(!allowed) return toast('이 회의 참석자만 수정할 수 있습니다.<br>참석자: '
-    + esc(cur.att.join(', ')||'미기재')
-    + '<br>참석자 칸을 비우고 녹음하셨다면 관리자에게 말씀해주세요.', 6000);
-  if(cur.m.status==='reported' && !['manager','admin','ceo','dev'].includes(me.role))
-    return toast('경영진께 보고된 회의는 부서 관리자만 수정할 수 있습니다.',5000);
+  if(!(mine || boss || cur.att.some(a=>same(a, me.name))))
+    return {ok:false, why:'이 회의 참석자만 수정할 수 있습니다.<br>참석자: '
+      + esc(cur.att.join(', ')||'미기재')
+      + '<br>참석자 칸을 비우고 녹음하셨다면 관리자에게 말씀해주세요.'};
+  if(cur.m.status==='reported' && !boss)
+    return {ok:false, why:'경영진께 보고된 회의는 부서 관리자만 수정할 수 있습니다.'};
+  return {ok:true, why:''};
+}
+
+function startEdit(){
+  const el=$('#p-meeting');
+  const gate=canEditMeeting();
+  if(!gate.ok) return toast(gate.why, 6000);
   editing=true;
   el.querySelectorAll('#segs p, .hl h3, .hl li').forEach(e=>{e.contentEditable='true';e.spellcheck=false;});
   const mt=$('#mtitle');
@@ -2073,8 +2149,30 @@ function startEdit(){
       + '<div id="mparts"></div></div>');
     MATT = attInput($('#mparts'), cur.att);
   }
-  $('#smview').style.display='none';
-  const ta=$('#smedit'); ta.style.display='block'; ta.value=cur.m.summary_md||'';
+  // 요약 — 보던 화면 그대로 고칩니다 (2026-09-09 대표님 지적)
+  //   전에는 여기서 md 원문 글상자로 바꿔치웠는데, 표가 파이프 문자로 흩어져 읽기 어려웠습니다.
+  const sv=$('#smview'), ta=$('#smedit');
+  SM_RAW=false;
+  if(sv){
+    if(!(cur.m.summary_md||'').trim()) sv.innerHTML='<p><br></p>';   // 빈 회의록도 쓸 수 있게
+    sv.contentEditable='true'; sv.spellcheck=false;
+    sv.classList.remove('canedit');
+    const hint=$('#smhint'); if(hint) hint.style.display='flex';
+    const raw=$('#smraw');
+    if(raw) raw.onclick=()=>{
+      if(!SM_RAW){                       // 화면 → 원문
+        ta.value = htmlToMd(sv);
+        sv.style.display='none'; ta.style.display='block'; SM_RAW=true;
+        raw.textContent='화면으로 돌아가기';
+        $('#smhintt').textContent='마크다운 원문입니다. 표는 | 로 나뉩니다.';
+      }else{                             // 원문 → 화면
+        sv.innerHTML = mdHtml(ta.value) || '<p><br></p>';
+        ta.style.display='none'; sv.style.display=''; SM_RAW=false;
+        raw.textContent='마크다운 원문으로';
+        $('#smhintt').textContent='보시던 화면 그대로 고치시면 됩니다. 글자를 누르고 바로 쓰세요.';
+      }
+    };
+  }
   // 사전 안건 — 「안건」 탭에서 고칩니다 (2026-09-02 요약 탭에서 분리)
   const agv=$('#agview'); if(agv) agv.style.display='none';
   const agt=$('#agedit');
@@ -2156,7 +2254,9 @@ async function saveMeeting(){
     await SB.from('hd_meeting').update({agenda_md:agt.value}).eq('id',id);
     msg.push('사전 안건 수정');
   }
-  const sm=$('#smedit').value;
+  // 원문 글상자를 보고 있었으면 그 값을, 아니면 화면에서 읽어 마크다운으로 되돌립니다
+  const smv=$('#smview');
+  const sm = SM_RAW ? $('#smedit').value : (smv ? htmlToMd(smv) : (cur.m.summary_md||''));
   if(sm!==(cur.m.summary_md||'')){
     await SB.from('hd_meeting').update({summary_md:sm}).eq('id',id);
     msg.push('요약 수정');
@@ -3618,25 +3718,32 @@ async function renderRec(){
       끝내면 자동으로 올라가고, 전사·요약·하이라이트가 만들어집니다</div>
     <div class="box">
       <div id="rc-today"></div>
-      <div id="rc-cal-row" style="margin-bottom:12px">
-        <div style="font-size:13px;font-weight:700;color:var(--tx2);margin-bottom:5px">회의실 예약에서 고르기</div>
+      ${on?'':`<div class="recnote">
+        <b>바로 시작하셔도 됩니다.</b> 아래 네 칸은 <b>전부 안 채워도</b> 녹음됩니다.
+        채우시면 회의록이 더 정확해집니다.</div>`}
+      <div class="fld" id="rc-cal-row">
+        <div class="fldh"><b>회의실 예약에서 고르기</b><span class="opt">선택</span>
+          <span class="hint">고르면 회의명과 안건이 자동으로 채워집니다</span></div>
         <select id="rc-cal" class="full" style="max-width:640px" ${on?'disabled':''}>
           <option value="">불러오는 중…</option>
         </select>
-        <div class="sub" id="rc-cal-hint" style="margin:5px 0 0;font-size:12px">
-          고르면 회의명이 자동으로 채워집니다</div>
+        <div class="sub" id="rc-cal-hint" style="margin:7px 0 0;font-size:12px;display:none"></div>
       </div>
-      <div class="row" style="margin-bottom:4px">
-        <input id="rc-title" placeholder="무슨 회의인가요 (예: 주간회의)" style="flex:1;min-width:220px" ${on?'disabled':''}>
+      <div class="fld">
+        <div class="fldh"><b>회의명</b><span class="opt">선택</span>
+          <span class="hint">비우면 「회의 내용」 으로 저장됩니다</span></div>
+        <input id="rc-title" placeholder="무슨 회의인가요 (예: 주간회의)" class="full" style="max-width:640px" ${on?'disabled':''}>
+        <div class="sub" style="margin:7px 0 0;font-size:12px">앞에
+          <b>[${esc(ymd6())}, ${esc(me.company||'')}]</b> 처럼 <b>날짜 · 회사</b>가 자동으로 붙습니다</div>
       </div>
-      <div class="sub" style="margin:0 0 10px;font-size:12px">제목은
-        <b>[${esc(ymd6())}, ${esc(me.company||'')}] 회의 내용</b>
-        처럼 <b>날짜 · 회사</b>가 앞에 자동으로 붙습니다</div>
-      <div style="font-size:13px;font-weight:700;color:var(--tx2);margin-bottom:5px">참석자</div>
-      <div id="rc-parts" style="margin-bottom:10px"></div>
-      <div id="rc-ag-box" style="margin-bottom:12px">
-        <div style="font-size:13px;font-weight:700;color:var(--tx2);margin-bottom:5px">사전 안건
-          <span class="sub" style="margin:0;font-weight:400;font-size:12px">— 회의 중에도 이 자리에서 계속 보입니다</span></div>
+      <div class="fld">
+        <div class="fldh"><b>참석자</b><span class="opt">선택</span>
+          <span class="hint">적어두시면 그분들께 슬랙으로 알려 드리고, 나중에 이 회의록을 고칠 수 있습니다</span></div>
+        <div id="rc-parts"></div>
+      </div>
+      <div class="fld" id="rc-ag-box">
+        <div class="fldh"><b>사전 안건</b><span class="opt">선택</span>
+          <span class="hint">회의 중에도 이 자리에서 계속 보입니다</span></div>
         <div id="rc-ag"></div>
       </div>
       <select id="rc-type" style="display:none"><option value="meeting">회의</option></select>
@@ -3651,10 +3758,12 @@ async function renderRec(){
           ?'민감한 회의는 「전사 경영진」으로 — 일반 직원에게 보이지 않습니다'
           :'회의가 어느 회사 것인지 골라주세요'}</span>
       </div>`:''}
-      <div class="row" style="align-items:center">
-        <button class="btn p" id="rc-go" style="min-width:150px">${on?'■ 녹음 종료':'● 회의 녹음 시작'}</button>
-        <span id="rc-time" style="font-size:22px;font-weight:700;letter-spacing:1px">0:00</span>
-        <span id="rc-lv" class="sub" style="margin:0"></span>
+      <div class="recgo">
+        <div class="row" style="align-items:center">
+          <button class="btn p" id="rc-go" style="min-width:168px;font-size:15px;padding:13px 22px">${on?'■ 녹음 종료':'● 회의 녹음 시작'}</button>
+          <span id="rc-time" style="font-size:24px;font-weight:700;letter-spacing:1px">0:00</span>
+          <span id="rc-lv" class="sub" style="margin:0"></span>
+        </div>
       </div>
       <div class="sub" style="margin:12px 0 0">
         녹음 중에는 화면이 꺼지지 않게 잡아둡니다. 다른 탭으로 옮겨도 계속 녹음됩니다.<br>
@@ -3769,19 +3878,19 @@ async function loadCalPicks(){
   if(error){
     sel.innerHTML='<option value="">예약을 불러오지 못했습니다</option>';
     sel.disabled=true;
-    if(hint) hint.innerHTML='<span style="color:var(--warn)">'+esc(error.message)+'</span>';
+    if(hint){ hint.innerHTML='<span style="color:var(--warn)">'+esc(error.message)+'</span>'; hint.style.display=''; }
     return;
   }
   if(!data || !data.length){
     sel.innerHTML='<option value="">지금 시간대에 잡힌 회의실 예약이 없습니다</option>';
     sel.disabled=true;
-    if(hint) hint.innerHTML='예약이 있으면 여기서 고를 수 있습니다 · '
+    if(hint){ hint.innerHTML='예약이 있으면 여기서 고를 수 있습니다 · '
       + '예약 제목에 <b>회사명</b>이 들어가야 우리 그룹 회의로 알아봅니다 '
-      + '(예: [B1, 소회의실] 더올마이티 주간회의)';
+      + '(예: [B1, 소회의실] 더올마이티 주간회의)'; hint.style.display=''; }
     return;
   }
   sel.disabled=false;
-  if(hint) hint.textContent='고르면 회의명이 자동으로 채워집니다';
+  if(hint) hint.style.display='none';   // 안내는 칸 이름 옆으로 옮겼습니다 (2026-09-09)
   const hm=t=>new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',
     hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(t));
   sel.innerHTML='<option value="">고르지 않음 (회의명을 직접 적습니다)</option>'
@@ -4523,6 +4632,56 @@ function mdHtml(md){
   }
   closeL(); if(tbl) out.push('</table>');
   return out.join('\n').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+}
+
+// 화면에서 고친 요약을 다시 마크다운으로 되돌립니다.
+// mdHtml() 이 만드는 태그(h1~h3 · ul/li · table · p · strong)만 다룹니다.
+// (2026-09-09 — 편집을 누르면 md 원문으로 바뀌던 것을 없앴습니다)
+function htmlToMd(root){
+  const inline = el => {
+    let t='';
+    el.childNodes.forEach(n=>{
+      if(n.nodeType===3) t += n.nodeValue.replace(/\u00a0/g,' ');
+      else if(n.nodeType===1){
+        const g=n.tagName.toLowerCase();
+        if(g==='br') t+='\n';
+        else if(g==='strong'||g==='b'){ const v=inline(n).trim(); if(v) t+='**'+v+'**'; }
+        else if(g==='em'||g==='i'){ const v=inline(n).trim(); if(v) t+='*'+v+'*'; }
+        else t += inline(n);
+      }
+    });
+    return t;
+  };
+  const out=[];
+  const put = (el) => {
+    const g = el.tagName.toLowerCase();
+    if(g==='h1'){ out.push('# '+inline(el).trim(), ''); }
+    else if(g==='h2'){ out.push('## '+inline(el).trim(), ''); }
+    else if(g==='h3'){ out.push('### '+inline(el).trim(), ''); }
+    else if(g==='ul'||g==='ol'){
+      [...el.children].forEach(li=>{ const v=inline(li).trim(); if(v) out.push('- '+v); });
+      out.push('');
+    }
+    else if(g==='table'){
+      const rows=[...el.querySelectorAll('tr')];
+      rows.forEach((tr,i)=>{
+        const c=[...tr.children].map(td=>inline(td).trim().replace(/\|/g,'\\|'));
+        out.push('| '+c.join(' | ')+' |');
+        if(i===0) out.push('|'+c.map(()=>' --- ').join('|')+'|');
+      });
+      out.push('');
+    }
+    else if(g==='hr'){ out.push('---',''); }
+    else if(g==='div'){
+      // 글상자에서 엔터를 치면 브라우저가 div 를 만듭니다. 안을 다시 훑습니다.
+      if([...el.children].some(c=>/^(H1|H2|H3|UL|OL|TABLE|P|DIV)$/.test(c.tagName)))
+        [...el.children].forEach(put);
+      else { const v=inline(el).trim(); if(v) out.push(v,''); }
+    }
+    else { const v=inline(el).trim(); if(v) out.push(v,''); }
+  };
+  [...root.children].forEach(put);
+  return out.join('\n').replace(/\n{3,}/g,'\n\n').trim();
 }
 
 // ─────────────────────────── 앱 설치 · 업데이트
