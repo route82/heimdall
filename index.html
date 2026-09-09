@@ -23,15 +23,18 @@
 (function(){
   // 고른 값은 dark / light / auto 셋 중 하나입니다.
   // auto 는 기기(윈도우·안드로이드·맥)의 밝기 설정을 따라갑니다.
+  // 기본값은 「밝게」 입니다 (2026-09-09 — 처음 쓰는 분들이 어두운 화면에서
+  //   무엇을 고르고 무엇을 적어야 하는지 못 찾는다는 지적을 받아 바꿨습니다).
+  //   한 번이라도 직접 고른 분은 그 값을 그대로 씁니다.
   function resolve(t){
     if(t==='auto'){
-      try{ return matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'; }
-      catch(e){ return 'dark'; }
+      try{ return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
+      catch(e){ return 'light'; }
     }
-    return (t==='light') ? 'light' : 'dark';
+    return (t==='dark') ? 'dark' : 'light';
   }
-  var raw='dark';
-  try{ raw = localStorage.getItem('hd_theme') || 'dark'; }catch(e){}
+  var raw='light';
+  try{ raw = localStorage.getItem('hd_theme') || 'light'; }catch(e){}
   window.HD_THEME_RAW = raw;
   window.HD_THEME_RESOLVE = resolve;
   document.documentElement.setAttribute('data-theme', resolve(raw));
@@ -62,6 +65,10 @@
   --err:#F07570;  --errbg:#241211;
   --purple:#B79BF0; --teal:#5FD3CE;
   --mark:#4A4118; --markt:#F5DE7A;
+  /* 녹음 화면 카드 — 다크에서 판이 갈라져 보이도록 따로 뺐습니다 (2026-09-09 2차)
+     기존 --s1/--s2 는 명도 차가 2% 라 처음 쓰는 사람 눈에 한 덩어리로 보였습니다 */
+  --card:#191920; --cardln:#34343E; --cardon:#1F1F28; --cardln2:#55555F;
+  --inbg:#0A0A0C; --inln:#3B3B45; --num:#32323C;
   --shadow:rgba(0,0,0,.55);
   --scrim:rgba(0,0,0,.62);
   --dur:.18s; --ease:cubic-bezier(.32,.72,0,1);
@@ -84,6 +91,8 @@ html[data-theme=light]{
   --err:#B3251F;  --errbg:#FBEAE9;
   --purple:#5A3699; --teal:#0E6E6B;
   --mark:#FFF2A8; --markt:#4A3E00;
+  --card:#FFFFFF; --cardln:#D6D8DE; --cardon:#FBFBFC; --cardln2:#A9ADB8;
+  --inbg:#FFFFFF; --inln:#C8CBD3; --num:#E9EBF0;
   --shadow:rgba(20,20,18,.16);
   --scrim:rgba(20,20,18,.42);
   color-scheme:light;
@@ -305,19 +314,34 @@ mark{background:var(--mark);color:var(--markt);padding:1px 3px;border-radius:3px
   .bar{left:12px;right:12px;bottom:12px;justify-content:flex-end;flex-wrap:wrap}
   #p-meeting{padding-bottom:132px}
 }
-/* 녹음 화면 — 칸마다 판을 나눠 무엇을 적는 자리인지 보이게 합니다 (2026-09-09) */
-.fld{background:var(--s2);border:1px solid var(--line);border-radius:13px;
- padding:14px 16px;margin-bottom:11px}
-.fldh{display:flex;align-items:center;gap:8px;margin:0 0 7px;flex-wrap:wrap}
-.fldh b{font-size:13.5px;font-weight:800;color:var(--tx);letter-spacing:.01em}
-.fldh .opt{font-size:11px;font-weight:700;color:var(--tx3);border:1px solid var(--line);
- border-radius:999px;padding:2px 8px;line-height:1.4;white-space:nowrap}
-.fldh .req{color:var(--acon);background:var(--ac);border-color:var(--ac)}
-.fldh .hint{font-size:12px;color:var(--tx3);font-weight:400}
-.recgo{background:var(--s3);border:1px solid var(--acln);border-radius:14px;
- padding:15px 16px;margin-top:14px}
-.recnote{background:var(--acbg);border:1px solid var(--line);border-radius:12px;
- padding:12px 15px;margin-bottom:14px;font-size:13.5px;line-height:1.7;color:var(--tx2)}
+/* 녹음 화면 — 칸마다 판을 나눠 무엇을 적는 자리인지 보이게 합니다
+   (2026-09-09 1차 → 2차: 「처음 쓰는 사람은 다 까매서 뭘 해야 할지 모르겠다」
+    카드 바탕·테두리를 따로 빼고, 번호·왼쪽 색띠·시작 단추 고정을 넣었습니다) */
+#p-rec > .box{background:var(--bg);border-color:var(--line2);padding:18px 18px 20px}
+.fld{position:relative;background:var(--card);border:1px solid var(--cardln);
+ border-radius:14px;padding:15px 18px 16px 21px;margin-bottom:12px;overflow:hidden;
+ transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease)}
+.fld::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+ background:var(--cardln2);transition:background var(--dur) var(--ease)}
+.fld:focus-within{background:var(--cardon);border-color:var(--cardln2)}
+.fld:focus-within::before{background:var(--ac)}
+.fld input,.fld select,.fld textarea{background:var(--inbg);border-color:var(--inln)}
+.fldh{display:flex;align-items:center;gap:8px;margin:0 0 9px;flex-wrap:wrap}
+.fldh b{font-size:15px;font-weight:800;color:var(--tx);letter-spacing:.01em}
+.fldn{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;
+ border-radius:50%;background:var(--num);color:var(--tx2);font-family:var(--f-disp);
+ font-size:12.5px;font-weight:600;flex:none;line-height:1}
+.fld:focus-within .fldn{background:var(--ac);color:var(--acon)}
+.fldh .opt{font-size:11.5px;font-weight:700;color:var(--tx2);border:1px solid var(--cardln);
+ background:var(--num);border-radius:999px;padding:2.5px 9px;line-height:1.4;white-space:nowrap}
+.fldh .opt.good{color:var(--ok);border-color:var(--ok);background:var(--okbg)}
+.fldh .hint{font-size:12.5px;color:var(--tx2);font-weight:400}
+/* 시작 단추는 늘 화면에 붙어 있게 — 아래까지 다 채워야 하는 줄 알지 않도록 */
+.recgo{position:sticky;bottom:12px;z-index:12;background:var(--s3);
+ border:1px solid var(--acln);border-radius:15px;padding:14px 16px;margin-top:18px;
+ box-shadow:0 12px 32px var(--shadow)}
+.recnote{background:var(--acbg);border:1px solid var(--cardln);border-radius:13px;
+ padding:13px 16px;margin-bottom:15px;font-size:14px;line-height:1.75;color:var(--tx2)}
 .recnote b{color:var(--tx)}
 /* 요약 — 보던 화면에서 바로 고칩니다 (2026-09-09 대표님 지적) */
 .md[contenteditable=true]{outline:none;border:1.5px dashed var(--acln);border-radius:12px;
@@ -765,11 +789,11 @@ let SM_RAW=false;   // 요약을 마크다운 원문으로 보고 있는지 (202
 //          ② 이 기기(localStorage) 에도 남습니다.
 // ② 는 로그인하기 전, 화면이 그려지는 순간에 바로 쓰기 위한 것입니다.
 // 서버 값이 있으면 서버 값이 이깁니다 — 다른 컴퓨터에서 로그인해도 따라옵니다.
-const THEMES = [['dark','어둡게'],['light','밝게'],['auto','기기 설정 따름']];
-let THEME_RAW = (window.HD_THEME_RAW || 'dark');
+const THEMES = [['light','밝게'],['dark','어둡게'],['auto','기기 설정 따름']];
+let THEME_RAW = (window.HD_THEME_RAW || 'light');   // 기본값 밝게 (2026-09-09)
 
 function applyTheme(raw, save){
-  if(!THEMES.some(t=>t[0]===raw)) raw='dark';
+  if(!THEMES.some(t=>t[0]===raw)) raw='light';
   THEME_RAW = raw;
   document.documentElement.setAttribute('data-theme', window.HD_THEME_RESOLVE(raw));
   if(save!==false){ try{ localStorage.setItem('hd_theme', raw); }catch(e){} }
@@ -1074,7 +1098,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v19.16</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v19.18</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -3719,44 +3743,52 @@ async function renderRec(){
     <div class="box">
       <div id="rc-today"></div>
       ${on?'':`<div class="recnote">
-        <b>바로 시작하셔도 됩니다.</b> 아래 네 칸은 <b>전부 안 채워도</b> 녹음됩니다.
-        채우시면 회의록이 더 정확해집니다.</div>`}
+        <b>처음이시면 이것만 아시면 됩니다.</b><br>
+        아래 <b>①~④ 는 하나도 안 채우셔도</b> 녹음됩니다. 아무 때나
+        <b>맨 아래 「● 회의 녹음 시작」</b> 을 누르시면 시작합니다.<br>
+        채워두시면 회의록이 더 정확해지고, 참석자분들께 알림이 갑니다.</div>`}
       <div class="fld" id="rc-cal-row">
-        <div class="fldh"><b>회의실 예약에서 고르기</b><span class="opt">선택</span>
-          <span class="hint">고르면 회의명과 안건이 자동으로 채워집니다</span></div>
+        <div class="fldh"><span class="fldn">1</span><b>회의실 예약에서 고르기</b>
+          <span class="opt">비워도 됩니다</span>
+          <span class="hint">고르면 회의명과 안건이 저절로 채워집니다</span></div>
         <select id="rc-cal" class="full" style="max-width:640px" ${on?'disabled':''}>
           <option value="">불러오는 중…</option>
         </select>
         <div class="sub" id="rc-cal-hint" style="margin:7px 0 0;font-size:12px;display:none"></div>
       </div>
       <div class="fld">
-        <div class="fldh"><b>회의명</b><span class="opt">선택</span>
-          <span class="hint">비우면 「회의 내용」 으로 저장됩니다</span></div>
+        <div class="fldh"><span class="fldn">2</span><b>회의명</b>
+          <span class="opt">비워도 됩니다</span>
+          <span class="hint">안 적으면 「회의 내용」 으로 저장됩니다</span></div>
         <input id="rc-title" placeholder="무슨 회의인가요 (예: 주간회의)" class="full" style="max-width:640px" ${on?'disabled':''}>
         <div class="sub" style="margin:7px 0 0;font-size:12px">앞에
           <b>[${esc(ymd6())}, ${esc(me.company||'')}]</b> 처럼 <b>날짜 · 회사</b>가 자동으로 붙습니다</div>
       </div>
       <div class="fld">
-        <div class="fldh"><b>참석자</b><span class="opt">선택</span>
-          <span class="hint">적어두시면 그분들께 슬랙으로 알려 드리고, 나중에 이 회의록을 고칠 수 있습니다</span></div>
+        <div class="fldh"><span class="fldn">3</span><b>참석자</b>
+          <span class="opt good">적어두시면 좋습니다</span>
+          <span class="hint">적어두신 분들께 슬랙으로 알려 드리고, 그분들이 회의록을 고칠 수 있습니다</span></div>
         <div id="rc-parts"></div>
       </div>
       <div class="fld" id="rc-ag-box">
-        <div class="fldh"><b>사전 안건</b><span class="opt">선택</span>
+        <div class="fldh"><span class="fldn">4</span><b>사전 안건</b>
+          <span class="opt">비워도 됩니다</span>
           <span class="hint">회의 중에도 이 자리에서 계속 보입니다</span></div>
         <div id="rc-ag"></div>
       </div>
       <select id="rc-type" style="display:none"><option value="meeting">회의</option></select>
-      ${(me.role==='admin' || (me.extra_scopes||[]).length)?`<div class="row" style="margin-bottom:9px" id="rc-scope-row">
+      ${(me.role==='admin' || (me.extra_scopes||[]).length)?`<div class="fld" id="rc-scope-row">
+        <div class="fldh"><span class="fldn">5</span><b>어느 회사 회의인가요</b>
+          <span class="opt">그대로 두셔도 됩니다</span></div>
         <select id="rc-scope" style="min-width:230px" ${on?'disabled':''}>
           <option value="mine">내 소속 (${esc(me.company||'')} ${esc(me.dept||'')})</option>
           ${(me.extra_scopes||[]).map(v=>{const [c,d]=v.split('|');
             return `<option value="x:${esc(v)}">겸직 · ${esc(c)}${d?' '+esc(d):' 전체'}</option>`;}).join('')}
           ${me.role==='admin'?'<option value="exec">그룹 · 전사 경영진 — 관리자·경영진만 열람</option>':''}
         </select>
-        <span class="sub" style="margin:0">${me.role==='admin'
+        <div class="sub" style="margin:7px 0 0;font-size:12.5px">${me.role==='admin'
           ?'민감한 회의는 「전사 경영진」으로 — 일반 직원에게 보이지 않습니다'
-          :'회의가 어느 회사 것인지 골라주세요'}</span>
+          :'회의가 어느 회사 것인지 골라주세요'}</div>
       </div>`:''}
       <div class="recgo">
         <div class="row" style="align-items:center">
