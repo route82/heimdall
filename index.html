@@ -68,6 +68,7 @@
   /* 녹음 화면 카드 — 다크에서 판이 갈라져 보이도록 따로 뺐습니다 (2026-09-09 2차)
      기존 --s1/--s2 는 명도 차가 2% 라 처음 쓰는 사람 눈에 한 덩어리로 보였습니다 */
   --card:#191920; --cardln:#34343E; --cardon:#1F1F28; --cardln2:#55555F;
+  --verm:#E4614E;   /* 슈퍼홀릭 사이트 인쇄 잉크 버밀리언의 다크 대응 */
   --inbg:#0A0A0C; --inln:#3B3B45; --num:#32323C;
   --shadow:rgba(0,0,0,.55);
   --scrim:rgba(0,0,0,.62);
@@ -92,6 +93,7 @@ html[data-theme=light]{
   --purple:#5A3699; --teal:#0E6E6B;
   --mark:#FFF2A8; --markt:#4A3E00;
   --card:#FFFFFF; --cardln:#D6D8DE; --cardon:#FBFBFC; --cardln2:#A9ADB8;
+  --verm:#C8402F;   /* 인쇄 잉크 버밀리언 — superholics.co.kr 과 같은 값 */
   --inbg:#FFFFFF; --inln:#C8CBD3; --num:#E9EBF0;
   --shadow:rgba(20,20,18,.16);
   --scrim:rgba(20,20,18,.42);
@@ -301,55 +303,80 @@ mark{background:var(--mark);color:var(--markt);padding:1px 3px;border-radius:3px
 /* 아래 단추 묶음 — 판을 깔아 글 위에 겹쳐 보이지 않게 합니다 (2026-09-09 대표님 지적)
    같이: 회의 화면 아래에 여백을 줘서 단추가 내용을 가리지 않습니다 */
 .bar{position:fixed;right:22px;bottom:22px;display:flex;gap:7px;z-index:50;align-items:center;
- background:var(--s1);border:1px solid var(--line);border-radius:30px;padding:7px 8px;
+ background:var(--s1);border:1px solid var(--tx);border-radius:0;padding:7px 8px;
  box-shadow:0 12px 34px var(--shadow)}
-.bar .btn{box-shadow:none;padding:10px 17px;border-radius:22px}
+.bar .btn{box-shadow:none;padding:10px 17px;border-radius:0}
 .bar .sep{width:1px;height:22px;background:var(--line);margin:0 2px}
-.barmore{position:absolute;right:6px;bottom:calc(100% + 9px);display:flex;flex-direction:column;
- gap:6px;background:var(--s1);border:1px solid var(--line);border-radius:16px;padding:8px;
- box-shadow:0 14px 38px var(--shadow);min-width:186px}
-.barmore .btn{width:100%;justify-content:flex-start;border-radius:11px;padding:10px 13px}
+.barmore{position:absolute;right:-1px;bottom:calc(100% + 9px);display:flex;flex-direction:column;
+ gap:2px;background:var(--s1);border:1px solid var(--tx);border-radius:0;padding:6px;
+ box-shadow:0 14px 38px var(--shadow);min-width:190px}
+.barmore .btn{width:100%;justify-content:flex-start;border-radius:0;padding:10px 13px;border-color:transparent}
+.barmore .btn:hover{border-color:var(--line)}
 #p-meeting{padding-bottom:104px}
+/* 폰 — 아래 단추는 화면 폭을 꽉 채운 한 줄로 (2026-09-09 4차)
+   떠 있는 알약으로 두면 줄이 접히면서 크기가 제각각이 됩니다.
+   아이폰 홈 표시줄에 가리지 않도록 safe-area 만큼 더 내려 둡니다. */
 @media(max-width:760px){
-  .bar{left:12px;right:12px;bottom:12px;justify-content:flex-end;flex-wrap:wrap}
-  #p-meeting{padding-bottom:132px}
+  .bar{left:0;right:0;bottom:0;border:0;border-top:1.5px solid var(--tx);border-radius:0;
+   background:var(--bg);gap:7px;flex-wrap:nowrap;
+   padding:9px 12px calc(9px + env(safe-area-inset-bottom,0px));
+   box-shadow:0 -16px 26px -12px var(--shadow)}
+  .bar .sep{display:none}
+  .bar .btn{flex:1 1 0;min-width:0;justify-content:center;padding:13px 8px;font-size:14.5px}
+  .bar #barmoreb{flex:0 0 96px;font-size:13.5px}
+  .barmore{left:12px;right:12px;bottom:calc(100% + 8px);min-width:0}
+  .barmore .btn{flex:none;justify-content:flex-start;font-size:14.5px}
+  #p-meeting{padding-bottom:120px}
+  .recgo{padding-bottom:calc(15px + env(safe-area-inset-bottom,0px))}
+  .fld{padding-left:0;padding-top:34px}
+  .fld::before{top:34px;height:calc(100% - 60px)}
+  .fldn{top:8px;left:0;width:auto}
 }
-/* 녹음 화면 — 칸마다 판을 나눠 무엇을 적는 자리인지 보이게 합니다
-   (2026-09-09 1차 → 2차: 「처음 쓰는 사람은 다 까매서 뭘 해야 할지 모르겠다」
-    카드 바탕·테두리를 따로 빼고, 번호·왼쪽 색띠·시작 단추 고정을 넣었습니다) */
-#p-rec > .box{background:var(--bg);border-color:var(--line2);padding:18px 18px 20px}
-.fld{position:relative;background:var(--card);border:1px solid var(--cardln);
- border-radius:14px;padding:15px 18px 16px 21px;margin-bottom:12px;overflow:hidden;
- transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease)}
-.fld::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
- background:var(--cardln2);transition:background var(--dur) var(--ease)}
-.fld:focus-within{background:var(--cardon);border-color:var(--cardln2)}
-.fld:focus-within::before{background:var(--ac)}
-.fld input,.fld select,.fld textarea{background:var(--inbg);border-color:var(--inln)}
-.fldh{display:flex;align-items:center;gap:8px;margin:0 0 9px;flex-wrap:wrap}
-.fldh b{font-size:15px;font-weight:800;color:var(--tx);letter-spacing:.01em}
-.fldn{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;
- border-radius:50%;background:var(--num);color:var(--tx2);font-family:var(--f-disp);
- font-size:12.5px;font-weight:600;flex:none;line-height:1}
-.fld:focus-within .fldn{background:var(--ac);color:var(--acon)}
-.fldh .opt{font-size:11.5px;font-weight:700;color:var(--tx2);border:1px solid var(--cardln);
- background:var(--num);border-radius:999px;padding:2.5px 9px;line-height:1.4;white-space:nowrap}
-.fldh .opt.good{color:var(--ok);border-color:var(--ok);background:var(--okbg)}
-.fldh .hint{font-size:12.5px;color:var(--tx2);font-weight:400}
-/* 시작 단추는 늘 화면에 붙어 있게 — 아래까지 다 채워야 하는 줄 알지 않도록 */
-.recgo{position:sticky;bottom:12px;z-index:12;background:var(--s3);
- border:1px solid var(--acln);border-radius:15px;padding:14px 16px;margin-top:18px;
- box-shadow:0 12px 32px var(--shadow)}
-.recnote{background:var(--acbg);border:1px solid var(--cardln);border-radius:13px;
- padding:13px 16px;margin-bottom:15px;font-size:14px;line-height:1.75;color:var(--tx2)}
-.recnote b{color:var(--tx)}
+/* 녹음 화면 — superholics.co.kr 과 같은 에디토리얼 언어로 다시 짰습니다.
+   (2026-09-09 3차 — 「둥근 카드 + 알약 배지 + 원형 숫자」는 AI 가 내놓는 기본값이라
+    대표님이 웹사이트에서 이미 한 번 걷어내신 언어입니다. 실제로 그 사이트에는
+    border-radius 가 한 군데도 없습니다.)
+   원칙 넷 — ① 판을 깔지 않고 괘선으로 나눈다 ② 모서리를 굴리지 않는다
+             ③ 번호는 모노스페이스 두 자리 ④ 강조는 버밀리언 한 색만 */
+#p-rec > .box{background:transparent;border:0;padding:0;margin-bottom:0}
+.fld{position:relative;background:transparent;border:0;border-top:1px solid var(--line);
+ border-radius:0;padding:24px 0 26px 68px;margin:0}
+.fld:first-of-type{border-top:1.5px solid var(--tx)}
+.fld::before{content:'';position:absolute;left:0;top:26px;width:1px;
+ height:calc(100% - 52px);background:var(--line);transition:background var(--dur) var(--ease)}
+.fld:focus-within::before{background:var(--verm);width:2px}
+.fldn{position:absolute;left:0;top:24px;display:block;width:52px;height:auto;
+ font-family:var(--f-mono);font-size:12.5px;font-weight:500;letter-spacing:.16em;
+ color:var(--tx3);background:none;border-radius:0;line-height:1.4}
+.fld:focus-within .fldn{color:var(--verm);background:none}
+.fldh{display:flex;align-items:baseline;gap:11px;margin:0 0 14px;flex-wrap:wrap}
+.fldh b{font-size:17px;font-weight:700;color:var(--tx);letter-spacing:-.012em}
+.fldh .opt{font-size:11.5px;font-weight:600;letter-spacing:.1em;color:var(--tx3);
+ border:0;background:none;border-radius:0;padding:0;white-space:nowrap}
+.fldh .opt.good{color:var(--verm)}
+.fldh .hint{font-size:13px;color:var(--tx2);font-weight:400}
+.fld input,.fld select{border-radius:0;background:transparent;border:0;
+ border-bottom:1.5px solid var(--line);padding:9px 2px;max-width:640px}
+.fld textarea{border-radius:0;background:transparent;border:1px solid var(--line);padding:13px 14px}
+.fld input:focus,.fld select:focus,.fld textarea:focus{box-shadow:none;border-color:var(--tx)}
+.fld input:focus,.fld select:focus{border-bottom-color:var(--tx)}
+.fld .sub{font-size:12.5px}
+/* 머리글 — 판 대신 왼쪽 괘선 하나 */
+.recnote{background:none;border:0;border-left:2px solid var(--verm);border-radius:0;
+ padding:1px 0 1px 17px;margin:0 0 30px;font-size:14.5px;line-height:1.85;color:var(--tx2)}
+.recnote b{color:var(--tx);font-weight:700}
+/* 시작 줄 — 각지게, 화면 아래에 붙여 둡니다 */
+.recgo{position:sticky;bottom:0;z-index:12;background:var(--bg);border:0;
+ border-top:1.5px solid var(--tx);border-radius:0;padding:17px 0 15px;margin-top:0;
+ box-shadow:0 -18px 26px -8px var(--bg)}
+#rc-go{border-radius:0;letter-spacing:.02em}
 /* 요약 — 보던 화면에서 바로 고칩니다 (2026-09-09 대표님 지적) */
-.md[contenteditable=true]{outline:none;border:1.5px dashed var(--acln);border-radius:12px;
- padding:14px 16px;background:var(--s1)}
-.md[contenteditable=true]:focus{border-color:var(--ac)}
+.md[contenteditable=true]{outline:none;border:0;border-left:2px solid var(--verm);border-radius:0;
+ padding:2px 0 2px 17px;background:transparent}
+.md[contenteditable=true]:focus{border-left-color:var(--tx)}
 .edhint{display:flex;align-items:center;gap:9px;margin-bottom:10px;font-size:12.5px;
  color:var(--tx3)}
-.edhint .btn{padding:5px 11px;font-size:12px;border-radius:9px}
+.edhint .btn{padding:5px 11px;font-size:12px;border-radius:0}
 #smview.canedit{cursor:text}
 .hist{margin-top:26px;font-size:12.5px;color:var(--tx3)}
 .hist div{padding:4px 0;border-top:1px solid var(--line2)}
@@ -1098,7 +1125,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v19.18</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v19.20</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -3748,7 +3775,7 @@ async function renderRec(){
         <b>맨 아래 「● 회의 녹음 시작」</b> 을 누르시면 시작합니다.<br>
         채워두시면 회의록이 더 정확해지고, 참석자분들께 알림이 갑니다.</div>`}
       <div class="fld" id="rc-cal-row">
-        <div class="fldh"><span class="fldn">1</span><b>회의실 예약에서 고르기</b>
+        <div class="fldh"><span class="fldn">01</span><b>회의실 예약에서 고르기</b>
           <span class="opt">비워도 됩니다</span>
           <span class="hint">고르면 회의명과 안건이 저절로 채워집니다</span></div>
         <select id="rc-cal" class="full" style="max-width:640px" ${on?'disabled':''}>
@@ -3757,7 +3784,7 @@ async function renderRec(){
         <div class="sub" id="rc-cal-hint" style="margin:7px 0 0;font-size:12px;display:none"></div>
       </div>
       <div class="fld">
-        <div class="fldh"><span class="fldn">2</span><b>회의명</b>
+        <div class="fldh"><span class="fldn">02</span><b>회의명</b>
           <span class="opt">비워도 됩니다</span>
           <span class="hint">안 적으면 「회의 내용」 으로 저장됩니다</span></div>
         <input id="rc-title" placeholder="무슨 회의인가요 (예: 주간회의)" class="full" style="max-width:640px" ${on?'disabled':''}>
@@ -3765,20 +3792,20 @@ async function renderRec(){
           <b>[${esc(ymd6())}, ${esc(me.company||'')}]</b> 처럼 <b>날짜 · 회사</b>가 자동으로 붙습니다</div>
       </div>
       <div class="fld">
-        <div class="fldh"><span class="fldn">3</span><b>참석자</b>
+        <div class="fldh"><span class="fldn">03</span><b>참석자</b>
           <span class="opt good">적어두시면 좋습니다</span>
           <span class="hint">적어두신 분들께 슬랙으로 알려 드리고, 그분들이 회의록을 고칠 수 있습니다</span></div>
         <div id="rc-parts"></div>
       </div>
       <div class="fld" id="rc-ag-box">
-        <div class="fldh"><span class="fldn">4</span><b>사전 안건</b>
+        <div class="fldh"><span class="fldn">04</span><b>사전 안건</b>
           <span class="opt">비워도 됩니다</span>
           <span class="hint">회의 중에도 이 자리에서 계속 보입니다</span></div>
         <div id="rc-ag"></div>
       </div>
       <select id="rc-type" style="display:none"><option value="meeting">회의</option></select>
       ${(me.role==='admin' || (me.extra_scopes||[]).length)?`<div class="fld" id="rc-scope-row">
-        <div class="fldh"><span class="fldn">5</span><b>어느 회사 회의인가요</b>
+        <div class="fldh"><span class="fldn">05</span><b>어느 회사 회의인가요</b>
           <span class="opt">그대로 두셔도 됩니다</span></div>
         <select id="rc-scope" style="min-width:230px" ${on?'disabled':''}>
           <option value="mine">내 소속 (${esc(me.company||'')} ${esc(me.dept||'')})</option>
