@@ -376,7 +376,6 @@ mark{background:var(--mark);color:var(--markt);padding:1px 3px;border-radius:3px
 .md[contenteditable=true]:focus{border-left-color:var(--tx)}
 .edhint{display:flex;align-items:center;gap:9px;margin-bottom:10px;font-size:12.5px;
  color:var(--tx3)}
-.edhint .btn{padding:5px 11px;font-size:12px;border-radius:0}
 #smview.canedit{cursor:text}
 .hist{margin-top:26px;font-size:12.5px;color:var(--tx3)}
 .hist div{padding:4px 0;border-top:1px solid var(--line2)}
@@ -809,7 +808,6 @@ const isAdminish = r => ['admin','dev'].includes(r);
 // 사람·브리핑까지 보는 최고 권한 (관리자 · 공동대표)
 const isTop = r => ['admin','ceo'].includes(r);
 let me=null, view='list', cur=null, editing=false;
-let SM_RAW=false;   // 요약을 마크다운 원문으로 보고 있는지 (2026-09-09)
 
 // ─────────────────────────── 화면 밝기 (어둡게 / 밝게 / 기기 설정 따름)
 // 고른 값은 ① 서버(hd_member.theme) 에 계정별로 남고
@@ -1125,7 +1123,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v19.20</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v19.21</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -1680,7 +1678,7 @@ async function renderList(){
 
 // ─────────────────────────── 회의 상세
 async function openMeeting(id){
-  editing=false; SM_RAW=false;
+  editing=false;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   const el=$('#p-meeting'); el.classList.add('on'); el.innerHTML='<div class="sub">불러오는 중…</div>';
   const [m,segs,hls,acts,edits,att] = await Promise.all([
@@ -1791,13 +1789,12 @@ function drawMeeting(){
       <p data-i="${s.idx}">${esc(s.text)}</p></div></div>`).join('')}</div></div>
   <div class="pane on wide">
     <div class="edhint" id="smhint" style="display:none">
-      <span id="smhintt">보시던 화면 그대로 고치시면 됩니다. 글자를 누르고 바로 쓰세요.</span>
-      <button class="btn" id="smraw">마크다운 원문으로</button></div>
+      보시던 화면 그대로 고치시면 됩니다. 글자를 누르고 바로 쓰세요.</div>
     <div class="md" id="smview">${(m.summary_md||'').trim()
       ? mdHtml(m.summary_md)
       : '<div class="empty">회의록이 아직 없습니다.<br>'
         + '전사는 「전사」 탭에서 보실 수 있습니다.</div>'}</div>
-    <textarea id="smedit" class="full" style="display:none;min-height:520px;font-family:ui-monospace,Menlo,monospace;font-size:13.5px"></textarea></div>
+  </div>
   <div class="pane" id="mmpane">${(m.mindmap_md||'').trim()
     ? '<div class="sub" style="margin-bottom:8px">가지를 누르면 접었다 폈다 할 수 있습니다 · 마우스 휠로 확대</div><svg id="mmv" style="width:100%;height:600px;background:var(--s1);border:1px solid var(--line);border-radius:12px"></svg>'
     : '<div class="empty">마인드맵이 없습니다.<br>이 기능이 생기기 전에 만들어진 회의입니다.</div>'}
@@ -2200,29 +2197,15 @@ function startEdit(){
       + '<div id="mparts"></div></div>');
     MATT = attInput($('#mparts'), cur.att);
   }
-  // 요약 — 보던 화면 그대로 고칩니다 (2026-09-09 대표님 지적)
-  //   전에는 여기서 md 원문 글상자로 바꿔치웠는데, 표가 파이프 문자로 흩어져 읽기 어려웠습니다.
-  const sv=$('#smview'), ta=$('#smedit');
-  SM_RAW=false;
+  // 요약 — 보던 화면 그대로 고칩니다 (2026-09-09)
+  //   전에는 편집을 누르면 md 원문 글상자로 바꿔치웠는데, 표가 파이프 문자로 흩어져
+  //   읽기 어려웠습니다. 원문으로 보는 기능은 쓸 일이 없어 아예 뺐습니다.
+  const sv=$('#smview');
   if(sv){
     if(!(cur.m.summary_md||'').trim()) sv.innerHTML='<p><br></p>';   // 빈 회의록도 쓸 수 있게
     sv.contentEditable='true'; sv.spellcheck=false;
     sv.classList.remove('canedit');
     const hint=$('#smhint'); if(hint) hint.style.display='flex';
-    const raw=$('#smraw');
-    if(raw) raw.onclick=()=>{
-      if(!SM_RAW){                       // 화면 → 원문
-        ta.value = htmlToMd(sv);
-        sv.style.display='none'; ta.style.display='block'; SM_RAW=true;
-        raw.textContent='화면으로 돌아가기';
-        $('#smhintt').textContent='마크다운 원문입니다. 표는 | 로 나뉩니다.';
-      }else{                             // 원문 → 화면
-        sv.innerHTML = mdHtml(ta.value) || '<p><br></p>';
-        ta.style.display='none'; sv.style.display=''; SM_RAW=false;
-        raw.textContent='마크다운 원문으로';
-        $('#smhintt').textContent='보시던 화면 그대로 고치시면 됩니다. 글자를 누르고 바로 쓰세요.';
-      }
-    };
   }
   // 사전 안건 — 「안건」 탭에서 고칩니다 (2026-09-02 요약 탭에서 분리)
   const agv=$('#agview'); if(agv) agv.style.display='none';
@@ -2305,9 +2288,9 @@ async function saveMeeting(){
     await SB.from('hd_meeting').update({agenda_md:agt.value}).eq('id',id);
     msg.push('사전 안건 수정');
   }
-  // 원문 글상자를 보고 있었으면 그 값을, 아니면 화면에서 읽어 마크다운으로 되돌립니다
+  // 화면에서 읽어 마크다운으로 되돌립니다
   const smv=$('#smview');
-  const sm = SM_RAW ? $('#smedit').value : (smv ? htmlToMd(smv) : (cur.m.summary_md||''));
+  const sm = smv ? htmlToMd(smv) : (cur.m.summary_md||'');
   if(sm!==(cur.m.summary_md||'')){
     await SB.from('hd_meeting').update({summary_md:sm}).eq('id',id);
     msg.push('요약 수정');
