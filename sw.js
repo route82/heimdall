@@ -1,7 +1,7 @@
 // HEIMDALL 서비스 워커
 // 앱 껍데기만 캐시합니다. 회의 내용은 절대 캐시하지 않습니다 —
 // 오래된 회의록이 남거나, 기기에 회사 자료가 저장되면 안 되기 때문입니다.
-const V = 'heimdall-v13';   // 2026-09-09 — 새 화면을 받으려면 캐시 이름을 올려야 합니다
+const V = 'heimdall-v14';   // 2026-09-09 — 새 화면을 받으려면 캐시 이름을 올려야 합니다
 const SHELL = ['./', './index.html', './manifest.webmanifest',
                './icons/icon-192.png', './icons/icon-512.png', './icons/favicon.ico',
                './assets/logo-horizontal.svg', './assets/logo-vertical.svg'];

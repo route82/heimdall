@@ -1173,7 +1173,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v20.2</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v20.3</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -4871,11 +4871,38 @@ async function boot(){
     return;
   }
   if(!data.approved) return pendingPage(data);
+  // 회의실 태블릿 전용 계정은 이 화면을 열 수 없습니다 (2026-09-14)
+  //   태블릿은 회의실에 놓여 있어 아무나 만질 수 있습니다. 로그인이 살아 있으므로
+  //   주소만 치면 회의록이 그대로 열립니다. 그래서 여기서 막습니다.
+  if(isRoomAccount(data)) return roomAcctPage(data);
   me=data;
   // 계정에 저장된 밝기가 있으면 그것이 이깁니다 (다른 컴퓨터에서도 같게 보입니다)
   if(data.theme) applyTheme(data.theme);
   shell(); checkPending();
   if(!openFromHash()) go('home');
+}
+
+// 회의실 태블릿 전용 계정인가 — 이름이나 로그인 주소로 알아봅니다.
+// room.html 의 판정과 같은 기준을 씁니다.
+function isRoomAccount(m){
+  const n = (m && m.name) || '';
+  const e = ((m && m.email) || '').toLowerCase();
+  return /회의실|미팅룸|회의룸|room/i.test(n) || /(^|[.\-_])room/.test(e.split('@')[0]);
+}
+
+function roomAcctPage(m){
+  $('#app').innerHTML = `<div class="auth"><div class="box" style="text-align:center">
+    <h1 style="font-size:17px">회의실 태블릿 전용 계정입니다</h1>
+    <p class="sub">${esc(m.name||'')} 계정으로는 회의록을 볼 수 없습니다.<br>
+      이 계정은 회의실 화면에서 녹음하는 데만 씁니다.</p>
+    <p class="sub" style="margin-top:14px">회의록을 보시려면 <b>본인 계정</b>으로 로그인해주세요.</p>
+    <div class="row" style="justify-content:center;margin-top:18px">
+      <a class="btn" href="./room.html">회의실 화면으로</a>
+      <button class="btn p" id="ro-out">다른 계정으로 로그인</button></div></div></div>`;
+  $('#ro-out').onclick = async()=>{
+    try{ localStorage.setItem('hd_auto','0'); }catch(e){}
+    await SB.auth.signOut(); location.reload();
+  };
 }
 
 // 주소 뒤에 #m/<회의번호> 가 붙어 있으면 그 회의를 바로 엽니다
