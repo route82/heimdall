@@ -279,6 +279,9 @@ const CFG = {
 
 let me=null, cfg=CFG.get(), MEMBERS=[], EVENTS=[], tick=null;
 let PICKED=null;                 // 사람이 아래 목록에서 고른 회의
+// 예약에 없는 회의를 녹음할 때 켭니다. 켜지면 예약 카드를 무시합니다.
+// 회의실에 예약이 떠 있어도 갑자기 잡힌 회의를 바로 녹음할 수 있어야 합니다.
+let ADHOC=false;
 
 // 시험 모드는 이 계정만 켤 수 있습니다.
 // 다른 분이 모르고 켜두면 회의록이 조용히 안 만들어져 사고가 납니다.
@@ -429,7 +432,7 @@ function coFromTitle(t){
 // ─────────────────────────── 대기 화면
 function idlePage(){
   clearInterval(tick);
-  const ev=PICKED || current();
+  const ev=ADHOC ? null : (PICKED || current());
   const now=Date.now();
   // 이 회의실 예약을 먼저, 그다음 다른 회의실 예약.
   // 소회의실에 잡아놓고 대회의실에서 하는 일이 잦아 전부 고를 수 있게 둡니다.
@@ -454,8 +457,10 @@ function idlePage(){
           + '<div class="bar"><i id="bari"></i></div>'
           + '<div class="barlb" id="barlb"></div></div>'
           + '<div class="tether"><i></i></div>'
-          : '<div class="sub">지금 잡힌 예약이 없습니다<br>'
-          + '<span style="font-size:14px">아래 버튼을 누르면 제목 없이 녹음을 시작합니다</span></div>')
+          : '<div class="sub">'
+          + (ADHOC ? '예약에 없는 회의를 녹음합니다' : '지금 잡힌 예약이 없습니다') + '<br>'
+          + '<span style="font-size:14px">아래 버튼을 누르면 제목 없이 녹음을 시작합니다 · '
+          + '회사는 녹음 중에 참석자를 누르시면 정해집니다</span></div>')
     + '<button class="big go" id="start"><span class="dot"></span>'
     + '<span class="lbwrap"><span>회의 녹음 시작</span>'
     + (ev ? '<span class="sub2">'+esc(ev.title||'회의')+'</span>' : '')
@@ -464,6 +469,10 @@ function idlePage(){
     + (ev ? '위 회의로 녹음됩니다 · 다른 회의면 아래에서 골라주세요'
           : '누르면 바로 녹음이 시작됩니다')
     + ' · 참석자는 녹음 중에 이름을 누르시면 됩니다</div>'
+    // 예약이 떠 있어도 예약에 없는 회의를 녹음할 수 있게 합니다.
+    + (ev    ? '<button class="ghost" id="adhoc">예약에 없는 회의 녹음하기</button>' : '')
+    + (ADHOC && current()
+             ? '<button class="ghost" id="unadhoc">예약된 회의로 돌아가기</button>' : '')
     + '</div>'
     + (rest.length ? '<div class="list"><div class="h">다른 회의 고르기 — 누르면 위 카드가 바뀝니다 · '
         + '다른 회의실 예약도 여기 있습니다</div><div class="picks">'
@@ -485,9 +494,13 @@ function idlePage(){
 
   drawBar(ev);
   $('#start').onclick=()=>startRec(ev);
+  // 예약 카드를 끄고 제목 없는 회의로 녹음합니다.
+  const ah=$('#adhoc');   if(ah) ah.onclick=()=>{ ADHOC=true;  PICKED=null; idlePage(); };
+  const uh=$('#unadhoc'); if(uh) uh.onclick=()=>{ ADHOC=false; PICKED=null; idlePage(); };
   // 다른 회의를 누르면 바로 녹음하지 않고 위 카드만 바꿉니다.
   // 지나가다 잘못 눌러 진짜 회의가 시작되는 일을 막습니다.
   app.querySelectorAll('[data-ev]').forEach(b=>b.onclick=()=>{
+    ADHOC=false;                       // 예약을 고르면 「예약 없음」 상태를 풉니다
     PICKED = rest[+b.dataset.ev] || null;
     idlePage();
   });
@@ -535,7 +548,7 @@ async function startRec(ev){
 
   REC.stream=stream; REC.chunks=[]; REC.t0=Date.now(); REC.ev=ev||null;
   REC.title=(ev&&ev.title)||''; REC.who=new Set();
-  PICKED=null;
+  PICKED=null; ADHOC=false;
   REC.agenda=((ev&&ev.note)||'').trim();
   REC.room=cfg.room||'';
   REC.mr = mime ? new MediaRecorder(stream,{mimeType:mime, audioBitsPerSecond:64000})
