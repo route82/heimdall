@@ -772,16 +772,16 @@ const esc = s => (s??'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;
 const hms = s => { s=+s||0; return `${Math.floor(s/3600)}:${String(Math.floor(s%3600/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; };
 // 슬랙 워크스페이스와 연결된 회사 (이 회사 회의에만 「슬랙으로 보내기」 가 보입니다)
 // 슬랙으로 보낼 수 있는 회사. 처리 서버의 SLACK_COMPANY · SLACK2_COMPANY 와 맞춥니다.
-const SLACK_COS = ['슈퍼홀릭', '그룹 AX', '슈퍼홀릭인베스트먼트',
-                   '라피스인터내셔널', '더올마이티'];
+const SLACK_COS = ['슈퍼홀릭', 'AX팀', '슈퍼홀릭인베스트먼트',
+                   '라피스인터내셔널', '더올마이티', '루트82'];
 
 // 회사마다 슬랙이 다릅니다. 사람마다 각 슬랙의 계정을 따로 적습니다.
 // 처리 서버의 SLACK2_COMPANY 와 짝이 맞아야 합니다.
 const SLACK_WS = [
   {key:'slack_email',  name:'슈퍼홀릭 슬랙',
-   note:'슈퍼홀릭 · 그룹 AX · 슈퍼홀릭인베스트먼트 · 라피스인터내셔널 회의가 이쪽으로 갑니다'},
+   note:'슈퍼홀릭 · AX팀 · 슈퍼홀릭인베스트먼트 · 라피스인터내셔널 회의가 이쪽으로 갑니다'},
   {key:'slack2_email', name:'더올마이티 슬랙',
-   note:'더올마이티 회의가 이쪽으로 갑니다'},
+   note:'더올마이티 · 루트82 회의가 이쪽으로 갑니다'},
 ];
 
 // 이메일 줄 여러 개를 다루는 공통 도구
@@ -1173,7 +1173,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v20.5</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v20.6</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -4422,7 +4422,7 @@ function renderGuide(){
         회의록이 만들어지면 <b>참석자와 그 팀 팀장에게 1:1</b> 로 나갑니다.
         채널에는 올리지 않습니다.
         액션아이템은 담당자에게 따로 1:1 로 갑니다</li>
-    <li><b>회사마다 슬랙이 다릅니다.</b> 슈퍼홀릭 슬랙(슈퍼홀릭·그룹 AX·슈퍼홀릭인베스트먼트·라피스인터내셔널)과
+    <li><b>회사마다 슬랙이 다릅니다.</b> 슈퍼홀릭 슬랙(슈퍼홀릭·AX팀·슈퍼홀릭인베스트먼트·라피스인터내셔널)과
         더올마이티 슬랙으로 갈라집니다. 구성원 상세의 「슬랙 계정」 에
         각 슬랙의 가입 이메일을 <b>칸마다 따로</b> 넣어주세요</li>
     <li>서버가 30분 넘게 조용하면 관리자 메일로 자동 경고가 옵니다</li>
