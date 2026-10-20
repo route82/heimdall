@@ -405,8 +405,11 @@ const isRoomAcct = m => {
   return /회의실|미팅룸|회의룸|room/i.test(m.name||'');
 };
 async function loadMembers(){
-  const {data}=await SB.from('hd_member')
-    .select('id,name,company,dept,status,approved').eq('approved',true).order('name');
+  // 겸직(extra_scopes)도 함께 읽습니다. 칸이 없는 예전 서버면 빼고 다시 읽습니다.
+  let {data,error}=await SB.from('hd_member')
+    .select('id,name,company,dept,status,approved,extra_scopes').eq('approved',true).order('name');
+  if(error) ({data}=await SB.from('hd_member')
+    .select('id,name,company,dept,status,approved').eq('approved',true).order('name'));
   MEMBERS=(data||[]).filter(m=>(m.status||'active')==='active'
                             && (m.name||'').trim()
                             && !(m.id===me.id && isRoomAcct(m)));
@@ -571,7 +574,7 @@ async function startRec(ev){
     if(window.MediaRecorder && MediaRecorder.isTypeSupported(m)){ mime=m; break; }
 
   REC.stream=stream; REC.chunks=[]; REC.t0=Date.now(); REC.ev=ev||null;
-  REC.title=(ev&&ev.title)||''; REC.who=new Set();
+  REC.title=(ev&&ev.title)||''; REC.who=new Set(); REC.via=new Map();
   PICKED=null; ADHOC=false;
   REC.agenda=((ev&&ev.note)||'').trim();
   REC.room=cfg.room||'';
@@ -590,20 +593,36 @@ async function startRec(ev){
 // 팀을 누르면 그 팀 사람만 보이고, 이름을 누른 사람만 참석자가 됩니다.
 // 「팀 전체」 는 그 팀을 한 번에 넣고 뺍니다. 고른 사람은 다른 팀을 봐도 그대로 남습니다.
 const NO_DEPT='소속 팀 없음';
+// 겸직 — 「회사|부서」 면 그 팀에, 「회사|」(회사 전체) 면 그 회사의 「겸직」 칸에 함께 나옵니다 (2026-10-20)
+const EXTRA_ALL='겸직';
+const EXTRA=new Set();           // 「회사|팀|사람」 — 이 팀에는 겸직으로 들어간 사람
 function teams(){
   const t={};
-  MEMBERS.forEach(m=>{
-    const co=m.company||'회사 미지정', dp=m.dept||NO_DEPT;
-    ((t[co]=t[co]||{})[dp]=t[co][dp]||[]).push(m);
-  });
+  EXTRA.clear();
+  const put=(co,dp,m)=>{ const l=((t[co]=t[co]||{})[dp]=t[co][dp]||[]);
+    if(!l.includes(m)) { l.push(m); return true; } return false; };
+  MEMBERS.forEach(m=>put(m.company||'회사 미지정', m.dept||NO_DEPT, m));
+  MEMBERS.forEach(m=>(m.extra_scopes||[]).forEach(s=>{
+    const i=String(s).indexOf('|');
+    const co=(i<0?s:s.slice(0,i)).trim(), dp=(i<0?'':s.slice(i+1)).trim();
+    if(!co || (co===m.company && (!dp || dp===m.dept))) return;   // 본 소속과 같으면 건너뜀
+    const d=dp||EXTRA_ALL;
+    if(put(co,d,m)) EXTRA.add(co+'|'+d+'|'+m.id);
+  }));
+  Object.values(t).forEach(c=>Object.values(c).forEach(l=>
+    l.sort((a,b)=>(a.name||'').localeCompare(b.name||''))));
   return t;
 }
+// 어느 회사·팀 칸에서 골랐는지 기억합니다 — 회의의 회사·부서를 정할 때 씁니다
+function pickIn(id,co,dp){ REC.who.add(id); (REC.via=REC.via||new Map()).set(id,{co,dp}); }
+function unpick(id){ REC.who.delete(id); if(REC.via) REC.via.delete(id); }
 function ord(k){ return (k in ORDER) ? ORDER[k] : 9999; }
 function coList(t){
   return Object.keys(t).sort((a,b)=>ord(a)-ord(b) || a.localeCompare(b));
 }
 function dpList(t,co){
-  return Object.keys(t[co]||{}).sort((a,b)=>(a===NO_DEPT)-(b===NO_DEPT)
+  const last=d=>d===NO_DEPT?2:d===EXTRA_ALL?1:0;
+  return Object.keys(t[co]||{}).sort((a,b)=>last(a)-last(b)
     || ord(co+'|'+a)-ord(co+'|'+b) || a.localeCompare(b));
 }
 function picker(){
@@ -618,15 +637,19 @@ function pkInner(){
   }
   const dps=dpList(t,PK.co);
   if(PK.dp===null && dps.length===1) PK.dp=dps[0];   // 팀이 하나뿐이면 바로 펼침
-  const n=ms=>ms.filter(m=>sel.has(m.id)).length;
-  const coCnt=co=>Object.values(t[co]).reduce((s,ms)=>s+n(ms),0);
+  // 숫자는 「그 회사·팀 칸에서 고른 사람」 만 셉니다. 겸직으로 여러 칸에 나오는 사람이
+  // 다른 탭의 숫자까지 올리면, 어느 회사 회의로 잡힐지 헷갈립니다. (단추는 어디서든 켜져 보임)
+  const via=REC.via||new Map();
+  const at=(m,co,dp)=>{ const v=via.get(m.id); return sel.has(m.id) && (!v || (v.co===co && (dp===undefined || v.dp===dp))); };
+  const n=(ms,dp)=>ms.filter(m=>at(m,PK.co,dp)).length;
+  const coCnt=co=>new Set([].concat(...Object.values(t[co])).filter(m=>at(m,co)).map(m=>m.id)).size;
   let h='<div class="pkco">'+cos.map(co=>{
       const c=coCnt(co);
       return '<button class="pkc'+(co===PK.co?' on':'')+'" data-co="'+esc(co)+'">'+esc(co)
         +(c?'<span class="pkn">'+c+'</span>':'')+'</button>';
     }).join('')+'</div>';
   h+='<div class="pkdp">'+dps.map(dp=>{
-      const ms=t[PK.co][dp], c=n(ms);
+      const ms=t[PK.co][dp], c=n(ms,dp);
       return '<button class="pkd'+(dp===PK.dp?' on':'')+(c?' has':'')+'" data-dp="'+esc(dp)+'">'
         +esc(dp)+'<span class="pkn">'+(c?c+'/':'')+ms.length+'</span></button>';
     }).join('')+'</div>';
@@ -634,12 +657,15 @@ function pkInner(){
     h+='<div class="pkms"><span class="sub">위에서 팀을 누르시면 팀원이 나옵니다</span></div>';
     return h;
   }
-  const ms=t[PK.co][PK.dp], all=ms.length && n(ms)===ms.length;
+  const ms=t[PK.co][PK.dp], all=ms.length && ms.every(m=>sel.has(m.id));
   h+='<div class="pkms"><div class="grid">'
     +'<button class="nm all'+(all?' on':'')+'" data-all="1">'+(all?'팀 전체 빼기':'팀 전체')
     +'<span class="co">'+esc(PK.dp)+' '+ms.length+'명</span></button>'
-    +ms.map(m=>'<button class="nm'+(sel.has(m.id)?' on':'')+'" data-id="'+m.id+'">'
-      +esc(m.name)+'</button>').join('')
+    +ms.map(m=>{
+      const ex=EXTRA.has(PK.co+'|'+PK.dp+'|'+m.id);
+      return '<button class="nm'+(sel.has(m.id)?' on':'')+'" data-id="'+m.id+'">'+esc(m.name)
+        +(ex?'<span class="co">겸직 · '+esc([m.company,m.dept].filter(Boolean).join(' '))+'</span>':'')
+        +'</button>'; }).join('')
     +'</div></div>';
   return h;
 }
@@ -662,11 +688,11 @@ function bindPicker(){
     else if(b.dataset.all){
       const ms=(teams()[PK.co]||{})[PK.dp]||[];
       const all=ms.every(m=>REC.who.has(m.id));
-      ms.forEach(m=> all ? REC.who.delete(m.id) : REC.who.add(m.id));
+      ms.forEach(m=> all ? unpick(m.id) : (REC.who.has(m.id) || pickIn(m.id,PK.co,PK.dp)));
     }
     else if(b.dataset.id){
       const id=b.dataset.id;
-      REC.who.has(id) ? REC.who.delete(id) : REC.who.add(id);
+      REC.who.has(id) ? unpick(id) : pickIn(id,PK.co,PK.dp);
     }
     else return;
     const keep=(box.querySelector('.pkms')||{}).scrollTop||0;
@@ -827,21 +853,34 @@ function paintUp(){
           + '슬랙 알림이 나가지 않습니다');
 }
 
-async function upload(){
-  app.innerHTML='<div class="mid"><div class="done"><span class="ok">⏳</span>올리는 중입니다…</div></div>';
-
+// 이 회의의 회사·부서를 정합니다 (올리기 전에)
+function meetingCoDept(){
   // 이름을 누르신 분들이 참석자입니다. 그분들의 회사를 이 회의의 회사로 씁니다.
   const picked=MEMBERS.filter(m=>REC.who.has(m.id));
+  // 2026-10-20 — 본 소속이 아니라 「어느 회사·팀 칸에서 골랐는지」 로 셉니다.
+  //   겸직으로 슈퍼홀릭 칸에서 고른 김윤회 대표님(본 소속 더올마이티)은 슈퍼홀릭으로 셉니다.
+  const via=REC.via||new Map();
+  const coOf=m=>((via.get(m.id)||{}).co)||m.company||'';
+  const dpOf=m=>{ const v=via.get(m.id); return v && v.co===coOf(m) ? v.dp : m.dept; };
   const cos={};
-  picked.forEach(m=>{ if(m.company) cos[m.company]=(cos[m.company]||0)+1; });
+  picked.forEach(m=>{ const c=coOf(m); if(c) cos[c]=(cos[c]||0)+1; });
   let company=Object.keys(cos).sort((a,b)=>cos[b]-cos[a])[0] || '';
   if(!company) company=coFromTitle(REC.title);          // 예약 제목에서 찾아보고
   // 2026-09-14 — 「명단에서 가장 많은 회사」 로 찍는 폴백을 뺐습니다.
   //   회의실은 여러 회사가 같이 씁니다. 참석자를 안 누르고 예약도 없으면
   //   엉뚱한 회사로 잡혀 **다른 회사 슬랙으로 회의록이 새어 나갑니다.**
   //   모르면 비워 둡니다. 회사가 비면 슬랙이 나가지 않고, 헤임달에서 사람이 채웁니다.
-  const dps=[...new Set(picked.filter(m=>m.company===company).map(m=>m.dept).filter(Boolean))];
+  const dps=[...new Set(picked.filter(m=>coOf(m)===company).map(dpOf)
+    .filter(d=>d && d!==NO_DEPT && d!==EXTRA_ALL))];
   const dept = dps.length===1 ? dps[0] : '';
+  return {company, dept};
+}
+
+async function upload(){
+  app.innerHTML='<div class="mid"><div class="done"><span class="ok">⏳</span>올리는 중입니다…</div></div>';
+
+  const picked=MEMBERS.filter(m=>REC.who.has(m.id));
+  const {company, dept}=meetingCoDept();
 
   // 시험 모드 — 올리기는 하되 「나만 보기」로 넣습니다.
   // 계정을 여기서 한 번 더 확인합니다 (설정만 켜둔 채 계정이 바뀌었을 수 있습니다).
