@@ -199,7 +199,16 @@ button{font-family:inherit}
 .agn pre{margin:0;white-space:pre-wrap;word-break:break-word;font-family:inherit;
  font-size:clamp(14px,1.85vh,18px);line-height:1.75;color:var(--tx)}
 .cnt{font-size:clamp(13px,1.6vh,16px);font-weight:700;color:var(--blue-s);
- margin-bottom:10px;flex:none;min-height:20px}
+ margin-bottom:10px;flex:none;min-height:20px;display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;
+ max-height:24vh;overflow:auto;-webkit-overflow-scrolling:touch}
+.cntn{margin-right:4px}
+.selp{display:inline-flex;align-items:center;gap:7px;background:var(--blue);color:var(--on-acc);
+ border:0;border-radius:999px;padding:7px 8px 7px 14px;font-weight:700;cursor:pointer;
+ font-size:clamp(14px,1.7vh,17px)}
+.selp .w{font-size:.78em;font-weight:600;color:var(--on-acc2)}
+.selp .x{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;
+ border-radius:50%;background:rgba(0,0,0,.12);font-size:16px;line-height:1}
+.who .cnt{justify-content:center}
 .grid{display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start}
 .nm{background:var(--s2);border:2px solid var(--line);color:var(--tx);border-radius:var(--r1);
  font-size:clamp(15px,2vh,20px);font-weight:700;padding:12px 18px;cursor:pointer;
@@ -681,18 +690,38 @@ function pkInner(){
     +'</div></div>';
   return h;
 }
+// 고른 사람 카드 줄 — 다른 회사·팀으로 넘어가도 누가 골렸는지 늘 보이게 (2026-10-20)
+// 예전에는 「참석 N명 · 이름…」 한 줄 글자뿐이라, 팀을 옮기면 앞서 고른 사람이 잘 안 보였습니다.
+// × 를 누르면 그 사람만 뺍니다 (고른 팀을 찾아갈 필요 없음).
 function paintWho(){
   const c=$('#cnt');
   if(c){
-    const picked=MEMBERS.filter(m=>REC.who.has(m.id));
-    c.textContent = picked.length
-      ? '참석 '+picked.length+'명 · '+picked.map(m=>m.name).join(', ')
+    const via=REC.via||new Map();
+    const byId=new Map(MEMBERS.map(m=>[m.id,m]));
+    const ids=[...via.keys()].filter(id=>REC.who.has(id))
+      .concat([...REC.who].filter(id=>!via.has(id)));          // 고른 순서대로
+    const picked=ids.map(id=>byId.get(id)).filter(Boolean);
+    c.innerHTML = picked.length
+      ? '<span class="cntn">참석 '+picked.length+'명</span>'
+        + picked.map(m=>{ const v=via.get(m.id)||{co:m.company,dp:m.dept};
+            const where=[v.co, v.dp && v.dp!==NO_DEPT ? v.dp : ''].filter(Boolean).join(' ');
+            return '<button class="selp" data-un="'+m.id+'">'+esc(m.name)
+              +(where?'<span class="w">'+esc(where)+'</span>':'')+'<span class="x">×</span></button>'; }).join('')
       : '아직 아무도 누르지 않았습니다';
   }
   paintUp();          // 참석자 확인 화면일 때만 동작합니다
 }
 function bindPicker(){
   const box=$('#pk'); if(!box) return;
+  const c=$('#cnt');
+  if(c) c.onclick=e=>{
+    const b=e.target.closest('[data-un]'); if(!b) return;
+    unpick(b.dataset.un);
+    const keep=(box.querySelector('.pkms')||{}).scrollTop||0;
+    box.innerHTML=pkInner();
+    const ms=box.querySelector('.pkms'); if(ms) ms.scrollTop=keep;
+    paintWho();
+  };
   box.onclick=e=>{
     const b=e.target.closest('button'); if(!b) return;
     if(b.dataset.co!==undefined){ PK.co=b.dataset.co; PK.dp=null; }
