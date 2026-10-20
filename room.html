@@ -657,7 +657,10 @@ function pkInner(){
     PK.co = t[g] ? g : cos[0]; PK.dp=null;
   }
   const dps=dpList(t,PK.co);
-  if(PK.dp===null && dps.length===1) PK.dp=dps[0];   // 팀이 하나뿐이면 바로 펼침
+  // 팀이 하나뿐이면 바로 펼칩니다. 「CEO」·「겸직」 칸은 팀 수에 넣지 않습니다 —
+  // CEO 칸이 생기면서 AX팀처럼 팀이 하나인 회사도 두 번 눌러야 했습니다 (2026-10-20)
+  const real=dps.filter(d=>d!==CEO_DP && d!==EXTRA_ALL);
+  if(PK.dp===null && (dps.length===1 || real.length===1)) PK.dp = dps.length===1 ? dps[0] : real[0];
   // 숫자는 「그 회사·팀 칸에서 고른 사람」 만 셉니다. 겸직으로 여러 칸에 나오는 사람이
   // 다른 탭의 숫자까지 올리면, 어느 회사 회의로 잡힐지 헷갈립니다. (단추는 어디서든 켜져 보임)
   const via=REC.via||new Map();
