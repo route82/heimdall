@@ -206,6 +206,22 @@ button{font-family:inherit}
  min-width:104px;transition:background .15s ease,border-color .15s ease,color .15s ease}
 .nm.on{background:var(--blue);border-color:var(--blue);color:var(--on-acc)}
 .nm .co{display:block;font-size:clamp(10px,1.15vh,12px);font-weight:500;opacity:.62;margin-top:3px}
+/* 참석자 고르기 — 회사 탭 · 팀 칩 · 팀원 (2026-10-20) */
+.pk{display:flex;flex-direction:column;gap:10px;min-height:0;flex:1}
+.pkco,.pkdp{display:flex;flex-wrap:wrap;gap:8px;flex:none}
+.pkc,.pkd{background:transparent;border:1px solid var(--line2);color:var(--mut);cursor:pointer;
+ border-radius:999px;font-weight:700;display:inline-flex;align-items:center;gap:8px;
+ transition:background .15s ease,border-color .15s ease,color .15s ease}
+.pkc{font-size:clamp(14px,1.8vh,18px);padding:9px 18px}
+.pkd{font-size:clamp(14px,1.75vh,17px);padding:8px 16px;background:var(--s2);border-color:var(--line);color:var(--tx)}
+.pkc.on,.pkd.on{background:var(--blue);border-color:var(--blue);color:var(--on-acc)}
+.pkd.has:not(.on){border-color:var(--blue)}
+.pkn{font-size:.78em;font-weight:700;opacity:.75;font-variant-numeric:tabular-nums}
+.pkms{min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;flex:1;
+ border-top:1px solid var(--line);padding-top:10px}
+.nm.all{border-style:dashed}
+.nm.all.on{border-style:solid}
+.who .pk{max-height:52vh;width:min(100%,980px);text-align:left}
 
 /* ── 발: 종료 버튼 줄 */
 .ftr{display:flex;align-items:center;gap:14px;justify-content:center}
@@ -278,6 +294,8 @@ const CFG = {
 };
 
 let me=null, cfg=CFG.get(), MEMBERS=[], EVENTS=[], tick=null;
+let ORDER={};                    // 회사·팀 순서 (hd_org.sort)
+const PK={co:'', dp:null};       // 참석자 고르기 — 지금 펼친 회사·팀
 let PICKED=null;                 // 사람이 아래 목록에서 고른 회의
 // 예약에 없는 회의를 녹음할 때 켭니다. 켜지면 예약 카드를 무시합니다.
 // 회의실에 예약이 떠 있어도 갑자기 잡힌 회의를 바로 녹음할 수 있어야 합니다.
@@ -395,6 +413,12 @@ async function loadMembers(){
   // 회사별로 묶어 보여줍니다 (사람이 늘어도 자기 이름을 빨리 찾게)
   MEMBERS.sort((x,y)=> (x.company||'').localeCompare(y.company||'')
                     || (x.name||'').localeCompare(y.name||''));
+  // 회사·팀 순서는 웹 화면과 같은 명부(hd_org)를 따릅니다. 못 읽으면 가나다순.
+  try{
+    const {data:o}=await SB.from('hd_org').select('company,dept,sort').order('sort');
+    ORDER={}; (o||[]).forEach((r,i)=>{ const k=r.company+'|'+r.dept;
+      if(!(k in ORDER)) ORDER[k]=i; if(!(r.company in ORDER)) ORDER[r.company]=i; });
+  }catch(e){ ORDER={}; }
 }
 async function loadEvents(){
   const now=Date.now();
@@ -561,27 +585,96 @@ async function startRec(ev){
   recPage();
 }
 
-// 이름 버튼 격자 (회사 이름을 작게 함께 보여줍니다)
-function grid(sel){
-  if(!MEMBERS.length) return '<span class="sub">구성원 명단을 불러오지 못했습니다</span>';
-  return MEMBERS.map(m=>'<button class="nm'+(sel&&sel.has(m.id)?' on':'')
-    +'" data-id="'+m.id+'">'+esc(m.name)
-    +'<span class="co">'+esc(m.company||'')+'</span></button>').join('');
-}
-function bindGrid(){
-  app.querySelectorAll('.nm').forEach(b=>b.onclick=()=>{
-    const id=b.dataset.id;
-    if(REC.who.has(id)){ REC.who.delete(id); b.classList.remove('on'); }
-    else { REC.who.add(id); b.classList.add('on'); }
-    const c=$('#cnt');
-    if(c){
-      const picked=MEMBERS.filter(m=>REC.who.has(m.id));
-      c.textContent = picked.length
-        ? '참석 '+picked.length+'명 · '+picked.map(m=>m.name).join(', ')
-        : '아직 아무도 누르지 않았습니다';
-    }
-    paintUp();          // 참석자 확인 화면일 때만 동작합니다
+// ── 참석자 고르기 — 회사 → 팀 → 팀원 (2026-10-20)
+// 예전에는 전 직원 이름을 한 판에 늘어놓아, 사람이 많아지자 찾기가 어려웠습니다.
+// 팀을 누르면 그 팀 사람만 보이고, 이름을 누른 사람만 참석자가 됩니다.
+// 「팀 전체」 는 그 팀을 한 번에 넣고 뺍니다. 고른 사람은 다른 팀을 봐도 그대로 남습니다.
+const NO_DEPT='소속 팀 없음';
+function teams(){
+  const t={};
+  MEMBERS.forEach(m=>{
+    const co=m.company||'회사 미지정', dp=m.dept||NO_DEPT;
+    ((t[co]=t[co]||{})[dp]=t[co][dp]||[]).push(m);
   });
+  return t;
+}
+function ord(k){ return (k in ORDER) ? ORDER[k] : 9999; }
+function coList(t){
+  return Object.keys(t).sort((a,b)=>ord(a)-ord(b) || a.localeCompare(b));
+}
+function dpList(t,co){
+  return Object.keys(t[co]||{}).sort((a,b)=>(a===NO_DEPT)-(b===NO_DEPT)
+    || ord(co+'|'+a)-ord(co+'|'+b) || a.localeCompare(b));
+}
+function picker(){
+  if(!MEMBERS.length) return '<span class="sub">구성원 명단을 불러오지 못했습니다</span>';
+  return '<div class="pk" id="pk">'+pkInner()+'</div>';
+}
+function pkInner(){
+  const t=teams(), cos=coList(t), sel=REC.who||new Set();
+  if(!t[PK.co]){                       // 처음 — 예약 제목의 회사, 없으면 맨 앞 회사
+    const g=coFromTitle(REC.title);
+    PK.co = t[g] ? g : cos[0]; PK.dp=null;
+  }
+  const dps=dpList(t,PK.co);
+  if(PK.dp===null && dps.length===1) PK.dp=dps[0];   // 팀이 하나뿐이면 바로 펼침
+  const n=ms=>ms.filter(m=>sel.has(m.id)).length;
+  const coCnt=co=>Object.values(t[co]).reduce((s,ms)=>s+n(ms),0);
+  let h='<div class="pkco">'+cos.map(co=>{
+      const c=coCnt(co);
+      return '<button class="pkc'+(co===PK.co?' on':'')+'" data-co="'+esc(co)+'">'+esc(co)
+        +(c?'<span class="pkn">'+c+'</span>':'')+'</button>';
+    }).join('')+'</div>';
+  h+='<div class="pkdp">'+dps.map(dp=>{
+      const ms=t[PK.co][dp], c=n(ms);
+      return '<button class="pkd'+(dp===PK.dp?' on':'')+(c?' has':'')+'" data-dp="'+esc(dp)+'">'
+        +esc(dp)+'<span class="pkn">'+(c?c+'/':'')+ms.length+'</span></button>';
+    }).join('')+'</div>';
+  if(PK.dp===null || !t[PK.co][PK.dp]){
+    h+='<div class="pkms"><span class="sub">위에서 팀을 누르시면 팀원이 나옵니다</span></div>';
+    return h;
+  }
+  const ms=t[PK.co][PK.dp], all=ms.length && n(ms)===ms.length;
+  h+='<div class="pkms"><div class="grid">'
+    +'<button class="nm all'+(all?' on':'')+'" data-all="1">'+(all?'팀 전체 빼기':'팀 전체')
+    +'<span class="co">'+esc(PK.dp)+' '+ms.length+'명</span></button>'
+    +ms.map(m=>'<button class="nm'+(sel.has(m.id)?' on':'')+'" data-id="'+m.id+'">'
+      +esc(m.name)+'</button>').join('')
+    +'</div></div>';
+  return h;
+}
+function paintWho(){
+  const c=$('#cnt');
+  if(c){
+    const picked=MEMBERS.filter(m=>REC.who.has(m.id));
+    c.textContent = picked.length
+      ? '참석 '+picked.length+'명 · '+picked.map(m=>m.name).join(', ')
+      : '아직 아무도 누르지 않았습니다';
+  }
+  paintUp();          // 참석자 확인 화면일 때만 동작합니다
+}
+function bindPicker(){
+  const box=$('#pk'); if(!box) return;
+  box.onclick=e=>{
+    const b=e.target.closest('button'); if(!b) return;
+    if(b.dataset.co!==undefined){ PK.co=b.dataset.co; PK.dp=null; }
+    else if(b.dataset.dp!==undefined){ PK.dp=b.dataset.dp; }
+    else if(b.dataset.all){
+      const ms=(teams()[PK.co]||{})[PK.dp]||[];
+      const all=ms.every(m=>REC.who.has(m.id));
+      ms.forEach(m=> all ? REC.who.delete(m.id) : REC.who.add(m.id));
+    }
+    else if(b.dataset.id){
+      const id=b.dataset.id;
+      REC.who.has(id) ? REC.who.delete(id) : REC.who.add(id);
+    }
+    else return;
+    const keep=(box.querySelector('.pkms')||{}).scrollTop||0;
+    box.innerHTML=pkInner();
+    const ms=box.querySelector('.pkms'); if(ms && b.dataset.id) ms.scrollTop=keep;
+    paintWho();
+  };
+  paintWho();
 }
 
 function recPage(){
@@ -611,9 +704,9 @@ function recPage(){
         : '')
     +   '</div>'
     +   '<div class="col"><div class="card" style="flex:1">'
-    +     '<div class="h">들어오시면 본인 이름을 눌러주세요</div>'
+    +     '<div class="h">들어오시면 팀을 누르고 본인 이름을 눌러주세요</div>'
     +     '<div class="cnt" id="cnt">아직 아무도 누르지 않았습니다</div>'
-    +     '<div class="body"><div class="grid">'+grid(REC.who)+'</div></div>'
+    +     picker()
     +   '</div></div>'
     + '</div>'
     // 발
@@ -626,7 +719,7 @@ function recPage(){
     const a=$('#ela'); if(a) a.textContent=el((Date.now()-REC.t0)/1000);
     const c=$('#ck'); if(c) c.textContent=clk().hm;
   }, 500);
-  bindGrid();
+  bindPicker();
   $('#stop').onclick=stopRec;
   const rb=$('#rmch'); if(rb) rb.onclick=roomPick;
 }
@@ -703,16 +796,16 @@ function askWho(){
   app.innerHTML=
     '<div></div><div class="mid">'
     + '<div class="mtitle">누가 참석하셨나요?</div>'
-    + '<div class="sub">이름을 누르시면 그분들께 회의록이 슬랙으로 갑니다.<br>'
+    + '<div class="sub">팀을 누르고 이름을 누르시면 그분들께 회의록이 슬랙으로 갑니다.<br>'
     + '안 누르고 올리셔도 됩니다 — 그때는 팀장님과 관리자에게만 보입니다.</div>'
     + '<div class="who"><div class="cnt" id="cnt">아직 아무도 누르지 않았습니다</div>'
-    + '<div class="grid">'+grid(REC.who)+'</div></div>'
+    + picker()+'</div>'
     + '<button class="big go" id="up" style="font-size:26px;padding:24px 44px">'
     + '<span id="uplb">참석자 없이 올리기</span></button>'
     + '<div class="sub" style="font-size:13px" id="uphint">'
     + '이대로 올리면 팀장님과 관리자에게만 보입니다</div>'
     + '</div><div></div>';
-  bindGrid();
+  bindPicker();
   $('#up').onclick=upload;
   paintUp();
 }
