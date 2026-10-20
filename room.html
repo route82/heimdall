@@ -596,19 +596,31 @@ const NO_DEPT='소속 팀 없음';
 // 겸직 — 「회사|부서」 면 그 팀에, 「회사|」(회사 전체) 면 그 회사의 「겸직」 칸에 함께 나옵니다 (2026-10-20)
 const EXTRA_ALL='겸직';
 const EXTRA=new Set();           // 「회사|팀|사람」 — 이 팀에는 겸직으로 들어간 사람
+// 대표님 세 분은 회사와 상관없이 각 회사의 「CEO」 칸에만 나옵니다 (2026-10-20 김현우)
+//   값 = 나오지 않을 회사. 정원하 대표님은 슈퍼홀릭에서만 뺍니다.
+//   태블릿에서 고르는 자리만 바꿉니다 — 헤임달 권한(볼 수 있는 회의)은 그대로입니다.
+const CEO_DP='CEO';
+const CEOS={'홍석진':[], '김윤회':[], '정원하':['슈퍼홀릭']};
+const isCeo=m=>Object.prototype.hasOwnProperty.call(CEOS,(m&&m.name||'').trim());
 function teams(){
   const t={};
   EXTRA.clear();
   const put=(co,dp,m)=>{ const l=((t[co]=t[co]||{})[dp]=t[co][dp]||[]);
     if(!l.includes(m)) { l.push(m); return true; } return false; };
-  MEMBERS.forEach(m=>put(m.company||'회사 미지정', m.dept||NO_DEPT, m));
-  MEMBERS.forEach(m=>(m.extra_scopes||[]).forEach(s=>{
+  MEMBERS.forEach(m=>{ if(!isCeo(m)) put(m.company||'회사 미지정', m.dept||NO_DEPT, m); });
+  MEMBERS.forEach(m=>{ if(!isCeo(m)) (m.extra_scopes||[]).forEach(s=>{
     const i=String(s).indexOf('|');
     const co=(i<0?s:s.slice(0,i)).trim(), dp=(i<0?'':s.slice(i+1)).trim();
     if(!co || (co===m.company && (!dp || dp===m.dept))) return;   // 본 소속과 같으면 건너뜀
     const d=dp||EXTRA_ALL;
     if(put(co,d,m)) EXTRA.add(co+'|'+d+'|'+m.id);
-  }));
+  }); });
+  // 대표님 — 화면에 나오는 모든 회사(본 소속·겸직 회사 포함)의 「CEO」 칸
+  const ceos=MEMBERS.filter(isCeo);
+  const cos=new Set(Object.keys(t).filter(c=>c!=='회사 미지정'));
+  ceos.forEach(m=>{ if(m.company) cos.add(m.company);
+    (m.extra_scopes||[]).forEach(s=>{ const c=String(s).split('|')[0].trim(); if(c) cos.add(c); }); });
+  cos.forEach(co=>ceos.forEach(m=>{ if(!CEOS[m.name.trim()].includes(co)) put(co,CEO_DP,m); }));
   Object.values(t).forEach(c=>Object.values(c).forEach(l=>
     l.sort((a,b)=>(a.name||'').localeCompare(b.name||''))));
   return t;
@@ -621,7 +633,7 @@ function coList(t){
   return Object.keys(t).sort((a,b)=>ord(a)-ord(b) || a.localeCompare(b));
 }
 function dpList(t,co){
-  const last=d=>d===NO_DEPT?2:d===EXTRA_ALL?1:0;
+  const last=d=>d===CEO_DP?-1:d===NO_DEPT?2:d===EXTRA_ALL?1:0;   // CEO 칸은 맨 앞
   return Object.keys(t[co]||{}).sort((a,b)=>last(a)-last(b)
     || ord(co+'|'+a)-ord(co+'|'+b) || a.localeCompare(b));
 }
@@ -861,7 +873,8 @@ function meetingCoDept(){
   //   겸직으로 슈퍼홀릭 칸에서 고른 김윤회 대표님(본 소속 더올마이티)은 슈퍼홀릭으로 셉니다.
   const via=REC.via||new Map();
   const coOf=m=>((via.get(m.id)||{}).co)||m.company||'';
-  const dpOf=m=>{ const v=via.get(m.id); return v && v.co===coOf(m) ? v.dp : m.dept; };
+  // 대표님은 여러 팀 회의에 들어오시므로 부서를 정하는 데는 빼고 셉니다
+  const dpOf=m=>{ if(isCeo(m)) return ''; const v=via.get(m.id); return v && v.co===coOf(m) ? v.dp : m.dept; };
   const cos={};
   picked.forEach(m=>{ const c=coOf(m); if(c) cos[c]=(cos[c]||0)+1; });
   let company=Object.keys(cos).sort((a,b)=>cos[b]-cos[a])[0] || '';
