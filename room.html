@@ -200,14 +200,14 @@ button{font-family:inherit}
  font-size:clamp(14px,1.85vh,18px);line-height:1.75;color:var(--tx)}
 .cnt{font-size:clamp(16px,2vh,19px);font-weight:700;color:var(--blue-s);
  margin-bottom:10px;flex:none;min-height:20px;display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;
- max-height:min(24vh,108px);overflow:auto;-webkit-overflow-scrolling:touch}   /* 카드 두 줄까지 — 넘치면 이 줄 안에서 넘겨 봄 */
+ max-height:24vh;overflow:auto;-webkit-overflow-scrolling:touch}
 .cntn{margin-right:4px}
 .selp{display:inline-flex;align-items:center;gap:7px;background:var(--blue);color:var(--on-acc);
- border:0;border-radius:999px;padding:8px 9px 8px 16px;font-weight:700;cursor:pointer;
+ border:0;border-radius:999px;padding:7px 8px 7px 14px;font-weight:700;cursor:pointer;
  font-size:clamp(17px,2.1vh,20px)}   /* 2026-10-26 글씨가 작다는 의견 — 14→17px (약 20%) */
 .selp .w{font-size:.8em;font-weight:600;color:var(--on-acc2)}
-.selp .x{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;
- border-radius:50%;background:rgba(0,0,0,.12);font-size:18px;line-height:1}
+.selp .x{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;
+ border-radius:50%;background:rgba(0,0,0,.12);font-size:16px;line-height:1}
 .who .cnt{justify-content:center}
 .grid{display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start}
 .nm{background:var(--s2);border:2px solid var(--line);color:var(--tx);border-radius:var(--r1);
@@ -226,25 +226,10 @@ button{font-family:inherit}
 .pkc.on,.pkd.on{background:var(--blue);border-color:var(--blue);color:var(--on-acc)}
 .pkd.has:not(.on){border-color:var(--blue)}
 .pkn{font-size:.78em;font-weight:700;opacity:.75;font-variant-numeric:tabular-nums}
-.pkms{min-height:92px;overflow:auto;   /* 고른 사람이 많아도 팀원 단추 한 줄은 늘 보이게 */
- -webkit-overflow-scrolling:touch;flex:1;
+.pkms{min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;flex:1;
  border-top:1px solid var(--line);padding-top:10px}
 .nm.all{border-style:dashed}
 .nm.all.on{border-style:solid}
-/* 화면이 낮으면 참석자 칸 전체가 그 안에서 넘겨 보이게 — 회의 종료 단추를 덮지 않게 (2026-10-26) */
-.pkcard{overflow-y:auto;-webkit-overflow-scrolling:touch}
-.pkcard .pk{flex:1 0 auto}
-/* 높이가 낮은 화면(8.7인치 태블릿 등)에서는 녹음 시간 칸을 줄여 참석자 칸에 자리를 줍니다 (2026-10-26) */
-@media (max-height:720px){
- .rec2 .timer{padding:8px 16px;gap:0}
- .rec2 .timer .elapsed{font-size:clamp(34px,7vh,52px);margin:2px 0}
- .rec2 .timer .lv{height:16px}
- .rec2.solo{gap:10px}
- .pkcard{padding:12px 16px}
- .pkcard > .h{margin-bottom:6px}
-}
-/* 아주 낮은 화면(높이 600 이하)에서는 고른 사람 카드 줄을 한 줄 반 정도로 — 넘치면 그 줄 안에서 넘겨 봄 */
-@media (max-height:600px){ .cnt{max-height:64px} }
 .who .pk{max-height:52vh;width:min(100%,980px);text-align:left}
 
 /* ── 발: 종료 버튼 줄 */
@@ -788,7 +773,7 @@ function recPage(){
           + '<div class="body"><pre>'+esc(REC.agenda)+'</pre></div></div>'
         : '')
     +   '</div>'
-    +   '<div class="col"><div class="card pkcard" style="flex:1">'
+    +   '<div class="col"><div class="card" style="flex:1">'
     +     '<div class="h">들어오시면 팀을 누르고 본인 이름을 눌러주세요</div>'
     +     '<div class="cnt" id="cnt">아직 아무도 누르지 않았습니다</div>'
     +     picker()
