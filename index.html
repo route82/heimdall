@@ -937,6 +937,9 @@ const AUTH_MSG = {
   'User already registered':'이미 가입된 이메일입니다. 로그인해주세요.',
   'Password should be at least 6 characters.':'비밀번호는 6자 이상이어야 합니다.',
   'Email not confirmed':'메일 확인이 필요한 설정입니다. 관리자에게 문의해주세요.',
+  'New password should be different from the old password.':'지금 쓰는 비밀번호와 다른 비밀번호를 넣어주세요.',
+  'Email rate limit exceeded':'메일을 너무 자주 보냈습니다. 잠시 뒤 다시 해주세요.',
+  'Auth session missing!':'로그인이 끊겼습니다. 나갔다가 다시 로그인한 뒤 바꿔주세요.',
 };
 const authErr = m => AUTH_MSG[m] || m;
 
@@ -1008,7 +1011,9 @@ function loginPage(mode='in', msg=''){
   if(rs) rs.onclick = async () => {
     if(!email()) return loginPage('in','!이메일을 먼저 입력해주세요.');
     const {error} = await SB.auth.resetPasswordForEmail(email(), {redirectTo:location.href});
-    loginPage('in', error? '!'+authErr(error.message) : '재설정 메일을 보냈습니다.');
+    // 메일은 Supabase 기본 발송기로 나가 회사 메일함에 안 닿을 수 있습니다 (2026-10-27)
+    loginPage('in', error? '!'+authErr(error.message)
+      : '재설정 메일을 보냈습니다. 몇 분 안에 안 오면 관리자에게 「임시 비밀번호 발급」을 부탁해주세요.');
   };
 }
 
@@ -1173,7 +1178,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:11px">웹 v20.8</span>
+       <span class="sub" style="margin:0;font-size:11px">웹 v20.9</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">나가기</button>
@@ -1313,7 +1318,7 @@ function shell(){
       const btn=$('#pwsave'); btn.disabled=true;
       const {error}=await SB.auth.updateUser({password:a});
       btn.disabled=false;
-      if(error) return toast('바꾸지 못했습니다: '+esc(error.message));
+      if(error) return toast('바꾸지 못했습니다: '+esc(authErr(error.message)), 7000);
       d.remove(); toast('비밀번호를 바꿨습니다. 다음 로그인부터 새 비밀번호를 쓰세요');
     };
   };
@@ -2135,7 +2140,7 @@ function drawMeeting(){
     ub.disabled=true;
     const {error}=await SB.from('hd_meeting')
       .update({visibility:'private', owner_id:me.id}).eq('id',m.id);
-    if(error){ ub.disabled=false; return toast('바꾸지 못했습니다: '+esc(error.message)); }
+    if(error){ ub.disabled=false; return toast('바꾸지 못했습니다: '+esc(authErr(error.message)), 7000); }
     toast('비공개로 되돌렸습니다'); openMeeting(m.id);
   };
   $('#expdoc').onclick=()=>exportDoc();
@@ -2204,7 +2209,7 @@ function drawMeeting(){
       if(to===undefined) return;
       const {data:d2,error}=await SB.from('hd_meeting')
         .update({project_id:to||null}).eq('id',m.id).select('id');
-      if(error) return toast('바꾸지 못했습니다: '+esc(error.message));
+      if(error) return toast('바꾸지 못했습니다: '+esc(authErr(error.message)), 7000);
       if(!(d2||[]).length)
         return toast('이 회의 참석자만 프로젝트를 바꾸실 수 있습니다.', 5000);
       curId=to; paint();
@@ -2906,7 +2911,7 @@ async function renderMembers(){
   el.querySelectorAll('.alld').forEach(c=>c.onchange=async()=>{
     const {error}=await SB.from('hd_member')
       .update({all_dept:c.checked}).eq('id',c.dataset.id);
-    if(error){toast('바꾸지 못했습니다: '+esc(error.message)); c.checked=!c.checked; return;}
+    if(error){toast('바꾸지 못했습니다: '+esc(authErr(error.message)), 7000); c.checked=!c.checked; return;}
     toast(c.checked?'회사 전체 회의를 볼 수 있게 했습니다':'본인 부서 회의만 보게 했습니다', 2500);});
 
   el.querySelectorAll('.sv').forEach(b=>b.onclick=async()=>{
