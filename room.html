@@ -313,6 +313,7 @@ const CFG = {
 
 let me=null, cfg=CFG.get(), MEMBERS=[], EVENTS=[], tick=null;
 let ORDER={};                    // 회사·팀 순서 (hd_org.sort)
+const ALL_CO='전체';              // 참석자 고르기 맨 앞 탭 — 전 직원 가나다순
 const PK={co:'', dp:null};       // 참석자 고르기 — 지금 펼친 회사·팀
 let PICKED=null;                 // 사람이 아래 목록에서 고른 회의
 // 예약에 없는 회의를 녹음할 때 켭니다. 켜지면 예약 카드를 무시합니다.
@@ -430,7 +431,9 @@ async function loadMembers(){
     .select('id,name,company,dept,status,approved').eq('approved',true).order('name'));
   MEMBERS=(data||[]).filter(m=>(m.status||'active')==='active'
                             && (m.name||'').trim()
-                            && !(m.id===me.id && isRoomAcct(m)));
+                            && !(m.id===me.id && isRoomAcct(m))
+                            // 2026-10-28 회의실 계정이 넷이 되면서 다른 회의실 계정이 사람처럼 떠서 함께 뺍니다
+                            && !/회의실|미팅룸|회의룸/.test(m.name||''));
   // 회사별로 묶어 보여줍니다 (사람이 늘어도 자기 이름을 빨리 찾게)
   MEMBERS.sort((x,y)=> (x.company||'').localeCompare(y.company||'')
                     || (x.name||'').localeCompare(y.name||''));
@@ -661,26 +664,34 @@ function picker(){
 }
 function pkInner(){
   const t=teams(), cos=coList(t), sel=REC.who||new Set();
-  if(!t[PK.co]){                       // 처음 — 예약 제목의 회사, 없으면 맨 앞 회사
+  if(PK.co!==ALL_CO && !t[PK.co]){     // 처음 — 예약 제목의 회사, 없으면 「전체」
     const g=coFromTitle(REC.title);
-    PK.co = t[g] ? g : cos[0]; PK.dp=null;
+    PK.co = t[g] ? g : ALL_CO; PK.dp=null;
   }
-  const dps=dpList(t,PK.co);
-  // 팀이 하나뿐이면 바로 펼칩니다. 「CEO」·「겸직」 칸은 팀 수에 넣지 않습니다 —
-  // CEO 칸이 생기면서 AX팀처럼 팀이 하나인 회사도 두 번 눌러야 했습니다 (2026-10-20)
-  const real=dps.filter(d=>d!==CEO_DP && d!==EXTRA_ALL);
-  if(PK.dp===null && (dps.length===1 || real.length===1)) PK.dp = dps.length===1 ? dps[0] : real[0];
   // 숫자는 「그 회사·팀 칸에서 고른 사람」 만 셉니다. 겸직으로 여러 칸에 나오는 사람이
   // 다른 탭의 숫자까지 올리면, 어느 회사 회의로 잡힐지 헷갈립니다. (단추는 어디서든 켜져 보임)
   const via=REC.via||new Map();
   const at=(m,co,dp)=>{ const v=via.get(m.id); return sel.has(m.id) && (!v || (v.co===co && (dp===undefined || v.dp===dp))); };
   const n=(ms,dp)=>ms.filter(m=>at(m,PK.co,dp)).length;
   const coCnt=co=>new Set([].concat(...Object.values(t[co])).filter(m=>at(m,co)).map(m=>m.id)).size;
-  let h='<div class="pkco">'+cos.map(co=>{
-      const c=coCnt(co);
+  // 「전체」 탭을 맨 앞에 — 팀을 몰라도 이름만 보고 찾게 전 직원을 가나다순으로 (2026-10-28 대표님 의견)
+  let h='<div class="pkco">'+[ALL_CO].concat(cos).map(co=>{
+      const c=co===ALL_CO ? sel.size : coCnt(co);
       return '<button class="pkc'+(co===PK.co?' on':'')+'" data-co="'+esc(co)+'">'+esc(co)
         +(c?'<span class="pkn">'+c+'</span>':'')+'</button>';
     }).join('')+'</div>';
+  if(PK.co===ALL_CO){
+    const ms=MEMBERS.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','ko'));
+    return h+'<div class="pkms"><div class="grid">'
+      +ms.map(m=>'<button class="nm'+(sel.has(m.id)?' on':'')+'" data-id="'+m.id+'">'+esc(m.name)
+        +'<span class="co">'+esc(m.dept&&m.dept!==NO_DEPT?m.dept:(m.company||''))+'</span></button>').join('')
+      +'</div></div>';
+  }
+  const dps=dpList(t,PK.co);
+  // 팀이 하나뿐이면 바로 펼칩니다. 「CEO」·「겸직」 칸은 팀 수에 넣지 않습니다 —
+  // CEO 칸이 생기면서 AX팀처럼 팀이 하나인 회사도 두 번 눌러야 했습니다 (2026-10-20)
+  const real=dps.filter(d=>d!==CEO_DP && d!==EXTRA_ALL);
+  if(PK.dp===null && (dps.length===1 || real.length===1)) PK.dp = dps.length===1 ? dps[0] : real[0];
   h+='<div class="pkdp">'+dps.map(dp=>{
       const ms=t[PK.co][dp], c=n(ms,dp);
       return '<button class="pkd'+(dp===PK.dp?' on':'')+(c?' has':'')+'" data-dp="'+esc(dp)+'">'
@@ -745,7 +756,8 @@ function bindPicker(){
     }
     else if(b.dataset.id){
       const id=b.dataset.id;
-      REC.who.has(id) ? unpick(id) : pickIn(id,PK.co,PK.dp);
+      const m=PK.co===ALL_CO && MEMBERS.find(x=>x.id===id);   // 「전체」 에서 고르면 본 소속으로
+      REC.who.has(id) ? unpick(id) : m ? pickIn(id,m.company||'회사 미지정',m.dept||NO_DEPT) : pickIn(id,PK.co,PK.dp);
     }
     else return;
     const keep=(box.querySelector('.pkms')||{}).scrollTop||0;
@@ -784,7 +796,7 @@ function recPage(){
     +   '</div>'
     +   '<div class="col"><div class="card" style="flex:1">'
     +     '<div class="cnt" id="cnt">아직 아무도 누르지 않았습니다</div>'
-    +     '<div class="h">들어오시면 팀을 누르고 본인 이름을 눌러주세요</div>'
+    +     '<div class="h">들어오시면 본인 이름을 눌러주세요</div>'
     +     picker()
     +   '</div></div>'
     + '</div>'
