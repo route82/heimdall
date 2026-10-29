@@ -427,9 +427,12 @@ async function loadMembers(){
   // 겸직(extra_scopes)도 함께 읽습니다. 칸이 없는 예전 서버면 빼고 다시 읽습니다.
   let {data,error}=await SB.from('hd_member')
     .select('id,name,company,dept,status,approved,extra_scopes').eq('approved',true).order('name');
-  if(error) ({data}=await SB.from('hd_member')
+  if(error) ({data,error}=await SB.from('hd_member')
     .select('id,name,company,dept,status,approved').eq('approved',true).order('name'));
-  MEMBERS=(data||[]).filter(m=>(m.status||'active')==='active'
+  // 2026-10-29 B1 태블릿 — 2분마다 다시 읽다 와이파이가 잠깐 끊기면 받아둔 명단을 빈 명단으로 덮어써
+  //            「구성원 명단을 불러오지 못했습니다」 가 떴습니다. 못 읽으면 있던 명단을 그대로 둡니다.
+  if(error || !data || !data.length) throw new Error(error ? error.message : '명단이 비어 있습니다');
+  MEMBERS=data.filter(m=>(m.status||'active')==='active'
                             && (m.name||'').trim()
                             && !(m.id===me.id && isRoomAcct(m))
                             // 2026-10-28 회의실 계정이 넷이 되면서 다른 회의실 계정이 사람처럼 떠서 함께 뺍니다
@@ -659,8 +662,26 @@ function dpList(t,co){
     || ord(co+'|'+a)-ord(co+'|'+b) || a.localeCompare(b));
 }
 function picker(){
-  if(!MEMBERS.length) return '<span class="sub">구성원 명단을 불러오지 못했습니다</span>';
+  if(!MEMBERS.length){ retryMembers();
+    return '<div class="pk" id="pk"><span class="sub">구성원 명단을 불러오는 중입니다…</span></div>'; }
   return '<div class="pk" id="pk">'+pkInner()+'</div>';
+}
+// 명단이 비어 있으면 5초마다 다시 읽어, 받는 대로 고르는 칸을 채웁니다
+let memRetry=null;
+function retryMembers(){
+  if(memRetry) return;
+  let n=0;
+  memRetry=setInterval(async()=>{
+    n++;
+    await loadMembers().catch(()=>{});
+    const box=$('#pk');
+    if(MEMBERS.length){
+      clearInterval(memRetry); memRetry=null;
+      if(box){ box.innerHTML=pkInner(); paintWho(); }
+    }else if(box && n>=6){
+      box.innerHTML='<span class="sub">구성원 명단을 불러오지 못했습니다 · 와이파이를 확인해주세요. 계속 다시 시도합니다</span>';
+    }
+  }, 5000);
 }
 function pkInner(){
   const t=teams(), cos=coList(t), sel=REC.who||new Set();
