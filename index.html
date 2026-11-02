@@ -1756,6 +1756,25 @@ async function openMeeting(id){
   drawMeeting();
 }
 
+// 이그드라실(거래처 관계 DB)에 이어진 회의면 그 거래처로 바로 갑니다 (11-02).
+// 타임라인에 연결된 회사 → 회사 화면, 확인 대기에 올라간 것 → 확인 대기. 이어진 것이 없으면(내부 회의 등) 보이지 않습니다.
+const YGG_URL='https://thealmightycorp.github.io/pantheon/';
+async function drawYgg(m){
+  const box=$('#ygg'); if(!box || !m) return;
+  try{
+    const [ev,rq]=await Promise.all([
+      SB.from('pt_rel_event').select('entity_id').eq('source_system','heimdall').eq('source_ref',m.id),
+      SB.from('pt_review_queue').select('id').eq('kind','meeting').eq('status','pending').eq('payload->>meeting_id',m.id).limit(1)]);
+    const ids=[...new Set((ev.data||[]).map(x=>x.entity_id).filter(Boolean))];
+    const ents=ids.length ? ((await SB.from('pt_entity').select('id,name').in('id',ids)).data||[]) : [];
+    if(cur.m.id!==m.id || (!ents.length && !(rq.data||[]).length)) return;
+    box.innerHTML=`<span style="font-size:13px;color:var(--tx2)">이그드라실</span>
+      ${ents.map(e=>`<a class="pjbtn" style="text-decoration:none" href="${YGG_URL}#entities/${encodeURIComponent(e.id)}" target="_blank" rel="noopener" title="이그드라실에서 ${esc(e.name)} 보기">${esc(e.name)} ↗</a>`).join('')}
+      ${(rq.data||[]).length?`<a class="pjbtn none" style="text-decoration:none" href="${YGG_URL}#review" target="_blank" rel="noopener" title="이그드라실 확인 대기에서 거래처에 연결">확인 대기에서 거래처 연결 ↗</a>`:''}`;
+    box.style.display='flex';
+  }catch(e){}
+}
+
 // 같은 회의가 반복될 때, 지난 기록을 시간순으로 함께 보여줍니다.
 // 「그때 왜 그렇게 결정했지?」 를 찾으러 목록을 뒤지지 않게 하려는 것입니다.
 async function drawSeries(m){
@@ -1820,6 +1839,7 @@ function drawMeeting(){
     <span style="font-size:13px;color:var(--tx2)">프로젝트</span>
     <button class="pjbtn none" id="pjsel">분류 안 됨</button>
   </div>
+  <div class="row" id="ygg" style="margin-bottom:6px;gap:6px;flex-wrap:wrap;display:none"></div>
   <div class="tabs">
     <button class="tab">안건</button>
     <button class="tab">하이라이트</button>
@@ -1903,7 +1923,7 @@ function drawMeeting(){
     pop.querySelectorAll('.btn').forEach(x=>x.addEventListener('click', shut));
   })();
 
-  drawSeries(m);
+  drawSeries(m); drawYgg(m);
   const tabs=[...el.querySelectorAll('.tab')], panes=[...el.querySelectorAll('.pane')];
   tabs.forEach((t,i)=>t.onclick=()=>{tabs.forEach(x=>x.setAttribute('aria-selected','false'));
     panes.forEach(p=>p.classList.remove('on'));t.setAttribute('aria-selected','true');panes[i].classList.add('on');
