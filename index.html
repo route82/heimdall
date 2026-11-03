@@ -755,6 +755,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 // 비밀번호 재설정 메일의 링크로 들어왔는지 먼저 확인합니다.
 // supabase 가 주소창을 정리해버리기 전에 잡아야 해서 맨 앞에 둡니다.
 let RECOVERY = /type=recovery/.test(location.hash || '');
+// 이미 쓴·만료된 메일 링크는 주소에 error_code 만 붙어 옵니다 — 안내 없이 로그인 화면만 뜨던 것 (11-03)
+const LINK_ERR = /error_code=|error=access_denied/.test(location.hash || '');
+if(LINK_ERR) try{ history.replaceState(null,'',location.pathname); }catch{}
 
 let AUTH_DEAD = false;
 function authDead(){
@@ -4840,8 +4843,8 @@ async function boot(){
   // 메일 링크로 들어오셨으면 새 비밀번호부터 받습니다
   if(RECOVERY && session) return recoveryPage('');
   if(!session){
-    if(RECOVERY) return loginPage('in',
-      '!재설정 링크가 만료되었습니다. 「비밀번호를 잊으셨나요?」 로 다시 받아주세요.');
+    if(RECOVERY || LINK_ERR) return loginPage('in',
+      '!이미 사용했거나 만료된 링크입니다. 「비밀번호를 잊으셨나요?」로 다시 요청하고, 가장 최근에 받은 메일의 링크를 클릭해 주세요.');
     return loginPage();
   }
   // 자동 로그인을 끄셨으면, 브라우저를 닫았다 연 경우 다시 로그인하게 합니다.
