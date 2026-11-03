@@ -778,7 +778,16 @@ const SB = createClient('https://dwoiobqucmikbtikfjwk.supabase.co', 'sb_publisha
       const r = await fetch(input, init);
       try{
         const u = (typeof input === 'string' ? input : (input && input.url) || '');
-        if((r.status === 401 || r.status === 403) && u.includes('/rest/v1/')) authDead();
+        // 2026-11-03 403 은 「권한 없음(42501, 행 보안 정책)」 일 때도 옵니다. 그것까지 로그아웃으로 처리해
+        //            나원태 이사님이 회의록을 고칠 때마다 로그인이 풀렸습니다. 로그인 문제(JWT)일 때만 내보냅니다.
+        if(u.includes('/rest/v1/') && (r.status === 401 || r.status === 403)){
+          let body = {};
+          try{ body = await r.clone().json(); }catch(e){}
+          const msg = String((body && (body.message || body.msg)) || '');
+          if(r.status === 401 || /jwt|token/i.test(msg)) authDead();
+          else if(body && body.code === '42501')
+            setTimeout(()=>{ try{ toast('이 회의록을 고칠 권한이 없어 저장하지 못했습니다. 관리자에게 말씀해주세요.', 7000); }catch(e){} }, 0);
+        }
       }catch(e){}
       return r;
     }
