@@ -1488,7 +1488,7 @@ async function renderCal(){
   }catch(e){}
   el.innerHTML=`<h1>일정</h1>
     <div class="sub">회의실 예약 중 우리 그룹 것만 보입니다. 예약을 누르면 그 회의를 녹음하거나 회의록을 엽니다
-      ${last?` · 구글 캘린더에서 <b>${last}</b> 확인함 (2분마다 자동)`:''}</div>
+       · 구글 캘린더 예약은 처리 서버가 2분마다 자동으로 가져옵니다</div>
     <div class="row" style="margin-bottom:14px;flex-wrap:wrap">
       <button class="btn" id="cprev">←</button>
       <button class="btn" id="ctoday">오늘</button>
