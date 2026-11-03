@@ -1036,10 +1036,16 @@ function loginPage(mode='in', msg=''){
   const rs=$('#reset');
   if(rs) rs.onclick = async () => {
     if(!email()) return loginPage('in','!이메일을 먼저 입력해주세요.');
+    rs.disabled=true;
     const {error} = await SB.auth.resetPasswordForEmail(email(), {redirectTo:location.href});
-    // 메일은 Supabase 기본 발송기로 나가 회사 메일함에 안 닿을 수 있습니다 (2026-10-27)
-    loginPage('in', error? '!'+authErr(error.message)
-      : '재설정 메일을 보냈습니다. 몇 분 안에 안 오면 관리자에게 「임시 비밀번호 발급」을 부탁해주세요.');
+    // 같은 계정은 60초 안에 다시 보낼 수 없다(429) — 메일은 이미 나간 것이므로 실패로 보이지 않게 (11-03 정원하 대표님)
+    const wait = error && (error.status===429 || /seconds|rate limit/i.test(error.message||'')) ? (+((error.message||'').match(/after (\d+) seconds/)||[])[1] || 60) : 0;
+    if(error && !wait){ rs.disabled=false; return loginPage('in','!'+authErr(error.message)); }
+    loginPage('in', wait ? '방금 재설정 메일을 보냈습니다. 메일함과 스팸함을 먼저 확인해 주세요.'
+      : '재설정 메일을 보냈습니다. 몇 분 안에 도착하니 메일함과 스팸함을 확인해 주세요. 메일이 오지 않으면 관리자에게 「임시 비밀번호 발급」을 요청해 주세요.');
+    let n = wait || 60;
+    const tick = () => { const b=$('#reset'); if(!b) return; if(n<=0){ b.disabled=false; b.textContent='비밀번호를 잊으셨나요?'; return; } b.disabled=true; b.textContent=`메일이 오지 않았다면 ${n}초 뒤 다시 보낼 수 있습니다`; n--; setTimeout(tick,1000); };
+    tick();
   };
 }
 
