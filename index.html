@@ -982,6 +982,9 @@ const authErr = m => AUTH_MSG[m] || m;
 // 슬랙으로 로그인 (11-04) — 슬랙 앱 「Heimdall」 · Supabase Slack(OIDC). 이그드라실·궁니르도 같은 계정
 const SLACK_SVG = '<svg width="16" height="16" viewBox="0 0 122.8 122.8" aria-hidden="true" style="stroke:none;flex-shrink:0"><path d="M25.8 77.6a12.9 12.9 0 1 1-12.9-12.9h12.9zm6.5 0a12.9 12.9 0 0 1 25.8 0v32.3a12.9 12.9 0 1 1-25.8 0z" fill="#e01e5a"/><path d="M45.2 25.8a12.9 12.9 0 1 1 12.9-12.9v12.9zm0 6.5a12.9 12.9 0 0 1 0 25.8H12.9a12.9 12.9 0 0 1 0-25.8z" fill="#36c5f0"/><path d="M97 45.2a12.9 12.9 0 1 1 12.9 12.9H97zm-6.5 0a12.9 12.9 0 0 1-25.8 0V12.9a12.9 12.9 0 1 1 25.8 0z" fill="#2eb67d"/><path d="M77.6 97a12.9 12.9 0 1 1-12.9 12.9V97zm0-6.5a12.9 12.9 0 0 1 0-25.8h32.3a12.9 12.9 0 0 1 0 25.8z" fill="#ecb22e"/></svg>';
 const slackSignIn = () => SB.auth.signInWithOAuth({provider:'slack_oidc', options:{redirectTo: location.origin + location.pathname}});
+// 휴대폰은 슬랙 앱 로그인이 브라우저와 따로라 처음엔 브라우저에서 슬랙 로그인이 필요 — 휴대폰마다 한 번 미리 안내 (11-04 김현우)
+const isPhone = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+const slackHintDue = () => { if (!isPhone()) return false; try { return localStorage.getItem('hd_slack_hint') !== '1'; } catch { return false; } };
 let SLACK_BUSY = false;
 
 function loginPage(mode='in', msg=''){
@@ -1011,6 +1014,7 @@ function loginPage(mode='in', msg=''){
     </div>`:''}
     <button class="btn p full" id="go">${isUp?'가입하고 시작하기':'로그인'}</button>
     <button class="btn full" id="slack" style="margin-top:9px;display:flex;align-items:center;justify-content:center;gap:8px">${SLACK_SVG}${isUp?'슬랙으로 가입하기':'슬랙으로 로그인'}</button>
+    <p id="slack-hint" hidden style="margin:10px 0 0;padding:10px 12px;border-radius:8px;background:var(--s3);border:1px solid var(--line);color:var(--tx2);font-size:13px;line-height:1.6">휴대폰에서는 슬랙 앱이 아니라 브라우저에서 슬랙 로그인 화면이 열립니다. 처음 한 번은 회사 슬랙 계정으로 로그인해 주세요(이메일로 받은 코드로도 로그인할 수 있습니다). 한 번 로그인하면 다음부터는 바로 들어옵니다.</p>
     ${!isUp?'<button class="btn full" id="reset" style="margin-top:9px;border:0;color:var(--tx2);font-size:13px">비밀번호를 잊으셨나요?</button>':''}
     <p style="margin-top:14px;font-size:13px;color:${msg.startsWith('!')?'var(--err)':'var(--tx3)'}">${esc(msg.replace(/^!/,''))}</p>
     ${isUp?'<p style="font-size:12.5px;color:var(--tx3);margin:0">가입 신청 후 관리자 승인이 있어야 이용하실 수 있습니다.</p>':''}
@@ -1048,6 +1052,8 @@ function loginPage(mode='in', msg=''){
     }
   };
   $('#slack').onclick = async () => {
+    if(slackHintDue() && $('#slack-hint').hidden){ $('#slack-hint').hidden=false; $('#slack').lastChild.textContent='확인했습니다 · 슬랙으로 이동'; return; }
+    try{ localStorage.setItem('hd_slack_hint','1'); }catch{}
     $('#slack').disabled=true; $('#slack').lastChild.textContent='슬랙으로 이동하는 중…';
     sessionStorage.setItem('hd_slack','1'); sessionStorage.setItem('hd_live','1');
     if(!isUp) localStorage.setItem('hd_auto', $('#auto')?.checked?'1':'0');
