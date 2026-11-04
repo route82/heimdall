@@ -756,8 +756,15 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 // supabase 가 주소창을 정리해버리기 전에 잡아야 해서 맨 앞에 둡니다.
 let RECOVERY = /type=recovery/.test(location.hash || '');
 // 이미 쓴·만료된 메일 링크는 주소에 error_code 만 붙어 옵니다 — 안내 없이 로그인 화면만 뜨던 것 (11-03)
-const LINK_ERR = /error_code=|error=access_denied/.test(location.hash || '');
-if(LINK_ERR) try{ history.replaceState(null,'',location.pathname); }catch{}
+// 슬랙 로그인에서 돌아왔는데 오류가 붙어 있으면 메일 링크 안내 대신 슬랙 안내를 띄웁니다 (11-04)
+//   우리 워크스페이스가 아닌 슬랙은 가입 트리거가 막아 「Database error saving new user」 로 돌아옵니다
+const AUTH_Q = decodeURIComponent((location.hash || '') + (location.search || '')).replace(/\+/g,' ');
+const SLACK_ERR = sessionStorage.getItem('hd_slack') && /error/.test(AUTH_Q)
+  ? (/saving new user/i.test(AUTH_Q) ? '!더올마이티 슬랙 계정으로만 로그인할 수 있습니다. 회사 슬랙 계정으로 다시 시도해 주세요.'
+     : /access_denied/.test(AUTH_Q) ? '슬랙 로그인을 취소했습니다.' : '!슬랙으로 로그인하지 못했습니다. 잠시 후 다시 시도해 주세요.') : '';
+const LINK_ERR = !SLACK_ERR && /error_code=|error=access_denied/.test(location.hash || '');
+if(SLACK_ERR) sessionStorage.removeItem('hd_slack');
+if(LINK_ERR || SLACK_ERR) try{ history.replaceState(null,'',location.pathname); }catch{}
 
 let AUTH_DEAD = false;
 function authDead(){
@@ -972,6 +979,11 @@ const AUTH_MSG = {
 };
 const authErr = m => AUTH_MSG[m] || m;
 
+// 슬랙으로 로그인 (11-04) — 슬랙 앱 「Heimdall」 · Supabase Slack(OIDC). 이그드라실·궁니르도 같은 계정
+const SLACK_SVG = '<svg width="16" height="16" viewBox="0 0 122.8 122.8" aria-hidden="true" style="stroke:none;flex-shrink:0"><path d="M25.8 77.6a12.9 12.9 0 1 1-12.9-12.9h12.9zm6.5 0a12.9 12.9 0 0 1 25.8 0v32.3a12.9 12.9 0 1 1-25.8 0z" fill="#e01e5a"/><path d="M45.2 25.8a12.9 12.9 0 1 1 12.9-12.9v12.9zm0 6.5a12.9 12.9 0 0 1 0 25.8H12.9a12.9 12.9 0 0 1 0-25.8z" fill="#36c5f0"/><path d="M97 45.2a12.9 12.9 0 1 1 12.9 12.9H97zm-6.5 0a12.9 12.9 0 0 1-25.8 0V12.9a12.9 12.9 0 1 1 25.8 0z" fill="#2eb67d"/><path d="M77.6 97a12.9 12.9 0 1 1-12.9 12.9V97zm0-6.5a12.9 12.9 0 0 1 0-25.8h32.3a12.9 12.9 0 0 1 0 25.8z" fill="#ecb22e"/></svg>';
+const slackSignIn = () => SB.auth.signInWithOAuth({provider:'slack_oidc', options:{redirectTo: location.origin + location.pathname}});
+let SLACK_BUSY = false;
+
 function loginPage(mode='in', msg=''){
   const isUp = mode==='up';
   $('#app').innerHTML = `<div class="login">
@@ -998,6 +1010,7 @@ function loginPage(mode='in', msg=''){
       <label><input type="checkbox" id="auto" ${localStorage.getItem('hd_auto')==='1'?'checked':''}> 자동 로그인</label>
     </div>`:''}
     <button class="btn p full" id="go">${isUp?'가입하고 시작하기':'로그인'}</button>
+    <button class="btn full" id="slack" style="margin-top:9px;display:flex;align-items:center;justify-content:center;gap:8px">${SLACK_SVG}${isUp?'슬랙으로 가입하기':'슬랙으로 로그인'}</button>
     ${!isUp?'<button class="btn full" id="reset" style="margin-top:9px;border:0;color:var(--tx2);font-size:13px">비밀번호를 잊으셨나요?</button>':''}
     <p style="margin-top:14px;font-size:13px;color:${msg.startsWith('!')?'var(--err)':'var(--tx3)'}">${esc(msg.replace(/^!/,''))}</p>
     ${isUp?'<p style="font-size:12.5px;color:var(--tx3);margin:0">가입 신청 후 관리자 승인이 있어야 이용하실 수 있습니다.</p>':''}
@@ -1033,6 +1046,13 @@ function loginPage(mode='in', msg=''){
       sessionStorage.setItem('hd_live','1');
       boot();
     }
+  };
+  $('#slack').onclick = async () => {
+    $('#slack').disabled=true; $('#slack').lastChild.textContent='슬랙으로 이동하는 중…';
+    sessionStorage.setItem('hd_slack','1'); sessionStorage.setItem('hd_live','1');
+    if(!isUp) localStorage.setItem('hd_auto', $('#auto')?.checked?'1':'0');
+    const {error} = await slackSignIn();
+    if(error){ sessionStorage.removeItem('hd_slack'); loginPage(mode,'!슬랙으로 로그인하지 못했습니다. 잠시 후 다시 시도해 주세요.'); }
   };
   $('#em')?.addEventListener('keydown',e=>{if(e.key==='Enter')$('#pw').focus();});
   $('#pw')?.addEventListener('keydown',e=>{if(e.key==='Enter'&&!isUp)$('#go').click();});
@@ -4838,14 +4858,35 @@ if('serviceWorker' in navigator){
 
 // ─────────────────────────── 시작
 async function boot(){
+  if(SLACK_BUSY) return;                 // 슬랙 계정 연결 중 — 로그아웃·로그인 알림으로 다시 불려도 기다립니다
   await loadOrg();                       // 회사·부서 명부 먼저
   const {data:{session}} = await SB.auth.getSession();
   // 메일 링크로 들어오셨으면 새 비밀번호부터 받습니다
   if(RECOVERY && session) return recoveryPage('');
   if(!session){
+    if(SLACK_ERR) return loginPage('in', SLACK_ERR);
     if(RECOVERY || LINK_ERR) return loginPage('in',
       '!이미 사용했거나 만료된 링크입니다. 「비밀번호를 잊으셨나요?」로 다시 요청하고, 가장 최근에 받은 메일의 링크를 클릭해 주세요.');
     return loginPage();
+  }
+  // 슬랙 로그인 직후 — 슬랙 이메일이 로그인 이메일과 다른 직원은 원래 계정으로 옮긴 뒤 슬랙 로그인을 한 번 더 합니다
+  if(SLACK_BUSY) return;
+  const slackStep = sessionStorage.getItem('hd_slack');
+  if(slackStep){
+    SLACK_BUSY = true; sessionStorage.removeItem('hd_slack');
+    $('#app').innerHTML = `<div class="login"><p class="sub" style="text-align:center">슬랙 계정을 확인하는 중…</p></div>`;
+    const {data:r} = await SB.rpc('hd_slack_link');
+    if(r==='linked' && slackStep==='1'){
+      await SB.auth.signOut({scope:'local'});
+      sessionStorage.setItem('hd_slack','2');
+      $('#app').innerHTML = `<div class="login"><p class="sub" style="text-align:center">기존 헤임달 계정에 슬랙을 연결했습니다. 다시 로그인하는 중…</p></div>`;
+      return slackSignIn();
+    }
+    const fail = {linked:'!슬랙 계정을 연결하지 못했습니다. 관리자에게 문의해 주세요.',
+      other_team:'!더올마이티 슬랙 계정으로만 로그인할 수 있습니다. 회사 슬랙 계정으로 다시 시도해 주세요.',
+      ambiguous:'!이 슬랙 이메일로 찾은 헤임달 계정이 두 개 이상입니다. 관리자에게 문의해 주세요.'}[r];
+    if(fail){ await SB.auth.signOut({scope:'local'}); SLACK_BUSY = false; return loginPage('in', fail); }
+    SLACK_BUSY = false;
   }
   // 자동 로그인을 끄셨으면, 브라우저를 닫았다 연 경우 다시 로그인하게 합니다.
   // (같은 창에서 새로고침한 것은 그대로 유지합니다)
