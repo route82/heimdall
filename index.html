@@ -3342,7 +3342,7 @@ function drawSideTree(){
   const meetings=SDATA.all.filter(m=>m.visibility!=='private');
   const myNotes =SDATA.all.filter(m=>m.visibility==='private' && m.owner_id===me.id);
   const shNotes =SDATA.all.filter(m=>m.visibility==='private' && m.owner_id!==me.id);
-  const nkind=m=>m.source==='아이디어 노트'?'idea':m.source==='지시사항'?'order':'etc';
+  const nkind=m=>m.source==='아이디어 노트'?'idea':m.source==='지시사항'?'order':m.source==='개인 면담'?'talk':'etc';
   const NOTES='내 노트';
   const pcos=p=>(p.companies&&p.companies.length)?p.companies:(p.company?[p.company]:[PJ_NOCO]);
   const pdp=p=>p.dept||PJ_NODEPT;
@@ -3366,6 +3366,9 @@ function drawSideTree(){
         <span class="stc">${myNotes.filter(m=>nkind(m)==='idea').length}</span>`);
     h+=row(1,NOTES,'order','',`<span class="stw"></span>${FOLDER_ICO}<span class="stt">지시사항</span>
         <span class="stc">${myNotes.filter(m=>nkind(m)==='order').length}</span>`);
+    if(canTalk() || myNotes.some(m=>nkind(m)==='talk'))
+      h+=row(1,NOTES,'talk','',`<span class="stw"></span>${FOLDER_ICO}<span class="stt">개인 면담</span>
+          <span class="stc">${myNotes.filter(m=>nkind(m)==='talk').length}</span>`);
     if(shNotes.length)
       h+=row(1,NOTES,'shared','',`<span class="stw"></span>${FOLDER_ICO}<span class="stt">공유받은 노트</span>
           <span class="stc">${shNotes.length}</span>`);
@@ -3431,7 +3434,7 @@ async function renderProjects(){
   const meetings=all.filter(m=>m.visibility!=='private');
   const myNotes =all.filter(m=>m.visibility==='private' && m.owner_id===me.id);
   const shNotes =all.filter(m=>m.visibility==='private' && m.owner_id!==me.id);
-  const nkind=m=>m.source==='아이디어 노트'?'idea':m.source==='지시사항'?'order':'etc';
+  const nkind=m=>m.source==='아이디어 노트'?'idea':m.source==='지시사항'?'order':m.source==='개인 면담'?'talk':'etc';
   const NOTES='내 노트';
   const canMake=['admin','ceo','manager','dev'].includes(me.role);
 
@@ -3462,8 +3465,9 @@ async function renderProjects(){
   if(sc===NOTES){
     list = sd==='idea'  ? myNotes.filter(m=>nkind(m)==='idea')
          : sd==='order' ? myNotes.filter(m=>nkind(m)==='order')
+         : sd==='talk'  ? myNotes.filter(m=>nkind(m)==='talk')
          : sd==='shared'? shNotes : myNotes;
-    here = sd==='idea'?'아이디어 노트':sd==='order'?'지시사항'
+    here = sd==='idea'?'아이디어 노트':sd==='order'?'지시사항':sd==='talk'?'개인 면담'
          : sd==='shared'?'나에게 공유된 노트':'내 노트';
   }
   else if(sp && curPj){ list=meetings.filter(m=>m.project_id===sp); here=curPj.name; }
@@ -3492,6 +3496,9 @@ async function renderProjects(){
           <div class="tn"><div class="tb${on(NOTES,'order','')}" ${at(NOTES,'order','')} data-lv="dept">
             <span class="tw"></span>${FOLDER_ICO}<span class="tt">지시사항</span>
             <span class="tc">${myNotes.filter(m=>nkind(m)==='order').length}</span></div></div>
+          ${(canTalk() || myNotes.some(m=>nkind(m)==='talk'))?`<div class="tn"><div class="tb${on(NOTES,'talk','')}" ${at(NOTES,'talk','')} data-lv="dept">
+            <span class="tw"></span>${FOLDER_ICO}<span class="tt">개인 면담</span>
+            <span class="tc">${myNotes.filter(m=>nkind(m)==='talk').length}</span></div></div>`:''}
           ${shNotes.length?`<div class="tn">
             <div class="tb${on(NOTES,'shared','')}" ${at(NOTES,'shared','')} data-lv="dept">
             <span class="tw"></span>${FOLDER_ICO}<span class="tt">나에게 공유된 노트</span>
@@ -3921,9 +3928,13 @@ function recFmt(s){
               : `${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}:${String(x).padStart(2,'0')}`);
 }
 
+// 2026-11-06 개인 면담 — 대표·임원·인사 담당만. 팀장은 열지 않습니다.
+const canTalk = () => ['admin','ceo','exec'].includes(me.role) || !!me.hr;
+
 async function renderRec(){
   const el=$('#p-rec');
   const on = !!(REC.mr && REC.mr.state==='recording');
+  const talk = canTalk() && (on ? REC.type==='interview' : REC.mode==='interview');
   el.innerHTML=`<h1>녹음</h1>
     <div class="sub">이 기기의 마이크로 회의를 녹음합니다.
       끝내면 자동으로 올라가고, 전사·요약·하이라이트가 만들어집니다</div>
@@ -3934,6 +3945,18 @@ async function renderRec(){
         아래 <b>①~④ 는 하나도 안 채우셔도</b> 녹음됩니다. 아무 때나
         <b>맨 아래 「● 회의 녹음 시작」</b> 을 누르시면 시작합니다.<br>
         채워두시면 회의록이 더 정확해지고, 참석자분들께 알림이 갑니다.</div>`}
+      ${canTalk()?`<div class="fld">
+        <div class="fldh"><span class="fldn">00</span><b>녹음 종류</b>
+          <span class="hint">개인 면담은 녹음한 본인만 보고, 슬랙 알림이 가지 않습니다</span></div>
+        <select id="rc-type" style="min-width:230px" ${on?'disabled':''}>
+          <option value="meeting">회의</option>
+          <option value="interview" ${talk?'selected':''}>개인 면담 — 나만 보기</option>
+        </select>
+        <div class="recnote" id="rc-talk-note" style="margin-top:9px;${talk?'':'display:none'}">
+          <b>면담을 시작할 때 「기록을 위해 녹음합니다」 라고 먼저 말씀해 주세요.</b><br>
+          면담 기록은 녹음한 본인만 볼 수 있고 (관리자도 볼 수 없습니다), 슬랙 알림이 가지 않습니다.
+          <b>03 참석자</b>에 면담 대상을 넣어 주시면 기록이 더 정확해집니다.</div>
+      </div>`:'<select id="rc-type" style="display:none"><option value="meeting">회의</option></select>'}
       <div class="fld" id="rc-cal-row">
         <div class="fldh"><span class="fldn">01</span><b>회의실 예약에서 선택</b>
           <span class="opt">비워도 됩니다</span>
@@ -3963,7 +3986,6 @@ async function renderRec(){
           <span class="hint">회의 중에도 이 자리에서 계속 보입니다</span></div>
         <div id="rc-ag"></div>
       </div>
-      <select id="rc-type" style="display:none"><option value="meeting">회의</option></select>
       ${(me.role==='admin' || (me.extra_scopes||[]).length)?`<div class="fld" id="rc-scope-row">
         <div class="fldh"><span class="fldn">05</span><b>어느 회사 회의인가요</b>
           <span class="opt">그대로 두셔도 됩니다</span></div>
@@ -3979,7 +4001,7 @@ async function renderRec(){
       </div>`:''}
       <div class="recgo">
         <div class="row" style="align-items:center">
-          <button class="btn p" id="rc-go" style="min-width:168px;font-size:15px;padding:13px 22px">${on?'■ 녹음 종료':'● 회의 녹음 시작'}</button>
+          <button class="btn p" id="rc-go" style="min-width:168px;font-size:15px;padding:13px 22px">${on?'■ 녹음 종료':talk?'● 면담 녹음 시작':'● 회의 녹음 시작'}</button>
           <span id="rc-time" style="font-size:24px;font-weight:700;letter-spacing:1px">0:00</span>
           <span id="rc-lv" class="sub" style="margin:0"></span>
         </div>
@@ -4005,6 +4027,13 @@ async function renderRec(){
   });
   drawAgendaBox(on);
   $('#rc-go').onclick = on ? recStop : recStart;
+  const rt=$('#rc-type');
+  if(rt && !on) rt.onchange=()=>{
+    REC.mode=rt.value;
+    const t=rt.value==='interview', n=$('#rc-talk-note'), g=$('#rc-go');
+    if(n) n.style.display=t?'':'none';
+    if(g) g.textContent=t?'● 면담 녹음 시작':'● 회의 녹음 시작';
+  };
   if(on) recTick();
   loadUploads();
 }
@@ -4193,6 +4222,12 @@ async function recStart(){
     REC.cal={uid:cs.value, title:o.dataset.title, room:o.dataset.room};
   }
   REC.type=($('#rc-type')||{value:'meeting'}).value;
+  if(REC.type==='interview' && !canTalk()) REC.type='meeting';
+  // 면담명을 비워 두면 「개인 면담 · 면담 대상」 으로 씁니다
+  if(REC.type==='interview' && !($('#rc-title').value||'').trim()){
+    const who=REC.attNames.filter(n=>n && n!==me.name);
+    REC.title='개인 면담'+(who.length?' · '+who.join(', '):'');
+  }
   REC.shares=[...document.querySelectorAll('.rc-share:checked')].map(x=>x.value);
   REC.shco=[...document.querySelectorAll('.rc-shco:checked')].map(x=>x.value);
   REC.shdp=[...document.querySelectorAll('.rc-shdp:checked')].map(x=>x.value);
@@ -4206,7 +4241,7 @@ async function recStart(){
   REC.timer = setInterval(recTick, 1000);
   recWatchLevel(stream);
   renderRec();
-  toast('녹음을 시작했습니다: <b>'+esc(title)+'</b>');
+  toast('녹음을 시작했습니다: <b>'+esc(REC.title)+'</b>');
 }
 
 function recWatchLevel(stream){
@@ -4279,7 +4314,7 @@ async function recDone(){
     // 제목을 「날짜 · 회사 · 부서 · 내용」 으로 통일합니다 (2026-08-26 규칙)
     REC.title = mkTitle(REC.title, sc.company, '');
     const extra = priv ? {visibility:'private',
-      note_label: REC.type==='idea' ? '아이디어 노트' : '지시사항',
+      note_label: REC.type==='idea' ? '아이디어 노트' : REC.type==='interview' ? '개인 면담' : '지시사항',
       share_ids: REC.shares||[],
       share_companies: REC.shco||[],
       share_depts: REC.shdp||[]} : {};
