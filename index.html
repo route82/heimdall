@@ -3947,14 +3947,14 @@ async function renderRec(){
         채워두시면 회의록이 더 정확해지고, 참석자분들께 알림이 갑니다.</div>`}
       ${canTalk()?`<div class="fld">
         <div class="fldh"><span class="fldn">00</span><b>녹음 종류</b>
-          <span class="hint">개인 면담은 녹음한 본인만 보고, 슬랙 알림이 가지 않습니다</span></div>
+          <span class="hint">개인 면담은 녹음한 본인만 보고, 슬랙도 본인에게만 갑니다</span></div>
         <select id="rc-type" style="min-width:230px" ${on?'disabled':''}>
           <option value="meeting">회의</option>
           <option value="interview" ${talk?'selected':''}>개인 면담 — 나만 보기</option>
         </select>
         <div class="recnote" id="rc-talk-note" style="margin-top:9px;${talk?'':'display:none'}">
           <b>면담을 시작할 때 「기록을 위해 녹음합니다」 라고 먼저 말씀해 주세요.</b><br>
-          면담 기록은 녹음한 본인만 볼 수 있고 (관리자도 볼 수 없습니다), 슬랙 알림이 가지 않습니다.
+          면담 기록은 녹음한 본인만 볼 수 있고 (관리자도 볼 수 없습니다), 슬랙도 본인에게만 갑니다. 면담 대상에게는 가지 않습니다.
           <b>03 참석자</b>에 면담 대상을 넣어 주시면 기록이 더 정확해집니다.</div>
       </div>`:'<select id="rc-type" style="display:none"><option value="meeting">회의</option></select>'}
       <div class="fld" id="rc-cal-row">
