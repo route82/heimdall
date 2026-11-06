@@ -1224,7 +1224,8 @@ function shell(){
   const admin = [];
   if(['admin','ceo','dev'].includes(me.role)) admin.push(['brief','브리핑']);
   if(['admin','ceo','exec','dev'].includes(me.role)) admin.push(['usage','사용료']);
-  if(isTop(me.role)) admin.push(['members','구성원']);
+  // 2026-11-06 인사 담당(손창희 이사·이찬율 매니저)도 구성원을 정리합니다
+  if(isTop(me.role) || me.hr) admin.push(['members','구성원']);
   if(isAdminish(me.role)) admin.push(['server','처리서버']);
   if(admin.length) groups.push(['관리', admin]);
   groups.push(['도움말', [['guide','사용 매뉴얼']]]);
@@ -2692,9 +2693,15 @@ async function renderMembers(){
   const wait=data.filter(m=>!m.approved && m.status!=='left');
   const ok=data.filter(m=>m.approved && m.status!=='left');
   const left=data.filter(m=>m.status==='left');
-  const sel=(m)=>`<select data-id="${m.id}" class="rsel">
-     ${Object.entries(ROLE).map(([k,v])=>`<option value="${k}" ${m.role===k?'selected':''}>${v}</option>`).join('')}
-   </select>`;
+  // 인사 담당은 구성원 ↔ 부서 관리자(팀장)만 바꿉니다. 관리자·임원 계정은 고르지 못하게 둡니다 (서버도 막습니다)
+  const limRole = me.role!=='admin' && me.role!=='ceo';
+  const ROLE_OK = limRole ? {member:ROLE.member, manager:ROLE.manager} : ROLE;
+  const sel=(m)=>{
+    const fixed = limRole && !['member','manager'].includes(m.role||'member');
+    const opts = fixed ? {[m.role]:ROLE[m.role]||m.role} : ROLE_OK;
+    return `<select data-id="${m.id}" class="rsel" ${fixed?'disabled title="관리자만 바꿀 수 있습니다"':''}>
+     ${Object.entries(opts).map(([k,v])=>`<option value="${k}" ${m.role===k?'selected':''}>${v}</option>`).join('')}
+   </select>`;};
   el.innerHTML=`<h1>구성원</h1>
     <div class="sub">승인 대기 ${wait.length}명 · 사용 중 ${ok.length}명 · 등록해 둔 사람 ${invites.length}명</div>
 
@@ -2713,7 +2720,7 @@ async function renderMembers(){
         </select>
         <select id="iv-dept" style="flex:1;min-width:120px"><option value="">부서 선택</option></select>
         <select id="iv-role" style="min-width:190px">
-          ${Object.entries(ROLE).map(([k,v])=>`<option value="${k}">${v} — ${ROLE_HELP[k]}</option>`).join('')}
+          ${Object.entries(ROLE_OK).map(([k,v])=>`<option value="${k}">${v} — ${ROLE_HELP[k]}</option>`).join('')}
         </select>
         <button class="btn p" id="iv-add">추가</button>
       </div>
@@ -2752,6 +2759,10 @@ async function renderMembers(){
             <select class="mld" data-id="${m.id}" style="font-size:12px;padding:2px 6px">
               <option value="">아님</option>${divsOf(m.company).map(d=>`<option ${m.lead_div===d?'selected':''}>${d}</option>`).join('')}
             </select></label>`:''}
+          ${me.role==='admin'?`<label class="meta" style="display:flex;align-items:center;gap:7px;margin-top:6px;cursor:pointer">
+            <input type="checkbox" class="hrc" data-id="${m.id}" ${m.hr?'checked':''}
+              style="width:16px;height:16px;margin:0"> 인사 담당 (구성원 승인·팀장·실장 지정)</label>`
+            :m.hr?`<div class="meta" style="margin-top:5px"><span class="tag" style="background:var(--acbg);color:var(--ac)">인사 담당</span></div>`:''}
           ${(m.extra_scopes||[]).length?`<div class="meta" style="margin-top:5px">
             <span class="tag" style="background:var(--acbg);color:var(--ac);margin-right:4px">겸직</span>
             ${m.extra_scopes.map(x=>esc(x.endsWith('|')?x.slice(0,-1)+' 전체':x.replace('|',' '))).join(' · ')}</div>`:''}</div>
@@ -3008,6 +3019,13 @@ async function renderMembers(){
     if(error){toast('바꾸지 못했습니다: '+esc(authErr(error.message)), 7000); c.checked=!c.checked; return;}
     toast(c.checked?'회사 전체 회의를 볼 수 있게 했습니다':'본인 부서 회의만 보게 했습니다', 2500);});
 
+  // 인사 담당 지정 — 관리자만
+  el.querySelectorAll('.hrc').forEach(c=>c.onchange=async()=>{
+    const {error}=await SB.from('hd_member')
+      .update({hr:c.checked}).eq('id',c.dataset.id);
+    if(error){toast('바꾸지 못했습니다: '+esc(authErr(error.message)), 7000); c.checked=!c.checked; return;}
+    toast(c.checked?'인사 담당으로 정했습니다':'인사 담당을 풀었습니다', 2500);});
+
   // 실장 — 그 실에 속한 모든 팀의 회의를 보고, 회의록 슬랙도 받습니다
   el.querySelectorAll('.mld').forEach(c=>c.onchange=async()=>{
     const {error}=await SB.from('hd_member')
@@ -3022,7 +3040,7 @@ async function renderMembers(){
 
 // 승인 대기 알림 배지
 async function checkPending(){
-  if(!isTop(me.role)) return;
+  if(!isTop(me.role) && !me.hr) return;
   const {data}=await SB.rpc('hd_pending');
   if(data&&data.length){
     const b=document.querySelector('.nav[data-v=members]');
