@@ -897,6 +897,7 @@ function finish(){
   const ext=type.indexOf('mp4')>=0?'mp4':type.indexOf('ogg')>=0?'ogg':'webm';
   REC.blob=new Blob(REC.chunks,{type}); REC.ext=ext; REC.type=type;
   REC.mr=null; REC.chunks=[];
+  REC.up=true;      // 참석자 묻기·올리기가 끝날 때까지 2분마다 새로 읽기·새로고침을 쉽니다
   if(REC.blob.size<4000){ msg('녹음이 비어 있습니다','마이크가 연결되어 있는지 확인해주세요'); return; }
   // 아무도 이름을 누르지 않았으면 한 번 더 여쭙니다.
   // 참석자가 곧 열람 권한이라 비워두면 팀장·관리자만 보게 됩니다.
@@ -973,6 +974,7 @@ function meetingCoDept(){
 }
 
 async function upload(){
+  REC.up=true;      // 올리는 동안·결과 화면에서는 스스로 새로고침하지 않습니다
   app.innerHTML='<div class="mid"><div class="done"><span class="ok">⏳</span>올리는 중입니다…</div></div>';
 
   const picked=MEMBERS.filter(m=>REC.who.has(m.id));
@@ -1025,7 +1027,7 @@ function msg(head, sub){
     + '<div class="sub" style="max-width:620px">'+esc(sub||'')
     + '<br><br>회의록은 몇 분 뒤 헤임달에 올라옵니다.</div>'
     + '<button class="ghost" id="ok">확인</button></div><div></div>';
-  const back=()=>{ loadEvents().catch(()=>{}).then(idlePage); };
+  const back=()=>{ REC.up=false; loadEvents().catch(()=>{}).then(idlePage); };
   $('#ok').onclick=back;
   setTimeout(back, 12000);
 }
@@ -1072,8 +1074,19 @@ async function boot(){
   keepAwake();
   idlePage();
   // 예약과 명단을 조용히 새로 읽습니다 (녹음 중에는 건드리지 않습니다)
+  // 2026-11-06 — 태블릿은 며칠씩 켜 둔 채라 새로 배포한 화면을 안 받았습니다.
+  //   (새 조직도 반영 전 화면이 남아 사업개발팀 회의 부서가 비고, 다른 실로 슬랙이 감)
+  //   이 화면 파일이 바뀌었으면 녹음 중·올리는 중이 아닐 때 스스로 새로고침합니다.
+  const pageSig=async()=>{ const r=await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'});
+    if(!r.ok) return ''; const t=await r.text(); let h=0;
+    for(let i=0;i<t.length;i++) h=(h*31+t.charCodeAt(i))|0; return t.length+':'+h; };
+  const sig0=await pageSig().catch(()=>'');
   setInterval(async()=>{
-    if(REC.mr) return;
+    if(REC.mr || REC.up) return;
+    if(sig0){
+      const s=await pageSig().catch(()=>'');
+      if(s && s!==sig0){ location.reload(); return; }
+    }
     await loadEvents().catch(()=>{});
     await loadMembers().catch(()=>{});
     idlePage();
