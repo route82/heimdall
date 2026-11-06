@@ -950,12 +950,15 @@ let ORG = [];                                   // [{company,dept,pickable}]
 let COMPANIES = [];                             // 가입 화면에 보이는 회사
 async function loadOrg(){
   if(ORG.length) return ORG;
-  const {data} = await SB.from('hd_org').select('company,dept,sort,pickable').order('sort');
+  let {data, error} = await SB.from('hd_org').select('company,dept,sort,pickable,division').order('sort');
+  if(error) ({data} = await SB.from('hd_org').select('company,dept,sort,pickable').order('sort'));
   ORG = data || [];
   COMPANIES = [...new Set(ORG.filter(o=>o.pickable).map(o=>o.company))];
   return ORG;
 }
 const deptsOf = co => ORG.filter(o=>o.company===co && o.pickable).map(o=>o.dept);
+// 2026-11-06 실 > 팀 — 이 회사의 실 목록 (hd_org 에서 dept 와 division 이 같은 줄)
+const divsOf = co => [...new Set(ORG.filter(o=>o.company===co && o.division && o.division===o.dept).map(o=>o.division))];
 // 회사를 고르면 부서 목록이 따라 바뀝니다
 function bindOrgSelects(coId, dpId, curDept){
   const co=document.getElementById(coId), dp=document.getElementById(dpId);
@@ -2745,6 +2748,10 @@ async function renderMembers(){
           <label class="meta" style="display:flex;align-items:center;gap:7px;margin-top:6px;cursor:pointer">
             <input type="checkbox" class="alld" data-id="${m.id}" ${m.all_dept?'checked':''}
               style="width:16px;height:16px;margin:0"> 회사 전체 회의 열람 (부서 무관)</label>
+          ${divsOf(m.company).length?`<label class="meta" style="display:flex;align-items:center;gap:7px;margin-top:6px">실장
+            <select class="mld" data-id="${m.id}" style="font-size:12px;padding:2px 6px">
+              <option value="">아님</option>${divsOf(m.company).map(d=>`<option ${m.lead_div===d?'selected':''}>${d}</option>`).join('')}
+            </select></label>`:''}
           ${(m.extra_scopes||[]).length?`<div class="meta" style="margin-top:5px">
             <span class="tag" style="background:var(--acbg);color:var(--ac);margin-right:4px">겸직</span>
             ${m.extra_scopes.map(x=>esc(x.endsWith('|')?x.slice(0,-1)+' 전체':x.replace('|',' '))).join(' · ')}</div>`:''}</div>
@@ -3000,6 +3007,13 @@ async function renderMembers(){
       .update({all_dept:c.checked}).eq('id',c.dataset.id);
     if(error){toast('바꾸지 못했습니다: '+esc(authErr(error.message)), 7000); c.checked=!c.checked; return;}
     toast(c.checked?'회사 전체 회의를 볼 수 있게 했습니다':'본인 부서 회의만 보게 했습니다', 2500);});
+
+  // 실장 — 그 실에 속한 모든 팀의 회의를 보고, 회의록 슬랙도 받습니다
+  el.querySelectorAll('.mld').forEach(c=>c.onchange=async()=>{
+    const {error}=await SB.from('hd_member')
+      .update({lead_div:c.value}).eq('id',c.dataset.id);
+    if(error) return toast('바꾸지 못했습니다: '+esc(authErr(error.message)), 7000);
+    toast(c.value?esc(c.value)+' 실장으로 정했습니다. 이 실의 모든 팀 회의를 보고 슬랙으로 받습니다':'실장 지정을 풀었습니다', 3500);});
 
   el.querySelectorAll('.sv').forEach(b=>b.onclick=async()=>{
     const {error}=await SB.rpc('hd_set_role',{uid:b.dataset.id, new_role:roleOf(b.dataset.id)});

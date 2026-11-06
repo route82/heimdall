@@ -313,6 +313,7 @@ const CFG = {
 
 let me=null, cfg=CFG.get(), MEMBERS=[], EVENTS=[], tick=null;
 let ORDER={};                    // 회사·팀 순서 (hd_org.sort)
+let DIV={};                      // 「회사|팀」 → 그 팀이 속한 실 (hd_org.division, 2026-11-06)
 const ALL_CO='전체';              // 참석자 고르기 맨 앞 탭 — 전 직원 가나다순
 const PK={co:'', dp:null};       // 참석자 고르기 — 지금 펼친 회사·팀
 let PICKED=null;                 // 사람이 아래 목록에서 고른 회의
@@ -442,8 +443,10 @@ async function loadMembers(){
                     || (x.name||'').localeCompare(y.name||''));
   // 회사·팀 순서는 웹 화면과 같은 명부(hd_org)를 따릅니다. 못 읽으면 가나다순.
   try{
-    const {data:o}=await SB.from('hd_org').select('company,dept,sort').order('sort');
-    ORDER={}; (o||[]).forEach((r,i)=>{ const k=r.company+'|'+r.dept;
+    let {data:o,error:oe}=await SB.from('hd_org').select('company,dept,sort,division').order('sort');
+    if(oe) ({data:o}=await SB.from('hd_org').select('company,dept,sort').order('sort'));
+    ORDER={}; DIV={}; (o||[]).forEach((r,i)=>{ const k=r.company+'|'+r.dept;
+      if(r.division) DIV[k]=r.division;
       if(!(k in ORDER)) ORDER[k]=i; if(!(r.company in ORDER)) ORDER[r.company]=i; });
   }catch(e){ ORDER={}; }
 }
@@ -959,7 +962,13 @@ function meetingCoDept(){
   //   모르면 비워 둡니다. 회사가 비면 슬랙이 나가지 않고, 헤임달에서 사람이 채웁니다.
   const dps=[...new Set(picked.filter(m=>coOf(m)===company).map(dpOf)
     .filter(d=>d && d!==NO_DEPT && d!==EXTRA_ALL))];
-  const dept = dps.length===1 ? dps[0] : '';
+  let dept = dps.length===1 ? dps[0] : '';
+  // 2026-11-06 — 여러 팀이 섞여도 모두 한 실(예: 디자인팀+영상제작팀 → 크리에이티브실)이면 그 실로 둡니다.
+  //   비워 두면 회사 팀장 전원에게 슬랙이 갑니다.
+  if(dps.length>1){
+    const ds=[...new Set(dps.map(d=>DIV[company+'|'+d]||''))];
+    if(ds.length===1 && ds[0]) dept=ds[0];
+  }
   return {company, dept};
 }
 
