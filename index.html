@@ -1018,7 +1018,7 @@ function loginPage(mode='in', msg=''){
     <button class="btn p full" id="go">${isUp?'가입하고 시작하기':'로그인'}</button>
     <button class="btn full" id="slack" style="margin-top:9px;display:flex;align-items:center;justify-content:center;gap:8px">${SLACK_SVG}${isUp?'슬랙으로 가입하기':'슬랙으로 로그인'}</button>
     <p id="slack-hint" hidden style="margin:10px 0 0;padding:10px 12px;border-radius:8px;background:var(--s3);border:1px solid var(--line);color:var(--tx2);font-size:13px;line-height:1.6">휴대폰에서는 슬랙 앱이 아니라 브라우저에서 슬랙 로그인 화면이 열립니다. 처음 한 번은 회사 슬랙 계정으로 로그인해 주세요(이메일로 받은 코드로도 로그인할 수 있습니다). 한 번 로그인하면 다음부터는 바로 들어옵니다.</p>
-    ${!isUp?'<button class="btn full" id="reset" style="margin-top:9px;border:0;color:var(--tx2);font-size:13px">비밀번호를 잊으셨나요?</button>':''}
+    ${!isUp?'<a class="btn full" id="reset" href="https://axdx-dashboard.vercel.app/forgot-password" style="margin-top:9px;border:0;color:var(--tx2);font-size:13px;display:flex;justify-content:center;text-decoration:none">처음이거나 비밀번호를 잊었어요</a>':''}
     <p style="margin-top:14px;font-size:13px;color:${msg.startsWith('!')?'var(--err)':'var(--tx3)'}">${esc(msg.replace(/^!/,''))}</p>
     ${isUp?'<p style="font-size:12.5px;color:var(--tx3);margin:0">가입 신청 후 관리자 승인이 있어야 이용하실 수 있습니다.</p>':''}
   </div>`;
@@ -1065,20 +1065,7 @@ function loginPage(mode='in', msg=''){
   };
   $('#em')?.addEventListener('keydown',e=>{if(e.key==='Enter')$('#pw').focus();});
   $('#pw')?.addEventListener('keydown',e=>{if(e.key==='Enter'&&!isUp)$('#go').click();});
-  const rs=$('#reset');
-  if(rs) rs.onclick = async () => {
-    if(!email()) return loginPage('in','!이메일을 먼저 입력해주세요.');
-    rs.disabled=true;
-    const {error} = await SB.auth.resetPasswordForEmail(email(), {redirectTo:location.href});
-    // 같은 계정은 60초 안에 다시 보낼 수 없다(429) — 메일은 이미 나간 것이므로 실패로 보이지 않게 (11-03 정원하 대표님)
-    const wait = error && (error.status===429 || /seconds|rate limit/i.test(error.message||'')) ? (+((error.message||'').match(/after (\d+) seconds/)||[])[1] || 60) : 0;
-    if(error && !wait){ rs.disabled=false; return loginPage('in','!'+authErr(error.message)); }
-    loginPage('in', wait ? '방금 재설정 메일을 보냈습니다. 메일함과 스팸함을 먼저 확인해 주세요.'
-      : '재설정 메일을 보냈습니다. 몇 분 안에 도착하니 메일함과 스팸함을 확인해 주세요. 메일이 오지 않으면 관리자에게 「임시 비밀번호 발급」을 요청해 주세요.');
-    let n = wait || 60;
-    const tick = () => { const b=$('#reset'); if(!b) return; if(n<=0){ b.disabled=false; b.textContent='비밀번호를 잊으셨나요?'; return; } b.disabled=true; b.textContent=`메일이 오지 않았다면 ${n}초 뒤 다시 보낼 수 있습니다`; n--; setTimeout(tick,1000); };
-    tick();
-  };
+  // 비밀번호 찾기 창구는 노른 하나 (11-08 홍석진 대표님) — 링크만 둔다
 }
 
 // 메일 링크로 들어오신 분께 새 비밀번호를 받는 화면
@@ -4939,7 +4926,7 @@ async function boot(){
   if(!session){
     if(SLACK_ERR) return loginPage('in', SLACK_ERR);
     if(RECOVERY || LINK_ERR) return loginPage('in',
-      '!이미 사용했거나 만료된 링크입니다. 「비밀번호를 잊으셨나요?」로 다시 요청하고, 가장 최근에 받은 메일의 링크를 클릭해 주세요.');
+      '!이미 사용했거나 만료된 링크입니다. 「처음이거나 비밀번호를 잊었어요」로 다시 요청하고, 가장 최근에 받은 메일의 링크를 클릭해 주세요.');
     return loginPage();
   }
   // 슬랙 로그인 직후 — 슬랙 이메일이 로그인 이메일과 다른 직원은 원래 계정으로 옮긴 뒤 슬랙 로그인을 한 번 더 합니다
