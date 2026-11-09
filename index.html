@@ -778,7 +778,7 @@ function authDead(){
     + '회의록은 그대로 있으니 안심하셔도 됩니다.</p>'
     + '<button class="btn p full" id="relogin">로그인 화면으로</button></div></div>';
   const b = document.getElementById('relogin');
-  if(b) b.onclick = async()=>{ try{ await SB.auth.signOut(); }catch(e){} location.reload(); };
+  if(b) b.onclick = async()=>{ try{ await SB.auth.signOut({scope:'local'}); }catch(e){} location.reload(); };
 }
 
 const SB = createClient('https://dwoiobqucmikbtikfjwk.supabase.co', 'sb_publishable_K6BW26u2jRkTBDwuMqaaFA_3HkfnOc9', {
@@ -1119,7 +1119,7 @@ function pendingPage(row){
     <button class="btn full" id="out3" style="margin-top:8px;border:0;color:var(--tx2);font-size:13px">로그아웃</button>
   </div>`;
   $('#again').onclick=()=>boot();
-  $('#out3').onclick=async()=>{await SB.auth.signOut(); loginPage();};
+  $('#out3').onclick=async()=>{await SB.auth.signOut({scope:'local'}); loginPage();};
 }
 
 // 가입 정보가 비어 있으면 채우게 합니다 (예전 계정 대응)
@@ -1176,7 +1176,7 @@ function profilePage(row, msg=''){
     if(error) return profilePage(row, error.message);
     boot();
   };
-  $('#out2').onclick = async()=>{await SB.auth.signOut(); loginPage();};
+  $('#out2').onclick = async()=>{await SB.auth.signOut({scope:'local'}); loginPage();};
 }
 
 // ─────────────────────────── 뼈대 (왼쪽 사이드바)
@@ -1279,7 +1279,7 @@ function shell(){
 
   const logout = async()=>{
     localStorage.setItem('hd_auto','0'); sessionStorage.removeItem('hd_live');
-    await SB.auth.signOut(); location.reload();};
+    await SB.auth.signOut({scope:'local'}); location.reload();};
   $('#out').onclick = logout;
   const si=$('#selfinfo');
   if(si) si.onclick=()=>{
@@ -1399,7 +1399,7 @@ function watchStuck(el){
     const r=$('#stuck-reload'); if(r) r.onclick=()=>location.reload();
     const o=$('#stuck-out');
     if(o) o.onclick=async()=>{
-      try{ localStorage.setItem('hd_auto','0'); await SB.auth.signOut(); }catch(e){}
+      try{ localStorage.setItem('hd_auto','0'); await SB.auth.signOut({scope:'local'}); }catch(e){}
       location.reload();
     };
   }, 12000);
@@ -4951,7 +4951,7 @@ async function boot(){
   // 자동 로그인을 끄셨으면, 브라우저를 닫았다 연 경우 다시 로그인하게 합니다.
   // (같은 창에서 새로고침한 것은 그대로 유지합니다)
   if(localStorage.getItem('hd_auto')!=='1' && !sessionStorage.getItem('hd_live')){
-    await SB.auth.signOut();
+    await SB.auth.signOut({scope:'local'});
     return loginPage('in','자동 로그인이 꺼져 있어 다시 로그인해주세요.');
   }
   sessionStorage.setItem('hd_live','1');
@@ -4975,7 +4975,7 @@ async function boot(){
       <p class="sub">이 계정으로는 더 이상 헤임달을 쓸 수 없습니다.<br>
         잘못 처리된 것이라면 관리자에게 문의해주세요.</p>
       <button class="btn full" onclick="localStorage.setItem('hd_auto','0');window.SBOUT()">로그아웃</button></div></div>`;
-    window.SBOUT=async()=>{await SB.auth.signOut();location.reload();};
+    window.SBOUT=async()=>{await SB.auth.signOut({scope:'local'});location.reload();};
     return;
   }
   if(!data.approved) return pendingPage(data);
@@ -5009,7 +5009,7 @@ function roomAcctPage(m){
       <button class="btn p" id="ro-out">다른 계정으로 로그인</button></div></div></div>`;
   $('#ro-out').onclick = async()=>{
     try{ localStorage.setItem('hd_auto','0'); }catch(e){}
-    await SB.auth.signOut(); location.reload();
+    await SB.auth.signOut({scope:'local'}); location.reload();
   };
 }
 
