@@ -161,6 +161,22 @@ button{font-family:inherit}
  border-radius:999px;font-size:clamp(11px,1.35vh,13px);padding:5px 13px;cursor:pointer}
 .pillbtn:active{background:var(--s2)}
 
+/* ── 목소리 등록 (2026-11-14) */
+.vbox{width:min(100%,860px);text-align:left;background:var(--s2);border:1px solid var(--line2);
+ border-radius:var(--r2,16px);padding:clamp(16px,2.6vh,26px) clamp(18px,2.4vw,30px)}
+.vbox li{margin:0 0 10px 18px;font-size:clamp(15px,1.9vh,19px);line-height:1.6;color:var(--tx)}
+.vbox li:last-child{margin-bottom:0}
+.vread{font-size:clamp(16px,2.45vh,25px);line-height:1.6;font-weight:600;color:var(--tx);
+ max-height:60vh;overflow:auto;-webkit-overflow-scrolling:touch;word-break:keep-all}
+.vread p{margin:0 0 .42em}
+.vread p:last-child{margin-bottom:0}
+.vrow{display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap}
+.velapsed{font-size:clamp(26px,4.4vh,42px);font-weight:600;font-family:var(--f-disp);
+ font-variant-numeric:tabular-nums}
+.big[disabled]{opacity:.35;animation:none;cursor:default}
+.big[disabled]::after{display:none}
+.nm .reg{color:var(--green);font-weight:800;margin-left:5px}
+
 /* ── 발: 다른 예약 목록 */
 .list{border-top:1px solid var(--line);padding-top:clamp(8px,1.4vh,14px);min-height:0}
 .list .h{font-size:clamp(11px,1.3vh,13px);color:var(--dim);margin-bottom:8px;letter-spacing:.04em}
@@ -527,6 +543,7 @@ function idlePage(){
     + (ev    ? '<button class="ghost" id="adhoc">예약에 없는 회의 녹음하기</button>' : '')
     + (ADHOC && current()
              ? '<button class="ghost" id="unadhoc">예약된 회의로 돌아가기</button>' : '')
+    + '<button class="pillbtn" id="voice">목소리 등록 — 회의록에 내 이름이 붙습니다</button>'
     + '</div>'
     + (rest.length ? '<div class="list"><div class="h">다른 회의 고르기 — 누르면 위 카드가 바뀝니다 · '
         + '다른 회의실 예약도 여기 있습니다</div><div class="picks">'
@@ -551,6 +568,7 @@ function idlePage(){
   // 예약 카드를 끄고 제목 없는 회의로 녹음합니다.
   const ah=$('#adhoc');   if(ah) ah.onclick=()=>{ ADHOC=true;  PICKED=null; idlePage(); };
   const uh=$('#unadhoc'); if(uh) uh.onclick=()=>{ ADHOC=false; PICKED=null; idlePage(); };
+  const vb=$('#voice');   if(vb) vb.onclick=voicePick;
   // 다른 회의를 누르면 바로 녹음하지 않고 위 카드만 바꿉니다.
   // 지나가다 잘못 눌러 진짜 회의가 시작되는 일을 막습니다.
   app.querySelectorAll('[data-ev]').forEach(b=>b.onclick=()=>{
@@ -1032,11 +1050,192 @@ function msg(head, sub){
   setTimeout(back, 12000);
 }
 
+// ─────────────────────────── 목소리 등록 (2026-11-14 홍석진 대표 지시)
+// 회의실 마이크로 1분쯤 읽으면, 처리 PC 가 목소리 지문(숫자값)만 뽑아 보관하고 녹음은 지웁니다.
+// 그 뒤 회의록에서 「화자 1」 대신 이름이 붙습니다. 실제 회의와 같은 마이크·같은 설정으로 녹음해야 잘 맞습니다.
+// 올리는 방식은 회의 녹음과 같고(hd_job), kind 만 voice 입니다. 처리 서버 12.20 부터 알아듣습니다.
+const VO={};
+let VOICED=new Set();            // 이 태블릿에서 등록을 마친 사람
+const VOICE_MIN_SEC=30, VOICE_MAX_SEC=100;
+const VOICE_TEXT=[
+  '안녕하세요. 지금부터 제 목소리를 등록하겠습니다.',
+  '오늘 회의에서는 지난주에 정한 일정과 이번 주에 할 일을 차례로 확인하겠습니다.',
+  '먼저 진행 상황을 말씀드리면, 자료 조사는 끝났고 초안은 수요일까지 공유할 예정입니다.',
+  '예산은 삼백오십만 원 안에서 쓰기로 했고, 더 필요한 부분은 다음 회의에서 다시 논의하겠습니다.',
+  '거래처 미팅은 다음 주 화요일 오후 두 시, 오 층 대회의실에서 진행합니다.',
+  '일정이 어려운 분은 미리 알려 주시면 시간을 조정하겠습니다.',
+  '그리고 지난번에 나온 의견은 대부분 반영했는데, 디자인 시안은 한 번 더 보고 결정하면 좋겠습니다.',
+  '마지막으로, 회의가 끝나면 결정된 내용과 담당자를 정리해서 바로 공유하겠습니다.',
+  '질문이 있으시면 편하게 말씀해 주세요. 감사합니다.',
+];
+async function loadVoiced(){
+  try{
+    const {data}=await SB.from('hd_job').select('text_body').eq('kind','voice').eq('status','done')
+      .order('created_at',{ascending:false}).limit(500);
+    VOICED=new Set((data||[]).map(j=>{ try{ return JSON.parse(j.text_body||'{}').member_id; }catch(e){ return ''; } })
+      .filter(Boolean));
+  }catch(e){}
+}
+function voiceOff(){
+  clearInterval(VO.tick); clearInterval(REC.meter); clearTimeout(VO.poll);
+  try{ if(VO.mr && VO.mr.state==='recording'){ VO.mr.onstop=null; VO.mr.stop(); } }catch(e){}
+  try{ (VO.stream ? VO.stream.getTracks() : []).forEach(t=>t.stop()); }catch(e){}
+  try{ if(REC.ac) REC.ac.close(); }catch(e){}
+  VO.mr=null; VO.stream=null; VO.chunks=[]; REC.ac=null;
+}
+function voiceExit(){
+  voiceOff(); REC.up=false;
+  loadEvents().catch(()=>{}).then(idlePage);
+}
+// ① 누구 목소리인지 고릅니다
+function voicePick(){
+  clearInterval(tick); voiceOff();
+  REC.up=true;                  // 등록하는 동안에는 화면을 스스로 새로고침하지 않습니다
+  const draw=()=>{
+    const ms=MEMBERS.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','ko'));
+    app.innerHTML='<div></div><div class="mid">'
+      + '<div class="mtitle">목소리 등록 — 누구 목소리인가요?</div>'
+      + '<div class="sub">본인 이름을 눌러주세요. 1분쯤 안내 글을 읽으면 끝납니다.<br>'
+      + '✓ 표시는 이 태블릿에서 이미 등록한 분입니다 (다시 등록하셔도 됩니다)</div>'
+      + '<div class="who"><div class="pk"><div class="pkms"><div class="grid">'
+      + (ms.length ? ms.map(m=>'<button class="nm" data-id="'+m.id+'">'+esc(m.name)+(VOICED.has(m.id)?'<span class="reg">✓</span>':'')
+          + '<span class="co">'+esc(m.dept&&m.dept!==NO_DEPT?m.dept:(m.company||''))+'</span></button>').join('')
+          : '<span class="sub">구성원 명단을 불러오지 못했습니다 · 와이파이를 확인해주세요</span>')
+      + '</div></div></div></div>'
+      + '<button class="ghost" id="vx">돌아가기</button>'
+      + '</div><div></div>';
+    $('#vx').onclick=voiceExit;
+    app.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>{
+      const m=MEMBERS.find(x=>x.id===b.dataset.id); if(m) voiceConsent(m); });
+  };
+  draw();
+  loadVoiced().then(()=>{ if($('#vx') && !VO.who) draw(); });
+  VO.who=null;
+}
+// ② 동의 — 목소리 등록은 따로 동의를 받는 항목입니다
+function voiceConsent(m){
+  VO.who=m;
+  app.innerHTML='<div></div><div class="mid">'
+    + '<div class="done" style="font-size:clamp(22px,3.2vh,30px)">'+esc(m.name)+' 님 목소리를 등록합니다</div>'
+    + '<div class="vbox"><ul style="margin:0;padding:0">'
+    + '<li>회의록에서 「화자 1」 대신 <b>이름을 붙이는 데에만</b> 씁니다.</li>'
+    + '<li>지금 녹음하는 소리는 등록이 끝나면 <b>바로 지웁니다.</b> 목소리 특징을 나타내는 숫자값만 회사 처리 PC 에 보관합니다.</li>'
+    + '<li>등록하지 않아도 불이익은 없습니다. 등록한 뒤에도 <b>언제든 지울 수 있습니다</b> — 헤임달 관리자에게 말씀해 주세요.</li>'
+    + '</ul></div>'
+    + '<div class="sub">본인이 직접 눌러주세요. 다른 분의 목소리를 대신 등록하면 안 됩니다.</div>'
+    + '<div class="vrow"><button class="ghost" id="vx">취소</button>'
+    + '<button class="big go" id="vok" style="font-size:clamp(20px,3vh,28px)">동의하고 시작</button></div>'
+    + '</div><div></div>';
+  $('#vx').onclick=voicePick;
+  $('#vok').onclick=()=>{ VO.consent=new Date().toISOString(); voiceRec(); };
+}
+// ③ 안내 글 읽기
+async function voiceRec(){
+  const m=VO.who;
+  let stream;
+  try{
+    // 회의 녹음과 똑같은 설정으로 받습니다 — 설정이 다르면 지문이 달라집니다
+    stream=await navigator.mediaDevices.getUserMedia({audio:{
+      echoCancellation:true, noiseSuppression:true, autoGainControl:true}});
+  }catch(e){
+    alert('마이크를 쓸 수 없습니다.\n태블릿 설정에서 이 페이지의 마이크 사용을 허용해주세요.');
+    return;
+  }
+  let mime='';
+  for(const t of ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg'])
+    if(window.MediaRecorder && MediaRecorder.isTypeSupported(t)){ mime=t; break; }
+  VO.stream=stream; VO.chunks=[]; VO.t0=Date.now();
+  VO.mr = mime ? new MediaRecorder(stream,{mimeType:mime, audioBitsPerSecond:64000})
+               : new MediaRecorder(stream);
+  VO.mr.ondataavailable=e=>{ if(e.data&&e.data.size) VO.chunks.push(e.data); };
+  VO.mr.onstop=voiceUpload;
+  VO.mr.start(1000);
+  keepAwake();
+  app.innerHTML='<div></div><div class="mid">'
+    + '<div class="mtitle">'+esc(m.name)+' 님 — 아래 글을 평소 회의에서 말하듯 소리 내어 읽어주세요</div>'
+    + '<div class="vbox vread">'+VOICE_TEXT.map(t=>'<p>'+esc(t)+'</p>').join('')+'</div>'
+    + '<div class="vrow"><span class="velapsed" id="vela">0:00</span><span class="lv" id="lv"></span></div>'
+    + '<div class="vrow"><button class="ghost" id="vx">취소</button>'
+    + '<button class="big go" id="vdone" disabled style="font-size:clamp(20px,3vh,28px)">'
+    + '<span id="vdlb">'+VOICE_MIN_SEC+'초 뒤에 누를 수 있습니다</span></button></div>'
+    + '<div class="sub" style="font-size:13px">평소 앉는 자리에서, 평소 목소리 크기로 읽으시면 됩니다</div>'
+    + '</div><div></div>';
+  meter(stream);
+  const stop=()=>{ if(VO.mr && VO.mr.state==='recording'){ VO.dur=Math.floor((Date.now()-VO.t0)/1000);
+    clearInterval(VO.tick); clearInterval(REC.meter); VO.mr.stop();
+    (VO.stream.getTracks()||[]).forEach(t=>t.stop()); try{ if(REC.ac) REC.ac.close(); }catch(e){} REC.ac=null;
+    app.innerHTML='<div class="mid"><div class="done"><span class="ok">⏳</span>올리는 중입니다…</div></div>'; } };
+  VO.tick=setInterval(()=>{
+    const sec=(Date.now()-VO.t0)/1000;
+    const a=$('#vela'); if(a) a.textContent=el(sec);
+    const b=$('#vdone'), lb=$('#vdlb');
+    if(b && sec>=VOICE_MIN_SEC && b.disabled){ b.disabled=false; if(lb) lb.textContent='다 읽었습니다'; }
+    else if(lb && b && b.disabled) lb.textContent=Math.ceil(VOICE_MIN_SEC-sec)+'초 뒤에 누를 수 있습니다';
+    if(sec>=VOICE_MAX_SEC) stop();
+  }, 500);
+  $('#vdone').onclick=stop;
+  $('#vx').onclick=voicePick;
+}
+// ④ 올리고, 처리 PC 가 등록을 마칠 때까지 기다립니다
+async function voiceUpload(){
+  const m=VO.who;
+  const type=(VO.mr&&VO.mr.mimeType)||'audio/webm';
+  const ext=type.indexOf('mp4')>=0?'mp4':type.indexOf('ogg')>=0?'ogg':'webm';
+  const blob=new Blob(VO.chunks,{type});
+  VO.mr=null; VO.chunks=[];
+  if(blob.size<4000) return voiceResult(false, '녹음이 비어 있습니다', '마이크가 연결되어 있는지 확인해주세요');
+  try{
+    const name='jobs/'+Date.now()+'_voice.'+ext;
+    const up=await SB.storage.from('hd-audio').upload(name, blob, {upsert:true, contentType:type});
+    if(up.error) return voiceResult(false, '올리지 못했습니다', up.error.message);
+    const ins=await SB.from('hd_job').insert({
+      title:'목소리 등록 · '+m.name, participants:m.name,
+      audio_path:name, kind:'voice', orig_name:'voice.'+ext,
+      device:'회의실 태블릿', created_by:me.id, created_name:cfg.room||'회의실',
+      room:cfg.room||'', visibility:'private', note_label:'목소리 등록',
+      text_body:JSON.stringify({member_id:m.id, name:m.name, consent_at:VO.consent, room:cfg.room||''}),
+    }).select('id').single();
+    if(ins.error) return voiceResult(false, '기록을 남기지 못했습니다', ins.error.message);
+    app.innerHTML='<div class="mid"><div class="done"><span class="ok">⏳</span>목소리를 등록하는 중입니다…</div>'
+      + '<div class="sub">보통 1분 안에 끝납니다. 처리 PC 가 다른 회의록을 만드는 중이면 조금 더 걸립니다.</div></div>';
+    const id=ins.data.id, t0=Date.now();
+    const look=async()=>{
+      const {data:j}=await SB.from('hd_job').select('status,error,stage').eq('id',id).maybeSingle();
+      if(j && j.status==='done'){ VOICED.add(m.id);
+        return voiceResult(true, m.name+' 님 목소리를 등록했습니다',
+          (j.stage||'').replace(/^등록되었습니다 · /,'')+' · 다음 회의부터 회의록에 이름이 붙습니다'); }
+      if(j && j.status==='failed') return voiceResult(false, '등록하지 못했습니다', j.error||'다시 한 번 해주세요');
+      if(Date.now()-t0 > 4*60*1000)
+        return voiceResult(true, '등록 요청을 올렸습니다',
+          '처리 PC 가 다른 회의록을 만드는 중입니다. 순서가 되면 자동으로 등록됩니다 — 기다리지 않으셔도 됩니다');
+      VO.poll=setTimeout(look, 3000);
+    };
+    VO.poll=setTimeout(look, 3000);
+  }catch(e){
+    voiceResult(false, '올리지 못했습니다', e.message||String(e));
+  }
+}
+function voiceResult(ok, head, sub){
+  clearTimeout(VO.poll);
+  app.innerHTML='<div></div><div class="mid">'
+    + '<div class="done"><span class="ok"'+(ok?'':' style="color:var(--red);border-color:var(--red);background:transparent"')+'>'
+    + (ok?'✓':'!')+'</span>'+esc(head)+'</div>'
+    + '<div class="sub" style="max-width:640px">'+esc(sub||'')+'</div>'
+    + '<div class="vrow">'
+    + (ok ? '' : '<button class="ghost" id="vre">다시 하기</button>')
+    + '<button class="ghost" id="vnext">다른 분 등록하기</button>'
+    + '<button class="ghost" id="vend">끝내기</button></div>'
+    + '</div><div></div>';
+  const re=$('#vre'); if(re) re.onclick=()=>voiceConsent(VO.who);
+  $('#vnext').onclick=voicePick;
+  $('#vend').onclick=voiceExit;
+}
+
 // 설정 손잡이 — 오른쪽 위 구석을 3초 길게 눌러야 열립니다
 (function(){
   let t=null;
   const g=$('#gear');
-  const down=()=>{ t=setTimeout(()=>{ if(!REC.mr) setupPage(''); }, 3000); };
+  const down=()=>{ t=setTimeout(()=>{ if(!REC.mr && !VO.mr) setupPage(''); }, 3000); };
   const up=()=>{ clearTimeout(t); };
   g.addEventListener('touchstart',down); g.addEventListener('touchend',up);
   g.addEventListener('mousedown',down);  g.addEventListener('mouseup',up);

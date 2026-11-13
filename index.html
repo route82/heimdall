@@ -4593,6 +4593,8 @@ const CMDS = [
   ['slack_test',  '슬랙 시험 메시지', '눌러본 사람에게 1:1 로 시험 메시지를 보냅니다'],
   ['brief_now',   '브리핑 지금 만들기', '어제 회의로 브리핑을 만들고 대표님들께 슬랙으로 보냅니다'],
   ['slack',       '슬랙 지금 보내기', '아직 안 나간 회의록을 지금 바로 슬랙으로 보냅니다'],
+  ['voice_list',  '목소리 등록 현황', '회의실 태블릿에서 목소리를 등록한 분들을 봅니다'],
+  ['voice_del',   '목소리 등록 지우기', '동의를 거두신 분의 목소리 지문을 처리 PC 에서 지웁니다'],
 ];
 
 async function renderServer(){
@@ -4650,6 +4652,12 @@ async function renderServer(){
     // 「다시 만들기」는 같은 plaud 명령에 redo 표시만 붙여 보냅니다
     const k = b.dataset.cmd;
     if(k === 'plaud_redo') return sendCmd('plaud', {redo:'1'}, b);
+    if(k === 'voice_del'){
+      const nm=(prompt('목소리 등록을 지울 분의 이름을 적어주세요 (구성원 이름 그대로)')||'').trim();
+      if(!nm) return;
+      if(!confirm(nm+' 님의 목소리 등록을 지웁니다. 되돌릴 수 없고, 다시 쓰려면 새로 등록해야 합니다.')) return;
+      return sendCmd('voice_del', {name:nm}, b);
+    }
     sendCmd(k, {}, b);
   });
   $('#sv-set').onclick=()=>{
