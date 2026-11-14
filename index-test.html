@@ -1239,7 +1239,7 @@ function shell(){
   const groups = [
     ['',      [['home','홈']]],
     ['쓰기',   [['rec','녹음'],['upload','업로드']]],
-    ['보기',   [['cal','일정'],['list','회의록'],['projects','폴더']]],
+    ['보기',   [['cal','일정'],['list','회의록']]],
     ['찾기',   [['chat','물어보기'],['search','검색']]],
   ];
   const admin = [];
@@ -1293,8 +1293,8 @@ function shell(){
      </div>
    </div>`;
 
-  // 「폴더」 메뉴 밑에 폴더 나무를 바로 보여줍니다 (플라우드처럼)
-  const pnav=document.querySelector('.nav[data-v="projects"]');
+  // 「회의록」 메뉴 밑에 폴더 나무를 바로 보여줍니다 (폴더 메뉴는 회의록에 합쳤습니다)
+  const pnav=document.querySelector('.nav[data-v="list"]');
   if(pnav){ pnav.insertAdjacentHTML('afterend','<div class="stree" id="stree"></div>'); loadSideTree(); }
 
   const closeNav=()=>document.body.classList.remove('snav');
@@ -1448,7 +1448,7 @@ function watchStuck(el){
 function go(v){
   view=v; cur=null;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
-  document.querySelectorAll('.nav').forEach(b=>b.setAttribute('aria-current', b.dataset.v===v));
+  document.querySelectorAll('.nav').forEach(b=>b.setAttribute('aria-current', b.dataset.v===v || (v==='projects' && b.dataset.v==='list')));
   const el=$('#p-'+v); if(el) el.classList.add('on');
   ({home:renderHome, cal:renderCal, list:renderList, search:renderSearch, actions:renderActions, brief:renderBrief,
     members:renderMembers, chat:renderChat, projects:renderProjects,
@@ -2178,6 +2178,20 @@ async function renderList(){
               + 'project_id,source,visibility,owner_id,started_at,ended_at')
       .order('held_on',{ascending:false}).limit(200);
   if(!showArch) q = q.neq('status','archived');
+  // 폴더로 좁혀 보기 (2026-11-14 폴더 메뉴를 회의록에 합침)
+  const F=LFOLD, NOTES='내 노트';
+  if(F.co===NOTES){
+    q = q.eq('visibility','private');
+    const src={idea:'아이디어 노트',order:'지시사항',talk:'개인 면담'}[F.dept];
+    if(src) q = q.eq('source',src);
+    q = F.dept==='shared' ? q.neq('owner_id',me.id) : q.eq('owner_id',me.id);
+  }
+  else if(F.pid) q = q.eq('project_id',F.pid);
+  else if(F.co){
+    q = q.neq('visibility','private');
+    q = F.co===PJ_NOCO ? q.or('company.is.null,company.eq.') : q.eq('company',F.co);
+    if(F.dept) q = F.dept===PJ_NODEPT ? q.or('dept.is.null,dept.eq.') : q.eq('dept',F.dept);
+  }
   const [mres, pres, att] = await Promise.all([q,
     SB.from('hd_project').select('id,name,color'),
     SB.from('hd_attendee').select('meeting_id,member_id,name').limit(8000)]);
@@ -2185,7 +2199,8 @@ async function renderList(){
   if(error) return el.innerHTML=`<div class="empty">${esc(error.message)}</div>`;
   const PJ = Object.fromEntries((pres.data||[]).map(p=>[p.id,p]));
   const canArch = ['admin','ceo','exec'].includes(me.role);
-  const mfil = sessionStorage.getItem('hd_mfil') || 'all';
+  let mfil = sessionStorage.getItem('hd_mfil') || 'all';
+  if(mfil==='note') mfil='all';          // 「예전 내 노트」 는 위쪽 「내 노트」 폴더로 옮겼습니다
   let locked = 0;
   if(me.role==='dev'){
     const {data:lc} = await SB.rpc('hd_locked_count');
@@ -2203,7 +2218,18 @@ async function renderList(){
               : mfil==='mine' ? (mine.has(m.id) || m.owner_id===me.id)
               : true;
   const shown = data.filter(pick);
-  const FILS = [['all','전체'],['mine','내 회의'],['note','예전 내 노트']];
+  const FILS = [['all','전체'],['mine','내가 참석한 회의']];
+  // 위쪽 폴더 줄 — 전체 · 내 노트 · 폴더들 · 폴더 관리
+  const fps = (SDATA && SDATA.projects) || pres.data || [];
+  const fAll = !F.co && !F.pid;
+  const fInRow = fAll || (F.co===NOTES && !F.dept) || (F.pid && fps.some(p=>p.id===F.pid));
+  const fHere = fInRow ? '' : F.co===NOTES
+      ? ({idea:'아이디어 노트',order:'지시사항',talk:'개인 면담',shared:'나에게 공유된 노트'}[F.dept]||'내 노트')
+      : F.co + (F.dept ? ' · '+F.dept : '');
+  const FI = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" '
+    + 'style="width:13px;height:13px;vertical-align:-2px;margin-right:5px" aria-hidden="true">'
+    + '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
+  const LB = t => `<span class="sub" style="margin:0 2px 0 0;font-size:12px;align-self:center;min-width:28px">${t}</span>`;
 
   const meetCard = m => { const tp=titleParts(m); const sb2=subTitle(m.summary_md);
   return `<div class="card" data-id="${m.id}">
@@ -2222,10 +2248,17 @@ async function renderList(){
           ? `<div class="csum">${esc(oneLine(m.summary_md))}</div>`
           : '<div class="csum none">요약 없음</div>'}</div>`; };
   const up = await upcomingHtml().catch(()=>'');
-  el.innerHTML = `<h1>회의록</h1>${up}<div class="sub">${shown.length}건 · ${ROLE[me.role]} 권한으로 보이는 것만 표시됩니다
+  el.innerHTML = `<h1>회의록</h1>${up}<div class="sub">${shown.length}건 · ${ROLE[me.role]} 권한으로 보이는 것만 표시됩니다 · 폴더는 아래에서 골라 좁혀 봅니다
     ${canArch?`<label style="margin-left:12px;cursor:pointer"><input type="checkbox" id="sharch"
       ${showArch?'checked':''} style="width:14px;height:14px;vertical-align:-2px"> 보관된 회의 보기</label>`:''}</div>
-    <div class="chips" style="margin:0 0 14px">
+    <div class="chips" style="margin:0 0 8px">${LB('폴더')}
+      <button class="chip${fAll?' on':''}" data-fold="">전체</button>
+      <button class="chip${F.co===NOTES&&!F.dept?' on':''}" data-fold="note">내 노트</button>
+      ${fps.map(p=>`<button class="chip${F.pid===p.id?' on':''}" data-fold="p:${p.id}">${FI}${esc(p.name)}</button>`).join('')}
+      ${fHere?`<button class="chip on" data-fold="keep">${FI}${esc(fHere)}</button>`:''}
+      <button class="chip" data-go="projects" title="폴더 만들기 · 이름 바꾸기 · 회의 옮기기">+ 폴더 관리</button>
+    </div>
+    <div class="chips" style="margin:0 0 14px">${LB('범위')}
       ${FILS.map(([k,l])=>`<button class="chip${mfil===k?' on':''}" data-fil="${k}">${l}</button>`).join('')}
     </div>`
    + (locked?`<div class="card locked"><div class="ct">■■■■■■■■■■</div>
@@ -2234,6 +2267,7 @@ async function renderList(){
           <span>개발자 권한으로는 열 수 없습니다</span></div></div>`:'')
    + (shown.length? shown.filter(m=>!isEmptyMeet(m)).map(m=>meetCard(m)).join('')
        + (shown.some(isEmptyMeet)?`<details class="emptymeet"><summary>내용이 없는 회의 ${shown.filter(isEmptyMeet).length}건 — 녹음 내용이 거의 없어 회의록을 만들지 못했습니다</summary>${shown.filter(isEmptyMeet).map(m=>meetCard(m)).join('')}</details>`:'')
+     : !fAll ? '<div class="empty">이 폴더에는 볼 수 있는 회의록이 아직 없습니다.</div>'
      : (me.role==='member'
         ? `<div class="empty">보실 수 있는 회의가 아직 없습니다.<br><br>
              2026-08-26부터 회의록은 <b>참석한 사람 · 올린 사람 · 그 팀의 팀장</b>에게만 보입니다.<br>
@@ -2246,6 +2280,11 @@ async function renderList(){
     openMeeting(c.dataset.id);});
   el.querySelectorAll('[data-fil]').forEach(b=>b.onclick=()=>{
     sessionStorage.setItem('hd_mfil', b.dataset.fil); renderList();});
+  el.querySelectorAll('[data-fold]').forEach(b=>b.onclick=()=>{
+    const k=b.dataset.fold; if(k==='keep') return;
+    LFOLD = k==='' ? {co:'',dept:'',pid:''} : k==='note' ? {co:NOTES,dept:'',pid:''}
+          : {co:'',dept:'',pid:k.slice(2)};
+    renderList(); drawSideTree();});
   el.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
   const sa=$('#sharch');
   if(sa) sa.onchange=()=>{sessionStorage.setItem('hd_show_arch', sa.checked?'1':'0'); renderList();};
@@ -3787,7 +3826,8 @@ const groupCompanies = () => COMPANIES;
 // 보이는 범위는 서버(RLS)가 정합니다. 부서 관리자·부서원에게는
 // 본인 회사·부서 것만 내려오므로, 남의 회사 폴더는 애초에 생기지 않습니다.
 let PJOPEN = new Set();                 // 펼쳐놓은 폴더 (회사 / 회사+부서)
-let PJSEL  = {co:'', dept:'', pid:''};  // 지금 고른 위치
+let PJSEL  = {co:'', dept:'', pid:''};  // 지금 고른 위치 (폴더 관리 화면)
+let LFOLD  = {co:'', dept:'', pid:''};  // 회의록 화면에서 고른 폴더 (비어 있으면 전체)
 const PJ_NOCO = '⚠ 소속 없음';
 const PJ_NODEPT = '회사 공용';
 const PJ_KEY = (co, dept) => dept ? co + ' ▸ ' + dept : co;
@@ -3833,7 +3873,9 @@ function drawSideTree(){
   const cos=[...new Set([...meetings.map(mco), ...projects.flatMap(pcos)])].sort();
 
   const {co:sc, dept:sd, pid:sp}=PJSEL;
-  const onSel=(c,d,p)=>((view==='projects')&&(sc===c)&&((sd||'')===(d||''))&&((sp||'')===(p||'')))?' sel':'';
+  const S=(view==='list')?LFOLD:PJSEL;
+  const onSel=(c,d,p)=>((view==='projects'||view==='list')
+    && (S.pid ? S.pid===(p||'') : (!!S.co && !p && S.co===c && (S.dept||'')===(d||''))))?' sel':'';
   const row=(lv,c,d,p,inner)=>`<button class="st${onSel(c,d,p)}" data-lv="${lv}"
     data-co="${esc(c)}" data-dept="${esc(d||'')}" data-pid="${p||''}"
     style="padding-left:${8+lv*14}px">${inner}</button>`;
@@ -3893,7 +3935,8 @@ function drawSideTree(){
     PJOPEN.add(PJ_KEY(co));
     if(dept && co!=='내 노트') PJOPEN.add(PJ_KEY(co,dept));
     document.body.classList.remove('snav');
-    go('projects');           // 화면을 먼저 바꾸고
+    LFOLD={co, dept, pid};
+    go('list');               // 회의록 화면에서 그 폴더만 보여줍니다
     drawSideTree();           // 나무의 선택 표시를 맞춥니다
   });
 }
@@ -3960,8 +4003,9 @@ async function renderProjects(){
   const at=(c,d,p)=>`data-co="${esc(c)}" data-dept="${esc(d||'')}" data-pid="${p||''}"`;
   const on=(c,d,p)=>((sc===c)&&((sd||'')===(d||''))&&((sp||'')===(p||'')))?' sel':'';
 
-  el.innerHTML=`<h1>폴더</h1>
-    <div class="sub">회사 ▸ 부서 ▸ 프로젝트 순으로 펼쳐보세요.
+  el.innerHTML=`<h1>폴더 관리</h1>
+    <div class="row" style="margin:0 0 10px"><button class="btn" id="pj-back">← 회의록으로</button></div>
+    <div class="sub">폴더를 만들고, 이름을 바꾸고, 회의를 옮깁니다. 회사 ▸ 부서 ▸ 프로젝트 순으로 펼쳐보세요.
       고른 폴더 범위의 회의가 아래에 모두 나옵니다</div>
 
     <div class="tree">
@@ -4039,6 +4083,7 @@ async function renderProjects(){
 
     <div id="pjlist" style="margin-top:22px"></div>`;
 
+  const pjb=$('#pj-back'); if(pjb) pjb.onclick=()=>go('list');
   // ── ▸ 를 누르면 펼치기·접기
   el.querySelectorAll('[data-tog]').forEach(w=>w.onclick=e=>{
     e.stopPropagation();
