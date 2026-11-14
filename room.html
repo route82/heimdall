@@ -605,6 +605,112 @@ function drawBar(ev){
 
 // ─────────────────────────── 녹음
 const REC={};
+// ─────────────────────────── 녹음을 태블릿 안에 바로 저장 (2026-11-14, 유실 방지 1단계)
+// 전에는 녹음을 끝날 때까지 메모리에만 들고 있다가 한 번에 올렸습니다. 그래서
+//   · 회의 중 화면이 새로고침되거나 태블릿이 꺼지면 회의 전체가 사라졌고,
+//   · 올리다 실패하면 다시 올릴 방법이 없었고,
+//   · 앞 조각이 빠진 채 올라와 열리지 않는 녹음이 생겼습니다 (9/16 · 10/19 · 11/13).
+// 이제 5초 조각이 생길 때마다 태블릿 저장소(IndexedDB)에 적어 둡니다.
+// 다 올라간 것이 확인되면 지우고, 남아 있는 것은 화면을 다시 열 때·2분마다 스스로 이어 올립니다.
+const KEEP={db:null, id:null, seq:0, busy:false};
+const KEEP_MIN=12;               // 조각 12개(1분) 미만으로 끊긴 것은 실수로 누른 것으로 보고 버립니다
+function keepOpen(){
+  return new Promise(res=>{
+    if(KEEP.db) return res(KEEP.db);
+    try{
+      const r=indexedDB.open('hdrec',1);
+      r.onupgradeneeded=()=>{ const d=r.result;
+        if(!d.objectStoreNames.contains('sess')) d.createObjectStore('sess',{keyPath:'id'});
+        if(!d.objectStoreNames.contains('chunk')) d.createObjectStore('chunk'); };
+      r.onsuccess=()=>{ KEEP.db=r.result; res(KEEP.db); };
+      r.onerror=()=>res(null); r.onblocked=()=>res(null);
+    }catch(e){ res(null); }
+  });
+}
+function keepDo(store, mode, fn){
+  return new Promise(res=>{
+    if(!KEEP.db) return res(null);
+    try{
+      const tx=KEEP.db.transaction(store, mode);
+      const rq=fn(tx.objectStore(store));
+      tx.oncomplete=()=>res(rq && 'result' in rq ? rq.result : true);
+      tx.onerror=()=>res(null); tx.onabort=()=>res(null);
+    }catch(e){ res(null); }
+  });
+}
+const keepRange=id=>IDBKeyRange.bound(id+':', id+':\uffff');
+const keepKey=(id,n)=>id+':'+String(n).padStart(6,'0');
+async function keepStart(meta){
+  KEEP.id=null; KEEP.seq=0;
+  if(!(await keepOpen())) return;
+  const id=String(meta.t0);
+  if(await keepDo('sess','readwrite',st=>st.put(Object.assign({id, state:'rec'}, meta)))) KEEP.id=id;
+}
+function keepChunk(blob){
+  if(!KEEP.id) return;
+  const id=KEEP.id, n=KEEP.seq++;
+  keepDo('chunk','readwrite',st=>st.put(blob, keepKey(id,n)));
+}
+async function keepMeta(id, patch){
+  if(!id || !KEEP.db) return;
+  const cur=await keepDo('sess','readonly',st=>st.get(id));
+  if(cur) await keepDo('sess','readwrite',st=>st.put(Object.assign(cur, patch)));
+}
+async function keepDrop(id){
+  if(!id || !KEEP.db) return;
+  await keepDo('chunk','readwrite',st=>st.delete(keepRange(id)));
+  await keepDo('sess','readwrite',st=>st.delete(id));
+  if(KEEP.id===id) KEEP.id=null;
+}
+async function keepBlob(id, type){
+  const parts=await keepDo('chunk','readonly',st=>st.getAll(keepRange(id)));
+  return parts && parts.length ? {blob:new Blob(parts,{type:type||'audio/webm'}), n:parts.length} : null;
+}
+// 남아 있는 녹음을 이어 올립니다 — 녹음 중·올리는 중이 아닐 때만. 올린 건수를 돌려줍니다.
+async function keepRecover(){
+  if(KEEP.busy || REC.mr || REC.up || !me) return 0;
+  if(!(await keepOpen())) return 0;
+  KEEP.busy=true;
+  let sent=0;
+  try{
+    const list=(await keepDo('sess','readonly',st=>st.getAll()))||[];
+    for(const ss of list){
+      if(REC.mr || REC.up) break;                 // 그 사이 새 회의가 시작되면 물러납니다
+      const type=ss.mime||'audio/webm';
+      const ext=type.indexOf('mp4')>=0?'mp4':type.indexOf('ogg')>=0?'ogg':'webm';
+      let file=ss.file||'';
+      if(!file){
+        const got=await keepBlob(ss.id, type);
+        // 올리기 단계까지 못 간 짧은 것은 실수로 누른 것입니다
+        if(!got || got.blob.size<4000 || (!ss.job && got.n<KEEP_MIN)){ await keepDrop(ss.id); continue; }
+        ss.n=got.n;
+        file='jobs/'+ss.id+'_room.'+ext;          // 같은 녹음은 늘 같은 이름 — 두 번 올라가도 하나입니다
+        const up=await SB.storage.from('hd-audio').upload(file, got.blob, {upsert:true, contentType:type});
+        if(up.error) continue;                     // 다음 차례에 다시
+        await keepMeta(ss.id, {file});
+      }
+      const t0=+ss.t0, dur=ss.dur || (ss.n||0)*5;
+      const co=coFromTitle(ss.title||'');
+      const job=ss.job || {
+        title: mkTitle(ss.title||'', co), participants:'',
+        kind:'audio', orig_name:(ss.title||'회의')+'.'+ext,
+        device:'회의실 태블릿', created_by:me.id, created_name:ss.room||cfg.room||'회의실',
+        company:co, dept:'', cal_uid:ss.cal_uid||'', room:ss.room||cfg.room||'',
+        agenda_md:ss.agenda||'',
+        started_at:new Date(t0).toISOString(), ended_at:new Date(t0+dur*1000).toISOString(),
+        ...(cfg.test && canTest() ? {visibility:'private', note_label:'시험 녹음'} : {}),
+      };
+      job.audio_path=file;
+      const ins=await SB.from('hd_job').insert(job);
+      if(ins.error) continue;
+      await keepDrop(ss.id);
+      sent++;
+    }
+  }catch(e){}
+  KEEP.busy=false;
+  return sent;
+}
+
 async function startRec(ev){
   let stream;
   try{
@@ -625,7 +731,10 @@ async function startRec(ev){
   REC.room=cfg.room||'';
   REC.mr = mime ? new MediaRecorder(stream,{mimeType:mime, audioBitsPerSecond:64000})
                 : new MediaRecorder(stream);
-  REC.mr.ondataavailable=e=>{ if(e.data&&e.data.size) REC.chunks.push(e.data); };
+  await keepStart({t0:REC.t0, title:REC.title, room:REC.room, agenda:REC.agenda,
+                   cal_uid:(ev&&ev.uid)||'', mime:REC.mr.mimeType||mime||'audio/webm'});
+  REC.t0=Date.now();           // 저장소를 여는 데 걸린 시간만큼 시작 시각을 다시 맞춥니다
+  REC.mr.ondataavailable=e=>{ if(e.data&&e.data.size){ REC.chunks.push(e.data); keepChunk(e.data); } };
   REC.mr.onstop=finish;
   REC.mr.start(5000);          // 5초씩 나눠 모읍니다 (길게 녹음해도 안전)
   keepAwake();
@@ -1004,13 +1113,12 @@ async function upload(){
   const testFields = testMode
     ? {visibility:'private', note_label:'시험 녹음'} : {};
 
+  const kid=KEEP.id;
+  const kept = kid ? '태블릿에 녹음을 보관해 두었습니다. 연결되면 스스로 다시 올립니다 — 다시 녹음하지 않으셔도 됩니다.' : '';
   try{
-    const name='jobs/'+Date.now()+'_room.'+REC.ext;   // 저장소 파일 이름은 영문·숫자만
-    const up=await SB.storage.from('hd-audio')
-      .upload(name, REC.blob, {upsert:true, contentType:REC.type});
-    if(up.error){ msg('올리지 못했습니다', up.error.message); return; }
-
-    const ins=await SB.from('hd_job').insert({
+    // 저장소 파일 이름은 영문·숫자만. 태블릿에 적어 둔 녹음은 늘 같은 이름으로 올립니다.
+    const name='jobs/'+(kid||Date.now())+'_room.'+REC.ext;
+    const job={
       title: mkTitle(REC.title, company),
       participants: picked.map(m=>m.name).join(', '),
       audio_path:name, kind:'audio', orig_name:(REC.title||'회의')+'.'+REC.ext,
@@ -1021,8 +1129,22 @@ async function upload(){
       started_at:new Date(REC.t0).toISOString(),
       ended_at:new Date(REC.t0+(REC.dur||0)*1000).toISOString(),
       ...testFields,
-    });
-    if(ins.error){ msg('기록을 남기지 못했습니다', ins.error.message); return; }
+    };
+    // 누구 회의인지까지 태블릿에 적어 둡니다 — 여기서 끊겨도 같은 내용으로 다시 올라갑니다
+    await keepMeta(kid, {state:'stopped', job, dur:REC.dur||0});
+    // 태블릿에 적어 둔 조각이 빠짐없이 있으면 그것으로 올립니다 (메모리 쪽 앞 조각이 빠지는 일이 있었습니다)
+    if(kid){
+      const got=await keepBlob(kid, REC.type);
+      if(got && got.n>=KEEP.seq && got.blob.size>=REC.blob.size) REC.blob=got.blob;
+    }
+    const up=await SB.storage.from('hd-audio')
+      .upload(name, REC.blob, {upsert:true, contentType:REC.type});
+    if(up.error){ msg('올리지 못했습니다', kept || up.error.message, !!kept); return; }
+    await keepMeta(kid, {file:name});
+
+    const ins=await SB.from('hd_job').insert(job);
+    if(ins.error){ msg('기록을 남기지 못했습니다', kept || ins.error.message, !!kept); return; }
+    await keepDrop(kid);
 
     msg(testMode ? '시험 녹음을 올렸습니다' : '회의가 끝났습니다',
       testMode
@@ -1034,20 +1156,23 @@ async function upload(){
                 : '참석자를 누르지 않아 어느 회사 회의인지 모릅니다 · '
                   + '슬랙 알림 없이 저장했고, 헤임달에서 회사를 정하면 됩니다')));
   }catch(e){
-    msg('올리지 못했습니다', e.message||String(e));
+    msg('올리지 못했습니다', kept || e.message||String(e), !!kept);
   }
 }
 
-function msg(head, sub){
+// later=true — 지금은 못 올렸지만 태블릿에 보관해 둔 경우
+function msg(head, sub, later){
   clearInterval(tick);
   app.innerHTML='<div></div><div class="mid">'
-    + '<div class="done"><span class="ok">✓</span>'+esc(head)+'</div>'
+    + '<div class="done"><span class="ok">'+(later?'⏳':'✓')+'</span>'+esc(head)+'</div>'
     + '<div class="sub" style="max-width:620px">'+esc(sub||'')
-    + '<br><br>회의록은 몇 분 뒤 헤임달에 올라옵니다.</div>'
+    + (later ? '' : '<br><br>회의록은 몇 분 뒤 헤임달에 올라옵니다.')+'</div>'
     + '<button class="ghost" id="ok">확인</button></div><div></div>';
-  const back=()=>{ REC.up=false; loadEvents().catch(()=>{}).then(idlePage); };
+  let went=false;
+  const back=()=>{ if(went) return; went=true; REC.up=false;
+    loadEvents().catch(()=>{}).then(idlePage).then(()=>{ if(later) setTimeout(keepRecover, 20000); }); };
   $('#ok').onclick=back;
-  setTimeout(back, 12000);
+  setTimeout(back, later?20000:12000);
 }
 
 // ─────────────────────────── 목소리 등록 (2026-11-14 홍석진 대표 지시)
@@ -1280,7 +1405,10 @@ async function boot(){
     if(!r.ok) return ''; const t=await r.text(); let h=0;
     for(let i=0;i<t.length;i++) h=(h*31+t.charCodeAt(i))|0; return t.length+':'+h; };
   const sig0=await pageSig().catch(()=>'');
+  keepRecover().catch(()=>{});
   setInterval(async()=>{
+    if(REC.mr || REC.up || KEEP.busy) return;
+    await keepRecover().catch(()=>{});
     if(REC.mr || REC.up) return;
     if(sig0){
       const s=await pageSig().catch(()=>'');
