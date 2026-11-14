@@ -773,7 +773,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--verm);box-shadow:none
 .ht-bk.past{opacity:.55}
 .ht-bk.mine.past{opacity:.8}
 .ht-now{position:absolute;top:0;bottom:0;width:2px;background:var(--verm);z-index:2;pointer-events:none}
-.ht-now::before{content:'';position:absolute;top:-1px;left:-3px;width:8px;height:8px;border-radius:50%;background:var(--verm)}
+.ht-nowlb{position:absolute;top:4px;transform:translateX(-50%);background:var(--verm);color:#fff;font-size:11.5px;font-weight:600;padding:1px 7px;white-space:nowrap;z-index:3}
 .ht-legend{display:flex;gap:16px;font-size:12px;color:var(--tx3);padding:9px 12px;border-top:1px solid var(--line2);flex-wrap:wrap}
 .ht-legend i{display:inline-block;width:12px;height:12px;vertical-align:-2px;margin-right:5px;border:1px solid var(--cardln);background:var(--card)}
 .ht-legend i.m{border-color:var(--ac);background:var(--acbg)}
@@ -2059,6 +2059,8 @@ async function drawHomeTL(){
 
   let h='<div class="ht-row ht-head"><div class="ht-rm"></div><div class="ht-track">';
   for(let x=HT.H0+1;x<HT.H1;x++) h+=`<span class="ht-hr" style="left:${pct(x*60).toFixed(3)}%">${x}:00</span>`;
+  const nowM=mins(now), nowOn=(kd===today && nowM>=HT.H0*60 && nowM<=HT.H1*60);
+  if(nowOn) h+=`<span class="ht-nowlb" style="left:${pct(nowM).toFixed(3)}%">지금 ${hmOf(now)}</span>`;
   h+='</div></div>';
   const lost=[];
   BOOK_ROOMS.forEach((r,i)=>{
@@ -2073,7 +2075,7 @@ async function drawHomeTL(){
         style="left:${a.toFixed(3)}%;width:calc(${(b-a).toFixed(3)}% - 2px)" title="${esc(e.title)}">
         <b>${esc(htName(e))}</b><span>${hmOf(e.starts_at)}~${hmOf(e.ends_at)}${done.has(e.uid)?' · 회의록 있음':''}</span></div>`;
     });
-    if(kd===today){ const m=mins(now); if(m>=HT.H0*60 && m<=HT.H1*60) h+=`<div class="ht-now" style="left:${pct(m).toFixed(3)}%"></div>`; }
+    if(nowOn) h+=`<div class="ht-now" style="left:${pct(nowM).toFixed(3)}%"></div>`;
     h+='</div></div>';
   });
   evs.forEach(e=>{ if(htRoom(e)<0) lost.push(e); });
