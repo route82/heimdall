@@ -712,11 +712,23 @@ async function keepRecover(){
 }
 
 async function startRec(ev){
+  // 2026-11-14 — 11/13 5F 녹음 두 건에 「다른 녹음기의 조각」 이 섞여 있었습니다 (파일 앞 25초가 머리 없는 조각,
+  //   그 뒤에 새 녹음). 시작 단추가 두 번 눌리면 녹음기가 둘 생기고, 하나는 끝나지 않은 채 남아
+  //   마이크를 쥐고 다음 녹음들에 조각을 끼워 넣습니다. 그래서
+  //   ① 시작하는 중·녹음 중에는 다시 시작하지 않고  ② 남아 있는 녹음기·마이크는 끄고 시작하며
+  //   ③ 지금 녹음기가 만든 조각만 받습니다.
+  if(REC.starting || (REC.mr && REC.mr.state==='recording')) return;
+  REC.starting=true; setTimeout(()=>{ REC.starting=false; }, 8000);   // 마이크 허용 창에서 멈춰도 풀리게
+  (REC.olds||[]).forEach(o=>{
+    try{ o.mr.ondataavailable=null; o.mr.onstop=null; if(o.mr.state!=='inactive') o.mr.stop(); }catch(e){}
+    try{ o.stream.getTracks().forEach(t=>t.stop()); }catch(e){} });
+  REC.olds=[];
   let stream;
   try{
     stream=await navigator.mediaDevices.getUserMedia({audio:{
       echoCancellation:true, noiseSuppression:true, autoGainControl:true}});
   }catch(e){
+    REC.starting=false;
     alert('마이크를 쓸 수 없습니다.\n태블릿 설정에서 이 페이지의 마이크 사용을 허용해주세요.');
     return;
   }
@@ -734,9 +746,12 @@ async function startRec(ev){
   await keepStart({t0:REC.t0, title:REC.title, room:REC.room, agenda:REC.agenda,
                    cal_uid:(ev&&ev.uid)||'', mime:REC.mr.mimeType||mime||'audio/webm'});
   REC.t0=Date.now();           // 저장소를 여는 데 걸린 시간만큼 시작 시각을 다시 맞춥니다
-  REC.mr.ondataavailable=e=>{ if(e.data&&e.data.size){ REC.chunks.push(e.data); keepChunk(e.data); } };
-  REC.mr.onstop=finish;
-  REC.mr.start(5000);          // 5초씩 나눠 모읍니다 (길게 녹음해도 안전)
+  const mr=REC.mr;
+  REC.olds.push({mr, stream});
+  mr.ondataavailable=e=>{ if(REC.mr===mr && e.data && e.data.size){ REC.chunks.push(e.data); keepChunk(e.data); } };
+  mr.onstop=()=>{ if(REC.mr===mr) finish(); };
+  mr.start(5000);              // 5초씩 나눠 모읍니다 (길게 녹음해도 안전)
+  REC.starting=false;
   keepAwake();
   meter(stream);
   recPage();
@@ -1257,6 +1272,8 @@ function voiceConsent(m){
 // ③ 안내 글 읽기
 async function voiceRec(){
   const m=VO.who;
+  if(VO.starting || VO.mr) return;                 // 두 번 눌려 녹음기가 둘 생기지 않게
+  VO.starting=true; setTimeout(()=>{ VO.starting=false; }, 4000);
   let stream;
   try{
     // 회의 녹음과 똑같은 설정으로 받습니다 — 설정이 다르면 지문이 달라집니다
