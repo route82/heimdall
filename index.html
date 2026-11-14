@@ -744,7 +744,41 @@ input:focus,textarea:focus,select:focus{border-color:var(--verm);box-shadow:none
 .mandots i{font-style:normal;animation:mandot 1.4s infinite;opacity:0}.mandots i:nth-child(2){animation-delay:.2s}.mandots i:nth-child(3){animation-delay:.4s}
 @keyframes mandot{0%,20%{opacity:0}50%{opacity:1}100%{opacity:0}}
 @media (max-width:640px){.mantoc ul{columns:1}#p-usage .box{overflow-x:auto;-webkit-overflow-scrolling:touch}}
-</style></head><body>
+</style><style>
+/* 2026-11-14 — 홈 · 회의실 시간표 (홍석진 대표 시안 home-mock). 이름은 ht- 로 시작합니다 (.seg .st .tl 은 이미 다른 뜻으로 씀) */
+.ht-hd{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin:6px 0 12px;flex-wrap:wrap}
+.ht-hd h1{font-size:17px;margin:0}
+.ht-nav{display:flex;align-items:center;gap:8px;font-size:14px;flex-wrap:wrap}
+.ht-nav .btn{padding:5px 10px}
+.ht-nav b{font-family:var(--f-disp);letter-spacing:.02em;font-size:15px;min-width:128px;text-align:center}
+.ht-seg{display:inline-flex;border:1px solid var(--line)}
+.ht-seg button{appearance:none;border:0;background:var(--s1);color:var(--tx2);font:inherit;font-size:13px;padding:6px 13px;cursor:pointer}
+.ht-seg button+button{border-left:1px solid var(--line)}
+.ht-seg button.on{background:var(--ac);color:var(--acon);font-weight:600}
+.ht-tl{background:var(--s1);border:1px solid var(--line);margin-bottom:26px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.ht-in{min-width:980px}
+.ht-row{display:grid;grid-template-columns:118px 1fr;border-top:1px solid var(--line2)}
+.ht-row:first-child{border-top:0}
+.ht-rm{padding:10px 12px;font-size:13px;font-weight:600;border-right:1px solid var(--line2);display:flex;flex-direction:column;justify-content:center}
+.ht-track{position:relative;height:60px;cursor:copy;
+ background-image:linear-gradient(to right,var(--line2) 1px,transparent 1px);background-size:calc(100%/11) 100%}
+.ht-track.off{cursor:default}
+.ht-head .ht-track{height:28px;cursor:default;background:none}
+.ht-hr{position:absolute;top:6px;font-family:var(--f-mono);font-size:11.5px;color:var(--tx3);transform:translateX(-50%)}
+.ht-bk{position:absolute;top:7px;bottom:7px;border:1px solid var(--cardln);background:var(--card);
+ padding:4px 8px;font-size:12px;line-height:1.35;overflow:hidden;cursor:pointer;white-space:nowrap;text-overflow:ellipsis}
+.ht-bk b{display:block;font-weight:600;white-space:normal;line-height:1.25;max-height:2.5em;overflow:hidden}
+.ht-bk span{color:var(--tx3);font-size:11px}
+.ht-bk.mine{border-color:var(--ac);background:var(--acbg)}
+.ht-bk.past{opacity:.55}
+.ht-bk.mine.past{opacity:.8}
+.ht-now{position:absolute;top:0;bottom:0;width:2px;background:var(--verm);z-index:2;pointer-events:none}
+.ht-nowlb{position:absolute;top:4px;transform:translateX(-50%);background:var(--verm);color:#fff;font-size:11.5px;font-weight:600;padding:1px 7px;white-space:nowrap;z-index:3}
+.ht-legend{display:flex;gap:16px;font-size:12px;color:var(--tx3);padding:9px 12px;border-top:1px solid var(--line2);flex-wrap:wrap}
+.ht-legend i{display:inline-block;width:12px;height:12px;vertical-align:-2px;margin-right:5px;border:1px solid var(--cardln);background:var(--card)}
+.ht-legend i.m{border-color:var(--ac);background:var(--acbg)}
+</style>
+</head><body>
 
 <div id="app"><div class="boot"><div class="nm">HEIMDALL</div><div class="tr"><i></i></div><div class="lb">Loading</div></div></div>
 
@@ -1205,7 +1239,7 @@ function shell(){
   const groups = [
     ['',      [['home','홈']]],
     ['쓰기',   [['rec','녹음'],['upload','업로드']]],
-    ['보기',   [['cal','일정'],['list','회의록'],['projects','폴더']]],
+    ['보기',   [['cal','일정'],['list','회의록']]],
     ['찾기',   [['chat','물어보기'],['search','검색']]],
   ];
   const admin = [];
@@ -1230,7 +1264,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:12px">웹 v21.0</span>
+       <span class="sub" style="margin:0;font-size:12px">웹 v21.1</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">로그아웃</button>
@@ -1259,8 +1293,8 @@ function shell(){
      </div>
    </div>`;
 
-  // 「폴더」 메뉴 밑에 폴더 나무를 바로 보여줍니다 (플라우드처럼)
-  const pnav=document.querySelector('.nav[data-v="projects"]');
+  // 「회의록」 메뉴 밑에 폴더 나무를 바로 보여줍니다 (폴더 메뉴는 회의록에 합쳤습니다)
+  const pnav=document.querySelector('.nav[data-v="list"]');
   if(pnav){ pnav.insertAdjacentHTML('afterend','<div class="stree" id="stree"></div>'); loadSideTree(); }
 
   const closeNav=()=>document.body.classList.remove('snav');
@@ -1414,7 +1448,7 @@ function watchStuck(el){
 function go(v){
   view=v; cur=null;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
-  document.querySelectorAll('.nav').forEach(b=>b.setAttribute('aria-current', b.dataset.v===v));
+  document.querySelectorAll('.nav').forEach(b=>b.setAttribute('aria-current', b.dataset.v===v || (v==='projects' && b.dataset.v==='list')));
   const el=$('#p-'+v); if(el) el.classList.add('on');
   ({home:renderHome, cal:renderCal, list:renderList, search:renderSearch, actions:renderActions, brief:renderBrief,
     members:renderMembers, chat:renderChat, projects:renderProjects,
@@ -1620,17 +1654,18 @@ async function renderHome(){
       <button class="hcard" data-go="rec">
         <div class="hic" style="background:var(--errbg);color:var(--err)">${svgIco('rec')}</div>
         <h2>녹음하기</h2><p>회의나 아이디어를 바로 녹음합니다.<br>회의록은 자동으로 만들어집니다</p></button>
-      <button class="hcard" data-go="list">
-        <div class="hic" style="background:var(--acbg);color:var(--ac)">${svgIco('list')}</div>
-        <h2>회의록 보기</h2><p>내 권한으로 볼 수 있는 회의록과<br>내 노트를 확인합니다</p></button>
+      <button class="hcard" id="hbook">
+        <div class="hic" style="background:var(--acbg);color:var(--ac)">${svgIco('cal')}</div>
+        <h2>회의실 예약</h2><p>빈 시간을 골라 예약하면<br>건물 캘린더에도 같이 적힙니다</p></button>
       <button class="hcard" data-go="chat">
         <div class="hic" style="background:var(--okbg);color:var(--ok)">${svgIco('chat')}</div>
         <h2>물어보기</h2><p>"지난주 홍 대표님이 뭐라고 하셨지?"<br>회의 내용을 AI에게 질문합니다</p></button>
     </div>
-    <div id="h-cal"></div>
+    <div id="h-tl"></div>
     <div id="h-rec" class="hrec"><div class="sub">최근 회의를 불러오는 중…</div></div>`;
   el.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
-  drawTodayCal();
+  $('#hbook').onclick=()=>bookOpen({day: (HT.day && HT.day>=ymd(new Date())) ? HT.day : ymd(new Date())});
+  drawHomeTL();
 
   const [mres]=await Promise.all([
     SB.from('hd_meeting')
@@ -1849,6 +1884,7 @@ function bookOpen(keep){
       bookClose(); toast(esc(r.msg), 5000);
       CAL.anchor=new Date(d+'T12:00:00+09:00');
       if($('#cbook')) renderCal();
+      if($('#h-tl')){ HT.day=d; drawHomeTL(); }
       return;
     }
     btn.disabled=false; btn.textContent='예약하기'; say(r.msg);
@@ -1860,6 +1896,7 @@ async function bookCancel(uid, title){
   const r=await bookSend({op:'cancel', uid}, '회의실 예약 취소 · '+title);
   toast(esc(r.msg), r.ok?4000:8000);
   if(r.ok && $('#cbook')) renderCal();
+  if(r.ok && $('#h-tl')) drawHomeTL();
 }
 
 function shiftCal(n){
@@ -1983,6 +2020,116 @@ async function drawTodayCal(){
   });
 }
 
+// ─────────────────────────── 홈 · 회의실 시간표 (2026-11-14, 홍석진 대표 시안 home-mock)
+// 회의실 다섯 곳을 가로 시간표로 보여줍니다. 빈 곳을 누르면 그 회의실·그 시간으로 예약 창이 열립니다.
+// 지금은 우리 그룹 예약만 그립니다 — 다른 회사 예약은 서버에 들어오지 않아 빈 칸으로 보이고,
+// 겹치는지는 예약할 때 처리 서버가 구글 캘린더를 직접 읽어 막습니다.
+const HT={day:null, scope:'all', H0:9, H1:20};
+function htRoom(e){
+  const pick=t=>{ t=(t||'').toUpperCase().replace(/\s/g,'');
+    if(/5F|F5/.test(t)) return 0;
+    if(/1F|F1/.test(t)) return 1;
+    if(/B1/.test(t)){ if(/간이/.test(t)) return 4; if(/소회의/.test(t)) return 2; return 3; }
+    return -1; };
+  let i=pick(e.room);
+  if(i<0){ const m=(e.title||'').match(/^\s*[\[\(]([^\]\)]{1,60})[\]\)]/); if(m) i=pick(m[1]); }
+  return i;
+}
+const htName=e=>((e.title||'').replace(/^\s*[\[\(][^\]\)]*[\]\)]\s*/,'').trim() || e.title || '회의');
+async function drawHomeTL(){
+  const box=$('#h-tl'); if(!box) return;
+  const today=ymd(new Date());
+  if(!HT.day) HT.day=today;
+  const kd=HT.day;
+  const from=new Date(kd+'T00:00:00+09:00').toISOString();
+  const to  =new Date(kd+'T23:59:59+09:00').toISOString();
+  const [cal,mtg]=await Promise.all([
+    SB.from('hd_cal_event').select('uid,title,room,starts_at,ends_at,all_day')
+      .gte('starts_at',from).lte('starts_at',to).order('starts_at'),
+    SB.from('hd_meeting').select('id,cal_uid').not('cal_uid','is',null).eq('held_on',kd)]);
+  await loadMyBooks();
+  if(!$('#h-tl') || HT.day!==kd) return;
+  const evs=(cal.data||[]).filter(e=>!e.all_day);
+  const done=new Map((mtg.data||[]).map(x=>[x.cal_uid,x.id]));
+  const now=new Date();
+  const mins=t=>{ const p=hmOf(t).split(':').map(Number); return p[0]*60+p[1]; };
+  const span=(HT.H1-HT.H0)*60;
+  const pct=m=>Math.max(0,Math.min(100,(m-HT.H0*60)/span*100));
+  const label=KSTF({month:'long',day:'numeric',weekday:'short'}).format(new Date(kd+'T12:00:00+09:00'));
+
+  let h='<div class="ht-row ht-head"><div class="ht-rm"></div><div class="ht-track">';
+  for(let x=HT.H0+1;x<HT.H1;x++) h+=`<span class="ht-hr" style="left:${pct(x*60).toFixed(3)}%">${x}:00</span>`;
+  const nowM=mins(now), nowOn=(kd===today && nowM>=HT.H0*60 && nowM<=HT.H1*60);
+  if(nowOn) h+=`<span class="ht-nowlb" style="left:${pct(nowM).toFixed(3)}%">지금 ${hmOf(now)}</span>`;
+  h+='</div></div>';
+  const lost=[];
+  BOOK_ROOMS.forEach((r,i)=>{
+    h+=`<div class="ht-row"><div class="ht-rm">${esc(r)}</div><div class="ht-track${kd<today?' off':''}" data-room="${i}">`;
+    evs.forEach((e,n)=>{
+      if(htRoom(e)!==i) return;
+      const mine=MYBOOK.has(e.uid);
+      if(HT.scope==='mine' && !mine) return;
+      const a=pct(mins(e.starts_at)), b=pct(mins(e.ends_at));
+      if(b<=a) return;
+      h+=`<div class="ht-bk${mine?' mine':''}${new Date(e.ends_at)<now?' past':''}" data-n="${n}"
+        style="left:${a.toFixed(3)}%;width:calc(${(b-a).toFixed(3)}% - 2px)" title="${esc(e.title)}">
+        <b>${esc(htName(e))}</b><span>${hmOf(e.starts_at)}~${hmOf(e.ends_at)}${done.has(e.uid)?' · 회의록 있음':''}</span></div>`;
+    });
+    if(nowOn) h+=`<div class="ht-now" style="left:${pct(nowM).toFixed(3)}%"></div>`;
+    h+='</div></div>';
+  });
+  evs.forEach(e=>{ if(htRoom(e)<0) lost.push(e); });
+
+  box.innerHTML=`<div class="ht-hd"><h1>회의실 일정</h1>
+      <div class="ht-nav">
+        <div class="ht-seg"><button data-s="all" class="${HT.scope==='all'?'on':''}">전체 회의실</button><button data-s="mine" class="${HT.scope==='mine'?'on':''}">내 예약만</button></div>
+        <button class="btn" id="ht-prev" aria-label="전날">‹</button><b>${esc(label)}</b><button class="btn" id="ht-next" aria-label="다음날">›</button>
+        ${kd!==today?'<button class="btn" id="ht-today">오늘</button>':''}
+        <button class="btn p" id="ht-book">+ 예약</button>
+      </div></div>
+    ${cal.error?`<div class="empty">예약을 불러오지 못했습니다 · ${esc(cal.error.message)}</div>`:`
+    <div class="ht-tl"><div class="ht-in">${h}</div>
+      <div class="ht-legend"><span><i class="m"></i>내가 예약한 회의</span><span><i></i>우리 그룹 회의</span>
+        <span>빈 곳을 누르면 그 시간으로 예약 · 다른 회사 예약은 여기 보이지 않고, 겹치면 예약할 때 알려드립니다</span></div>
+    </div>`}
+    ${lost.length?`<div class="sub" style="margin:-16px 0 22px">회의실을 알 수 없는 예약 ${lost.length}건 · ${lost.map(e=>esc(hmOf(e.starts_at)+' '+htName(e))).join(' · ')}</div>`:''}`;
+
+  const shift=n=>{ const d=new Date(kd+'T12:00:00+09:00'); d.setDate(d.getDate()+n); HT.day=ymd(d); drawHomeTL(); };
+  $('#ht-prev').onclick=()=>shift(-1);
+  $('#ht-next').onclick=()=>shift(1);
+  if($('#ht-today')) $('#ht-today').onclick=()=>{ HT.day=today; drawHomeTL(); };
+  $('#ht-book').onclick=()=>bookOpen({day: kd<today?today:kd});
+  box.querySelectorAll('.ht-seg button').forEach(b=>b.onclick=()=>{ HT.scope=b.dataset.s; drawHomeTL(); });
+  box.querySelectorAll('.ht-bk').forEach(b=>b.onclick=ev=>{ ev.stopPropagation(); htOpen(evs[+b.dataset.n], done.get(evs[+b.dataset.n].uid)||''); });
+  box.querySelectorAll('.ht-track[data-room]').forEach(t=>t.onclick=ev=>{
+    if(ev.target!==t) return;
+    if(kd<today) return toast('지난 날짜에는 예약할 수 없습니다', 3000);
+    const r=t.getBoundingClientRect();
+    const st=HT.H0*60+Math.floor((ev.clientX-r.left)/r.width*(HT.H1-HT.H0)*2)*30;
+    const f=x=>String(Math.floor(x/60)).padStart(2,'0')+':'+String(x%60).padStart(2,'0');
+    if(new Date(kd+'T'+f(st+30)+':00+09:00')<=new Date()) return toast('이미 지난 시간입니다', 3000);
+    bookOpen({day:kd, room:BOOK_ROOMS[+t.dataset.room], st:f(st), en:f(st+60)});
+  });
+}
+// 시간표의 예약을 눌렀을 때 — 회의록이 있으면 바로 열고, 없으면 할 수 있는 일을 보여줍니다
+function htOpen(e, mid){
+  if(mid) return openMeeting(mid);
+  const past=new Date(e.ends_at)<new Date();
+  const mine=MYBOOK.has(e.uid);
+  const day=KSTF({month:'long',day:'numeric',weekday:'short'}).format(new Date(e.starts_at));
+  bookBox(`<span class="eyebrow">${esc(day)} · ${hmOf(e.starts_at)}~${hmOf(e.ends_at)}${e.room?' · '+esc(e.room):''}</span>
+    <h1 style="font-size:18px;margin:6px 0 10px">${esc(htName(e))}</h1>
+    <div class="sub" style="margin:0 0 16px">${past?'이 회의는 아직 회의록이 없습니다. 녹음 파일이 있으면 올려 주세요.'
+      :'회의가 시작되면 여기서 바로 녹음할 수 있습니다. 회의실 태블릿에서 녹음해도 됩니다.'}</div>
+    <div class="row"><button class="btn p" id="ht-rec">${past?'녹음 파일 올리기':'이 회의 녹음하기'}</button>
+      ${(!past && mine)?'<button class="btn" id="ht-cancel">예약 취소</button>':''}
+      <button class="btn" id="ht-x">닫기</button></div>`);
+  $('#ht-x').onclick=bookClose;
+  $('#ht-rec').onclick=()=>{ bookClose();
+    REC.cal={uid:e.uid, title:e.title, room:e.room||''}; REC.preTitle=e.title; pullAgenda(e.uid); go('rec'); };
+  if($('#ht-cancel')) $('#ht-cancel').onclick=()=>{ bookClose(); bookCancel(e.uid, e.title); };
+}
+
 // 같은 회의의 지난 기록을 찾기 위한 열쇠.
 // 제목에서 날짜·숫자·기호를 털어내고 남은 글자로 봅니다.
 //   「260901 그룹 AX 주간회의」 「260908 그룹 AX 주간회의」 → 같은 회의
@@ -2031,6 +2178,20 @@ async function renderList(){
               + 'project_id,source,visibility,owner_id,started_at,ended_at')
       .order('held_on',{ascending:false}).limit(200);
   if(!showArch) q = q.neq('status','archived');
+  // 폴더로 좁혀 보기 (2026-11-14 폴더 메뉴를 회의록에 합침)
+  const F=LFOLD, NOTES='내 노트';
+  if(F.co===NOTES){
+    q = q.eq('visibility','private');
+    const src={idea:'아이디어 노트',order:'지시사항',talk:'개인 면담'}[F.dept];
+    if(src) q = q.eq('source',src);
+    q = F.dept==='shared' ? q.neq('owner_id',me.id) : q.eq('owner_id',me.id);
+  }
+  else if(F.pid) q = q.eq('project_id',F.pid);
+  else if(F.co){
+    q = q.neq('visibility','private');
+    q = F.co===PJ_NOCO ? q.or('company.is.null,company.eq.') : q.eq('company',F.co);
+    if(F.dept) q = F.dept===PJ_NODEPT ? q.or('dept.is.null,dept.eq.') : q.eq('dept',F.dept);
+  }
   const [mres, pres, att] = await Promise.all([q,
     SB.from('hd_project').select('id,name,color'),
     SB.from('hd_attendee').select('meeting_id,member_id,name').limit(8000)]);
@@ -2038,7 +2199,8 @@ async function renderList(){
   if(error) return el.innerHTML=`<div class="empty">${esc(error.message)}</div>`;
   const PJ = Object.fromEntries((pres.data||[]).map(p=>[p.id,p]));
   const canArch = ['admin','ceo','exec'].includes(me.role);
-  const mfil = sessionStorage.getItem('hd_mfil') || 'all';
+  let mfil = sessionStorage.getItem('hd_mfil') || 'all';
+  if(mfil==='note') mfil='all';          // 「예전 내 노트」 는 위쪽 「내 노트」 폴더로 옮겼습니다
   let locked = 0;
   if(me.role==='dev'){
     const {data:lc} = await SB.rpc('hd_locked_count');
@@ -2056,7 +2218,18 @@ async function renderList(){
               : mfil==='mine' ? (mine.has(m.id) || m.owner_id===me.id)
               : true;
   const shown = data.filter(pick);
-  const FILS = [['all','전체'],['mine','내 회의'],['note','예전 내 노트']];
+  const FILS = [['all','전체'],['mine','내가 참석한 회의']];
+  // 위쪽 폴더 줄 — 전체 · 내 노트 · 폴더들 · 폴더 관리
+  const fps = (SDATA && SDATA.projects) || pres.data || [];
+  const fAll = !F.co && !F.pid;
+  const fInRow = fAll || (F.co===NOTES && !F.dept) || (F.pid && fps.some(p=>p.id===F.pid));
+  const fHere = fInRow ? '' : F.co===NOTES
+      ? ({idea:'아이디어 노트',order:'지시사항',talk:'개인 면담',shared:'나에게 공유된 노트'}[F.dept]||'내 노트')
+      : F.co + (F.dept ? ' · '+F.dept : '');
+  const FI = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" '
+    + 'style="width:13px;height:13px;vertical-align:-2px;margin-right:5px" aria-hidden="true">'
+    + '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
+  const LB = t => `<span class="sub" style="margin:0 2px 0 0;font-size:12px;align-self:center;min-width:28px">${t}</span>`;
 
   const meetCard = m => { const tp=titleParts(m); const sb2=subTitle(m.summary_md);
   return `<div class="card" data-id="${m.id}">
@@ -2075,10 +2248,17 @@ async function renderList(){
           ? `<div class="csum">${esc(oneLine(m.summary_md))}</div>`
           : '<div class="csum none">요약 없음</div>'}</div>`; };
   const up = await upcomingHtml().catch(()=>'');
-  el.innerHTML = `<h1>회의록</h1>${up}<div class="sub">${shown.length}건 · ${ROLE[me.role]} 권한으로 보이는 것만 표시됩니다
+  el.innerHTML = `<h1>회의록</h1>${up}<div class="sub">${shown.length}건 · ${ROLE[me.role]} 권한으로 보이는 것만 표시됩니다 · 폴더는 아래에서 골라 좁혀 봅니다
     ${canArch?`<label style="margin-left:12px;cursor:pointer"><input type="checkbox" id="sharch"
       ${showArch?'checked':''} style="width:14px;height:14px;vertical-align:-2px"> 보관된 회의 보기</label>`:''}</div>
-    <div class="chips" style="margin:0 0 14px">
+    <div class="chips" style="margin:0 0 8px">${LB('폴더')}
+      <button class="chip${fAll?' on':''}" data-fold="">전체</button>
+      <button class="chip${F.co===NOTES&&!F.dept?' on':''}" data-fold="note">내 노트</button>
+      ${fps.map(p=>`<button class="chip${F.pid===p.id?' on':''}" data-fold="p:${p.id}">${FI}${esc(p.name)}</button>`).join('')}
+      ${fHere?`<button class="chip on" data-fold="keep">${FI}${esc(fHere)}</button>`:''}
+      <button class="chip" data-go="projects" title="폴더 만들기 · 이름 바꾸기 · 회의 옮기기">+ 폴더 관리</button>
+    </div>
+    <div class="chips" style="margin:0 0 14px">${LB('범위')}
       ${FILS.map(([k,l])=>`<button class="chip${mfil===k?' on':''}" data-fil="${k}">${l}</button>`).join('')}
     </div>`
    + (locked?`<div class="card locked"><div class="ct">■■■■■■■■■■</div>
@@ -2087,6 +2267,7 @@ async function renderList(){
           <span>개발자 권한으로는 열 수 없습니다</span></div></div>`:'')
    + (shown.length? shown.filter(m=>!isEmptyMeet(m)).map(m=>meetCard(m)).join('')
        + (shown.some(isEmptyMeet)?`<details class="emptymeet"><summary>내용이 없는 회의 ${shown.filter(isEmptyMeet).length}건 — 녹음 내용이 거의 없어 회의록을 만들지 못했습니다</summary>${shown.filter(isEmptyMeet).map(m=>meetCard(m)).join('')}</details>`:'')
+     : !fAll ? '<div class="empty">이 폴더에는 볼 수 있는 회의록이 아직 없습니다.</div>'
      : (me.role==='member'
         ? `<div class="empty">보실 수 있는 회의가 아직 없습니다.<br><br>
              2026-08-26부터 회의록은 <b>참석한 사람 · 올린 사람 · 그 팀의 팀장</b>에게만 보입니다.<br>
@@ -2099,6 +2280,11 @@ async function renderList(){
     openMeeting(c.dataset.id);});
   el.querySelectorAll('[data-fil]').forEach(b=>b.onclick=()=>{
     sessionStorage.setItem('hd_mfil', b.dataset.fil); renderList();});
+  el.querySelectorAll('[data-fold]').forEach(b=>b.onclick=()=>{
+    const k=b.dataset.fold; if(k==='keep') return;
+    LFOLD = k==='' ? {co:'',dept:'',pid:''} : k==='note' ? {co:NOTES,dept:'',pid:''}
+          : {co:'',dept:'',pid:k.slice(2)};
+    renderList(); drawSideTree();});
   el.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
   const sa=$('#sharch');
   if(sa) sa.onchange=()=>{sessionStorage.setItem('hd_show_arch', sa.checked?'1':'0'); renderList();};
@@ -3640,7 +3826,8 @@ const groupCompanies = () => COMPANIES;
 // 보이는 범위는 서버(RLS)가 정합니다. 부서 관리자·부서원에게는
 // 본인 회사·부서 것만 내려오므로, 남의 회사 폴더는 애초에 생기지 않습니다.
 let PJOPEN = new Set();                 // 펼쳐놓은 폴더 (회사 / 회사+부서)
-let PJSEL  = {co:'', dept:'', pid:''};  // 지금 고른 위치
+let PJSEL  = {co:'', dept:'', pid:''};  // 지금 고른 위치 (폴더 관리 화면)
+let LFOLD  = {co:'', dept:'', pid:''};  // 회의록 화면에서 고른 폴더 (비어 있으면 전체)
 const PJ_NOCO = '⚠ 소속 없음';
 const PJ_NODEPT = '회사 공용';
 const PJ_KEY = (co, dept) => dept ? co + ' ▸ ' + dept : co;
@@ -3686,7 +3873,9 @@ function drawSideTree(){
   const cos=[...new Set([...meetings.map(mco), ...projects.flatMap(pcos)])].sort();
 
   const {co:sc, dept:sd, pid:sp}=PJSEL;
-  const onSel=(c,d,p)=>((view==='projects')&&(sc===c)&&((sd||'')===(d||''))&&((sp||'')===(p||'')))?' sel':'';
+  const S=(view==='list')?LFOLD:PJSEL;
+  const onSel=(c,d,p)=>((view==='projects'||view==='list')
+    && (S.pid ? S.pid===(p||'') : (!!S.co && !p && S.co===c && (S.dept||'')===(d||''))))?' sel':'';
   const row=(lv,c,d,p,inner)=>`<button class="st${onSel(c,d,p)}" data-lv="${lv}"
     data-co="${esc(c)}" data-dept="${esc(d||'')}" data-pid="${p||''}"
     style="padding-left:${8+lv*14}px">${inner}</button>`;
@@ -3746,7 +3935,8 @@ function drawSideTree(){
     PJOPEN.add(PJ_KEY(co));
     if(dept && co!=='내 노트') PJOPEN.add(PJ_KEY(co,dept));
     document.body.classList.remove('snav');
-    go('projects');           // 화면을 먼저 바꾸고
+    LFOLD={co, dept, pid};
+    go('list');               // 회의록 화면에서 그 폴더만 보여줍니다
     drawSideTree();           // 나무의 선택 표시를 맞춥니다
   });
 }
@@ -3813,8 +4003,9 @@ async function renderProjects(){
   const at=(c,d,p)=>`data-co="${esc(c)}" data-dept="${esc(d||'')}" data-pid="${p||''}"`;
   const on=(c,d,p)=>((sc===c)&&((sd||'')===(d||''))&&((sp||'')===(p||'')))?' sel':'';
 
-  el.innerHTML=`<h1>폴더</h1>
-    <div class="sub">회사 ▸ 부서 ▸ 프로젝트 순으로 펼쳐보세요.
+  el.innerHTML=`<h1>폴더 관리</h1>
+    <div class="row" style="margin:0 0 10px"><button class="btn" id="pj-back">← 회의록으로</button></div>
+    <div class="sub">폴더를 만들고, 이름을 바꾸고, 회의를 옮깁니다. 회사 ▸ 부서 ▸ 프로젝트 순으로 펼쳐보세요.
       고른 폴더 범위의 회의가 아래에 모두 나옵니다</div>
 
     <div class="tree">
@@ -3892,6 +4083,7 @@ async function renderProjects(){
 
     <div id="pjlist" style="margin-top:22px"></div>`;
 
+  const pjb=$('#pj-back'); if(pjb) pjb.onclick=()=>go('list');
   // ── ▸ 를 누르면 펼치기·접기
   el.querySelectorAll('[data-tog]').forEach(w=>w.onclick=e=>{
     e.stopPropagation();
