@@ -1690,6 +1690,7 @@ async function renderCal(){
     회의실_캘린더.sql 을 실행하셨는지 확인해주세요.</div>`;
   const evs=cal.data||[];
   const done=new Map((mtg.data||[]).filter(x=>x.cal_uid).map(x=>[x.cal_uid,x.id]));
+  await loadMyBooks();
 
   const title = CAL.mode==='month' ? KSTF({year:'numeric',month:'long'}).format(CAL.anchor)
     : CAL.mode==='week' ? `${ymd(s0)} ~ ${ymd(e0)}`
@@ -1707,8 +1708,9 @@ async function renderCal(){
   }catch(e){}
   el.innerHTML=`<h1>일정</h1>
     <div class="sub">회의실 예약 중 우리 그룹 것만 보입니다. 예약을 누르면 그 회의를 녹음하거나 회의록을 엽니다
-       · 구글 캘린더 예약은 처리 서버가 몇 분마다 자동으로 가져옵니다</div>
+       · 여기서 예약하면 건물 공용 구글 캘린더(★회의실★)에도 같이 적힙니다</div>
     <div class="row" style="margin-bottom:14px;flex-wrap:wrap">
+      <button class="btn p" id="cbook">+ 회의실 예약</button>
       <button class="btn" id="cprev">←</button>
       <button class="btn" id="ctoday">오늘</button>
       <button class="btn" id="cnext">→</button>
@@ -1722,6 +1724,9 @@ async function renderCal(){
   $('#cprev').onclick=()=>{ shiftCal(-1); renderCal(); };
   $('#cnext').onclick=()=>{ shiftCal(1);  renderCal(); };
   $('#ctoday').onclick=()=>{ CAL.anchor=new Date(); renderCal(); };
+  $('#cbook').onclick=()=>bookOpen();
+  el.querySelectorAll('[data-bcancel]').forEach(b=>b.onclick=ev=>{
+    ev.stopPropagation(); bookCancel(b.dataset.bcancel, b.dataset.title); });
   el.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{ CAL.mode=b.dataset.mode; renderCal(); });
   el.querySelectorAll('[data-ev]').forEach(b=>b.onclick=()=>{
     const mid=b.dataset.mid;
@@ -1731,6 +1736,129 @@ async function renderCal(){
     pullAgenda(b.dataset.ev);
     go('rec');
   });
+}
+
+// ─────────────────────────── 회의실 예약 (2026-11-14, 12.21)
+// 홍석진 대표 지시 — 회의실 캘린더는 건물의 다른 회사들도 함께 쓰므로 구글 캘린더는 그대로 두고,
+// 여기서 예약하면 처리 서버가 그 캘린더에 대신 적습니다 (hd_job kind=book).
+// 겹치는지는 처리 서버가 구글 캘린더를 바로 읽어 확인합니다 — 다른 회사 예약은 이 화면에 안 보이기 때문입니다.
+const BOOK_ROOMS=['5F 대회의실','1F 대회의실','B1 소회의실','B1 대회의실','B1 간이 회의실'];
+let MYBOOK=new Set();           // 내가 헤임달에서 넣은 예약 (취소 단추를 붙일 것)
+async function loadMyBooks(){
+  try{
+    const {data}=await SB.from('hd_job').select('cal_uid,text_body,created_at').eq('kind','book')
+      .eq('status','done').eq('created_by',me.id).order('created_at',{ascending:false}).limit(200);
+    const on=new Set(), off=new Set();
+    (data||[]).forEach(j=>{ let m={}; try{ m=JSON.parse(j.text_body||'{}'); }catch(e){}
+      if(m.op==='cancel'){ if(m.uid) off.add(m.uid); } else if(j.cal_uid) on.add(j.cal_uid); });
+    off.forEach(u=>on.delete(u));
+    MYBOOK=on;
+  }catch(e){ MYBOOK=new Set(); }
+}
+function bookBox(html){
+  let b=$('#bkbox');
+  if(!b){
+    b=document.createElement('div'); b.id='bkbox';
+    b.style.cssText='position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.45);display:flex;'
+      +'align-items:center;justify-content:center;padding:14px';
+    document.body.appendChild(b);
+  }
+  b.innerHTML='<div style="background:var(--s1);border:1px solid var(--line);padding:22px 24px;'
+    +'box-shadow:0 10px 40px var(--shadow);width:min(94vw,440px);max-height:92vh;overflow-y:auto;'
+    +'-webkit-overflow-scrolling:touch">'+html+'</div>';
+  return b;
+}
+function bookClose(){ clearTimeout(bookClose.t); const b=$('#bkbox'); if(b) b.remove(); }
+// 요청을 넣고 처리 서버의 답을 기다립니다 (보통 2~5초)
+async function bookSend(meta, label){
+  const ins=await SB.from('hd_job').insert({
+    title:label, participants:me.name, audio_path:'book/none', kind:'book', orig_name:'',
+    device:'웹 예약', created_by:me.id, created_name:me.name, room:meta.room||'',
+    visibility:'private', note_label:'회의실 예약', text_body:JSON.stringify(meta),
+  }).select('id').single();
+  if(ins.error) return {ok:false, msg:'요청을 남기지 못했습니다 · '+ins.error.message};
+  const id=ins.data.id, t0=Date.now();
+  for(;;){
+    await new Promise(r=>{ bookClose.t=setTimeout(r,1200); });
+    const {data:j}=await SB.from('hd_job').select('status,error,stage').eq('id',id).maybeSingle();
+    if(j && j.status==='done') return {ok:true, msg:j.stage||'처리되었습니다'};
+    if(j && j.status==='failed') return {ok:false, msg:j.error||'처리하지 못했습니다'};
+    if(Date.now()-t0>45000) return {ok:false, wait:true,
+      msg:'처리 서버의 답이 늦습니다. 잠시 뒤 일정 화면에서 예약이 들어갔는지 확인해주세요.'};
+  }
+}
+function bookOpen(keep){
+  const k=keep||{};
+  const day = k.day || (ymd(CAL.anchor)<ymd(new Date()) ? ymd(new Date()) : ymd(CAL.anchor));
+  const today=ymd(new Date());
+  // 지금 시각 다음 30분 단위를 기본으로 (오늘이 아니면 오전 10시)
+  let h0=10, m0=0;
+  if(day===today){ const n=new Date(); const p=hmOf(n).split(':').map(Number);
+    h0=p[0]; m0=p[1]<30?30:0; if(p[1]>=30) h0+=1; if(h0<8){h0=8;m0=0;} if(h0>21){h0=21;m0=30;} }
+  const T=[]; for(let h=8;h<=22;h++) for(const m of [0,30]){ if(h===22&&m) break;
+    T.push(String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')); }
+  const st=k.st || (String(h0).padStart(2,'0')+':'+String(m0).padStart(2,'0'));
+  const enDef=()=>{ const i=T.indexOf(st); return T[Math.min(T.length-1, (i<0?4:i)+2)]; };
+  const en=k.en || enDef();
+  const opt=(arr,v)=>arr.map(x=>`<option${x===v?' selected':''}>${esc(x)}</option>`).join('');
+  bookBox(`<h1 style="font-size:16px;margin:0 0 4px">회의실 예약</h1>
+    <div class="sub" style="margin:0 0 12px;font-size:12px">건물 공용 구글 캘린더(★회의실★)에 같이 적힙니다.
+      다른 회사 예약과 겹치면 예약되지 않습니다.</div>
+    <div class="shsec">회의실</div>
+    <select id="bkroom" class="full" style="margin:6px 0 10px">${opt(BOOK_ROOMS, k.room||BOOK_ROOMS[0])}</select>
+    <div class="shsec">날짜 · 시간</div>
+    <input id="bkday" type="date" class="full" value="${esc(day)}" min="${today}" style="margin:6px 0 6px">
+    <div class="row" style="margin-bottom:10px;align-items:center">
+      <select id="bkst" style="flex:1">${opt(T.slice(0,-1), st)}</select><span>~</span>
+      <select id="bken" style="flex:1">${opt(T.slice(1), en)}</select></div>
+    <div class="shsec">회의 이름</div>
+    <input id="bktitle" class="full" maxlength="80" placeholder="예: AX팀 주간회의"
+      value="${esc(k.title||'')}" style="margin:6px 0 4px">
+    <div class="sub" style="margin:0 0 10px;font-size:12px">캘린더에는
+      <b id="bkprev"></b> 로 적힙니다</div>
+    <div class="shsec">사전 안건 <span style="font-weight:400;text-transform:none;letter-spacing:0">(선택)</span></div>
+    <textarea id="bknote" class="full" rows="3" maxlength="4000" style="margin:6px 0 12px"
+      placeholder="적어 두면 녹음할 때 사전 안건으로 들어옵니다">${esc(k.note||'')}</textarea>
+    <div id="bkmsg" class="sub" style="margin:0 0 10px;color:var(--err);display:none"></div>
+    <div class="row"><button class="btn p" id="bkok">예약하기</button>
+      <button class="btn" id="bkx">닫기</button></div>`);
+  const TAG={'5F 대회의실':'[5F]','1F 대회의실':'[1F]','B1 소회의실':'[B1, 소회의실]',
+             'B1 대회의실':'[B1, 대회의실]','B1 간이 회의실':'[B1, 간이 회의실]'};
+  const prev=()=>{ $('#bkprev').textContent=(TAG[$('#bkroom').value]||'')+' '
+    +(($('#bktitle').value||'').trim()||'회의')+' ('+me.name+')'; };
+  prev(); $('#bkroom').onchange=prev; $('#bktitle').oninput=prev;
+  // 시작을 바꾸면 끝을 1시간 뒤로 맞춥니다 (끝이 시작보다 빠르지 않게)
+  $('#bkst').onchange=()=>{ const i=T.indexOf($('#bkst').value);
+    if($('#bken').value<=$('#bkst').value) $('#bken').value=T[Math.min(T.length-1,i+2)]; };
+  $('#bkx').onclick=bookClose;
+  const say=t=>{ const m=$('#bkmsg'); if(!m) return; m.style.display=t?'block':'none'; m.textContent=t||''; };
+  $('#bkok').onclick=async()=>{
+    const room=$('#bkroom').value, d=$('#bkday').value, a=$('#bkst').value, b=$('#bken').value;
+    const title=($('#bktitle').value||'').trim(), note=($('#bknote').value||'').trim();
+    if(!d) return say('날짜를 골라주세요.');
+    if(!title) return say('회의 이름을 적어주세요.');
+    if(b<=a) return say('끝나는 시각이 시작보다 늦어야 합니다.');
+    const s1=new Date(d+'T'+a+':00+09:00'), e1=new Date(d+'T'+b+':00+09:00');
+    if(e1<=new Date()) return say('이미 지난 시간입니다.');
+    say(''); const btn=$('#bkok'); btn.disabled=true; btn.textContent='예약하는 중…';
+    const r=await bookSend({op:'book', room, title, note, start:s1.toISOString(), end:e1.toISOString()},
+      '회의실 예약 · '+title);
+    if(!$('#bkbox')) return;
+    if(r.ok){
+      bookClose(); toast(esc(r.msg), 5000);
+      CAL.anchor=new Date(d+'T12:00:00+09:00');
+      if($('#cbook')) renderCal();
+      return;
+    }
+    btn.disabled=false; btn.textContent='예약하기'; say(r.msg);
+  };
+}
+async function bookCancel(uid, title){
+  if(!confirm('이 예약을 취소할까요?\n\n'+title+'\n\n구글 캘린더에서도 지워집니다.')) return;
+  toast('예약을 취소하는 중…', 2500);
+  const r=await bookSend({op:'cancel', uid}, '회의실 예약 취소 · '+title);
+  toast(esc(r.msg), r.ok?4000:8000);
+  if(r.ok && $('#cbook')) renderCal();
 }
 
 function shiftCal(n){
@@ -1793,6 +1921,8 @@ function listHtml(s0,e0,evs,done){
             ${mid?'<span style="color:var(--ok)">회의록 있음</span>'
                  :(past?'<span style="color:var(--err)">회의록 없음</span>':'')}</div>
         </div>
+        ${(!past && !mid && MYBOOK.has(e.uid)) ? `<button class="btn" data-bcancel="${esc(e.uid)}"
+          data-title="${esc(e.title)}" style="flex:none">예약 취소</button>` : ''}
         <button class="btn${mid?'':' p'}" data-ev="${esc(e.uid)}" data-mid="${mid}"
           data-title="${esc(e.title)}" data-room="${esc(e.room||'')}"
           style="flex:none">${mid?'회의록 열기':(past?'지금 업로드':'녹음 시작')}</button>
@@ -4557,6 +4687,7 @@ let MATT = null;
 async function loadUploads(){
   const box=$('#up-list'); if(!box) return;
   const {data,error}=await SB.from('hd_job').select('id,title,orig_name,status,error,created_at,kind,stage')
+    .or('kind.is.null,kind.not.in.(book,voice)')
     .order('created_at',{ascending:false}).limit(10);
   if(error){ box.textContent=error.message; return; }
   const L={queued:'대기 중',working:'처리 중',done:'완료',failed:'실패'};
