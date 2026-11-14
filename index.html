@@ -1603,6 +1603,7 @@ function voiceSelfResult(ok, head, sub){
 }
 
 async function renderHome(){
+  wkRecover().catch(()=>{});
   const el=$('#p-home');
   // 한국 시간 기준으로 인사를 고릅니다
   const hour=+new Intl.DateTimeFormat('en-US',
@@ -2188,6 +2189,40 @@ async function slackShare(m){
   toast('처리 서버가 응답하지 않습니다. 잠시 뒤 다시 시도해주세요', 6000);
 }
 
+// ─────────────────────────── 회사를 모르는 회의 (2026-11-14, 12.23)
+// 참석자도 예약도 없이 올라온 녹음은 어느 회사 회의인지 알 수 없습니다. 전에는 서버가 받지 않아 사라졌습니다.
+// 이제 회사 「미지정」 으로 저장되어 관리자·대표에게만 보이고, 여기서 회사를 정하면 그 회사 기준으로 열립니다.
+// 회사를 정하기 전에는 슬랙 알림이 나가지 않고, 정하면 다음 차례에 나갑니다.
+function coFixHtml(m){
+  if(!['admin','ceo'].includes(me.role)) return '';
+  if((m.company||'').trim() && m.company!=='미지정') return '';
+  setTimeout(coFixBind, 0);
+  return `<div id="cofix" style="border:1px solid var(--warn);background:var(--warnbg);padding:12px 14px;margin:0 0 12px">
+    <b>어느 회사 회의인지 정해지지 않았습니다</b>
+    <div class="sub" style="margin:4px 0 8px">참석자나 예약 없이 올라온 녹음입니다. 지금은 관리자에게만 보입니다.
+      회사를 정하면 그 회사·부서 기준으로 보이고, 슬랙 알림이 나갑니다.</div>
+    <div class="row" style="flex-wrap:wrap"><select id="cofx-co"></select><select id="cofx-dp"></select>
+      <button class="btn p" id="cofx-ok">소속 정하기</button></div></div>`;
+}
+async function coFixBind(){
+  const co=$('#cofx-co'); if(!co) return;
+  await loadOrg();
+  co.innerHTML='<option value="">회사 선택</option>'+COMPANIES.map(c=>`<option>${esc(c)}</option>`).join('');
+  bindOrgSelects('cofx-co','cofx-dp','');
+  $('#cofx-ok').onclick=async()=>{
+    const c=co.value, d=($('#cofx-dp').value||'');
+    if(!c) return toast('회사를 골라주세요.');
+    if(!confirm('이 회의를 「'+c+(d?' · '+d:'')+'」 회의로 정할까요?\n\n그 회사·부서 사람들에게 보이고 슬랙 알림이 나갑니다.')) return;
+    const m=cur.m;
+    const t=(m.title||'').replace(/^(\d{6}\s+)미지정(\s|$)/, '$1'+c+'$2');
+    const {error}=await SB.from('hd_meeting').update({company:c, dept:d, title:t}).eq('id',m.id);
+    if(error) return toast('소속을 정하지 못했습니다: '+esc(error.message), 7000);
+    m.company=c; m.dept=d; m.title=t;
+    toast('소속을 정했습니다. 슬랙 알림은 몇 분 안에 나갑니다.', 5000);
+    drawMeeting();
+  };
+}
+
 function drawMeeting(){
   const {m,segs,hls,acts,edits,att} = cur;
   const names=[...new Set(segs.map(s=>s.speaker).filter(Boolean))];
@@ -2196,7 +2231,7 @@ function drawMeeting(){
   const okd = m.status==='confirmed' || m.status==='reported';
   const tp = titleParts(m), sub = subTitle(m.summary_md);
   const el=$('#p-meeting');
-  el.innerHTML = `
+  el.innerHTML = `${coFixHtml(m)}
   <div class="row" style="margin-bottom:12px"><button class="btn" id="back">← 목록</button>
     ${okd?'<span class="tag t-reported">✓ 확정</span>':''}
     ${m.source?`<span class="tag" style="background:var(--warnbg);color:var(--warn)">${esc(m.source)} 사용 회의</span>`:''}
@@ -4496,15 +4531,144 @@ async function drawRecToday(){
   });
 }
 
+// ─────────────────────────── 녹음을 이 기기 안에 바로 저장 (2026-11-14, 유실 방지 — 회의실 태블릿과 같은 방식)
+// 전에는 녹음을 끝날 때까지 메모리에만 들고 있다가 한 번에 올렸습니다. 창이 닫히거나 휴대폰이 화면을
+// 내리면 회의 전체가 사라졌고, 올리다 실패하면 다시 올릴 방법이 없었습니다.
+// 이제 5초 조각마다 이 기기의 저장소(IndexedDB)에 적어 두고, 다 올라간 뒤에만 지웁니다.
+// 남은 것은 헤임달을 다시 열 때 스스로 이어 올립니다 — 누구 회의인지·나만 보기 여부까지 그대로.
+const WK={db:null, id:null, seq:0, busy:false};
+const WK_MIN=12;                 // 조각 12개(1분) 미만으로 끊긴 것은 실수로 누른 것으로 보고 버립니다
+function wkOpen(){
+  return new Promise(res=>{
+    if(WK.db) return res(WK.db);
+    try{
+      const r=indexedDB.open('hdrec_web',1);
+      r.onupgradeneeded=()=>{ const d=r.result;
+        if(!d.objectStoreNames.contains('sess')) d.createObjectStore('sess',{keyPath:'id'});
+        if(!d.objectStoreNames.contains('chunk')) d.createObjectStore('chunk'); };
+      r.onsuccess=()=>{ WK.db=r.result; res(WK.db); };
+      r.onerror=()=>res(null); r.onblocked=()=>res(null);
+    }catch(e){ res(null); }
+  });
+}
+function wkDo(store, mode, fn){
+  return new Promise(res=>{
+    if(!WK.db) return res(null);
+    try{
+      const tx=WK.db.transaction(store, mode);
+      const rq=fn(tx.objectStore(store));
+      tx.oncomplete=()=>res(rq && 'result' in rq ? rq.result : true);
+      tx.onerror=()=>res(null); tx.onabort=()=>res(null);
+    }catch(e){ res(null); }
+  });
+}
+const wkRange=id=>IDBKeyRange.bound(id+':', id+':\uffff');
+async function wkStart(meta){
+  WK.id=null; WK.seq=0;
+  if(!(await wkOpen())) return;
+  const id=String(meta.t0);
+  if(await wkDo('sess','readwrite',st=>st.put(Object.assign({id, state:'rec'}, meta)))) WK.id=id;
+}
+function wkChunk(blob){
+  if(!WK.id) return;
+  const id=WK.id, n=WK.seq++;
+  wkDo('chunk','readwrite',st=>st.put(blob, id+':'+String(n).padStart(6,'0')));
+}
+async function wkMeta(id, patch){
+  if(!id || !WK.db) return;
+  const cur=await wkDo('sess','readonly',st=>st.get(id));
+  if(cur) await wkDo('sess','readwrite',st=>st.put(Object.assign(cur, patch)));
+}
+async function wkDrop(id){
+  if(!id || !WK.db) return;
+  await wkDo('chunk','readwrite',st=>st.delete(wkRange(id)));
+  await wkDo('sess','readwrite',st=>st.delete(id));
+  if(WK.id===id) WK.id=null;
+}
+async function wkBlob(id, type){
+  const parts=await wkDo('chunk','readonly',st=>st.getAll(wkRange(id)));
+  return parts && parts.length ? {blob:new Blob(parts,{type:type||'audio/webm'}), n:parts.length} : null;
+}
+// 남아 있는 내 녹음을 이어 올립니다 — 녹음 중이 아닐 때만. 올린 건수를 돌려줍니다.
+async function wkRecover(){
+  if(WK.busy || !me || REC.starting || (REC.mr && REC.mr.state==='recording')) return 0;
+  if(!(await wkOpen())) return 0;
+  WK.busy=true;
+  let sent=0;
+  try{
+    const list=(await wkDo('sess','readonly',st=>st.getAll()))||[];
+    for(const ss of list){
+      if(REC.starting || REC.mr) break;
+      if(ss.owner!==me.id || !ss.job || ss.id===WK.id) continue;   // 다른 계정의 녹음은 건드리지 않습니다
+      const type=ss.mime||'audio/webm';
+      const ext=type.includes('mp4')?'mp4':type.includes('ogg')?'ogg':'webm';
+      let file=ss.file||'';
+      if(!file){
+        const got=await wkBlob(ss.id, type);
+        if(!got || got.blob.size<4000 || (ss.state!=='stopped' && got.n<WK_MIN)){ await wkDrop(ss.id); continue; }
+        ss.n=got.n;
+        file='jobs/'+ss.id+'_web.'+ext;           // 같은 녹음은 늘 같은 이름 — 두 번 올라가도 하나입니다
+        const up=await SB.storage.from('hd-audio').upload(file, got.blob, {upsert:true, contentType:type});
+        if(up.error) continue;
+        await wkMeta(ss.id, {file});
+      }
+      const job=Object.assign({}, ss.job, {audio_path:file});
+      if(ss.state!=='stopped' && ss.n)             // 끝내지 못한 녹음 — 받은 조각만큼을 길이로 봅니다
+        job.ended_at=new Date(+ss.t0 + ss.n*5000).toISOString();
+      const ins=await SB.from('hd_job').insert(job);
+      if(ins.error) continue;
+      await wkDrop(ss.id);
+      sent++;
+    }
+  }catch(e){}
+  WK.busy=false;
+  if(sent) toast('이 기기에 남아 있던 녹음 '+sent+'건을 다시 올렸습니다.<br>처리가 끝나면 회의 목록에 나타납니다.', 8000);
+  return sent;
+}
+// 올릴 때 서버에 남기는 줄 — 시작할 때와 끝낼 때 같은 식으로 만듭니다
+function recJobOf(ext){
+  const priv = REC.type && REC.type!=='meeting';
+  let sc={company:me.company||'', dept:me.dept||''};
+  if(!priv && me.role==='admin' && REC.scope==='exec')
+    sc={company:'그룹', dept:'전사 경영진'};
+  else if(!priv && (REC.scope||'').startsWith('x:')){
+    const [c,d]=REC.scope.slice(2).split('|');
+    sc={company:c||sc.company, dept:d||''};      // 부서가 비면 회사 공용
+  }
+  // 제목을 「날짜 · 회사 · 부서 · 내용」 으로 통일합니다 (2026-08-26 규칙)
+  const title = mkTitle(REC.title, sc.company, '');
+  const extra = priv ? {visibility:'private',
+    note_label: REC.type==='idea' ? '아이디어 노트' : REC.type==='interview' ? '개인 면담' : '지시사항',
+    share_ids: REC.shares||[],
+    share_companies: REC.shco||[],
+    share_depts: REC.shdp||[]} : {};
+  return {title, participants:REC.parts||'',
+    kind:'audio', orig_name:`${title}.${ext}`,
+    device:'웹 녹음', created_by:me.id, created_name:me.name,
+    started_at:new Date(REC.t0).toISOString(),
+    ended_at:new Date(REC.t0 + (REC.dur||0)*1000).toISOString(),
+    cal_uid:(REC.cal&&REC.cal.uid)||'', room:(REC.cal&&REC.cal.room)||'',
+    agenda_md:(REC.agenda||''),
+    ...sc, ...extra};
+}
+
 async function recStart(){
   if(!(me.company||'').trim())
     return toast('계정에 소속(회사)이 등록되어 있지 않습니다.<br>관리자에게 소속 등록을 요청해주세요.', 7000);
   const title=($('#rc-title').value||'').trim() || '회의';
+  // 시작 단추가 두 번 눌리면 녹음기가 둘 생겨 하나가 마이크를 쥔 채 남습니다 (회의실 태블릿에서 실제로 생긴 일)
+  if(REC.starting || (REC.mr && REC.mr.state==='recording')) return;
+  REC.starting=true; setTimeout(()=>{ REC.starting=false; }, 8000);
+  (REC.olds||[]).forEach(o=>{
+    try{ o.mr.ondataavailable=null; o.mr.onstop=null; if(o.mr.state!=='inactive') o.mr.stop(); }catch(e){}
+    try{ o.stream.getTracks().forEach(t=>t.stop()); }catch(e){} });
+  REC.olds=[];
   let stream;
   try{
     stream = await navigator.mediaDevices.getUserMedia({audio:{
       echoCancellation:true, noiseSuppression:true, autoGainControl:true}});
   }catch(e){
+    REC.starting=false;
     return toast('마이크를 쓸 수 없습니다.<br>브라우저 주소창 왼쪽의 자물쇠를 눌러 마이크를 허용해주세요.', 7000);
   }
   // 브라우저마다 되는 형식이 다릅니다. 되는 것을 골라 씁니다.
@@ -4534,11 +4698,19 @@ async function recStart(){
   REC.shdp=[...document.querySelectorAll('.rc-shdp:checked')].map(x=>x.value);
   REC.mr = mime? new MediaRecorder(stream,{mimeType:mime, audioBitsPerSecond:64000})
                 : new MediaRecorder(stream);
-  REC.mr.ondataavailable = e=>{ if(e.data && e.data.size) REC.chunks.push(e.data); };
-  REC.mr.onstop = recDone;
-  REC.mr.start(5000);            // 5초마다 조각으로 모읍니다 (길게 녹음해도 안전)
-  keepAwake(true);               // 화면이 꺼지지 않게 잡아둡니다
+  const mr=REC.mr;
+  REC.olds.push({mr, stream});
+  REC.t0 = Date.now(); REC.dur = 0;
+  const mt0=mr.mimeType||mime||'audio/webm';
+  // 누구 회의인지·나만 보기 여부까지 적어 둡니다 — 중간에 끊겨도 같은 내용으로 올라갑니다
+  await wkStart({t0:REC.t0, owner:me.id, mime:mt0,
+                 job:recJobOf(mt0.includes('mp4')?'mp4':mt0.includes('ogg')?'ogg':'webm')});
   REC.t0 = Date.now();
+  mr.ondataavailable = e=>{ if(REC.mr===mr && e.data && e.data.size){ REC.chunks.push(e.data); wkChunk(e.data); } };
+  mr.onstop = ()=>{ if(REC.mr===mr) recDone(); };
+  mr.start(5000);                // 5초마다 조각으로 모읍니다 (길게 녹음해도 안전)
+  REC.starting=false;
+  keepAwake(true);               // 화면이 꺼지지 않게 잡아둡니다
   REC.timer = setInterval(recTick, 1000);
   recWatchLevel(stream);
   renderRec();
@@ -4597,44 +4769,34 @@ function upErr(step, e){
 async function recDone(){
   const type = REC.mr.mimeType || 'audio/webm';
   const ext = type.includes('mp4')? 'mp4' : type.includes('ogg')? 'ogg' : 'webm';
-  const blob = new Blob(REC.chunks, {type});
+  let blob = new Blob(REC.chunks, {type});
   REC.mr=null; REC.chunks=[];
-  if(blob.size < 4000){ renderRec(); return toast('녹음이 비어 있습니다.', 6000); }
+  const kid=WK.id;
+  if(blob.size < 4000){ await wkDrop(kid); renderRec(); return toast('녹음이 비어 있습니다.', 6000); }
+  const kept = kid ? '<br>이 기기에 녹음을 보관해 두었습니다. 헤임달을 다시 열면 스스로 올립니다 — 다시 녹음하지 않으셔도 됩니다.' : '';
   try{
-    const name=`jobs/${Date.now()}_web.${ext}`;   // 이름은 영문·숫자만 (한글 불가)
-    const {error:e1}=await SB.storage.from('hd-audio').upload(name, blob, {upsert:true, contentType:type});
-    if(e1){ toast(upErr('file', e1), 9000); renderRec(); return; }
-    const priv = REC.type && REC.type!=='meeting';
-    let sc={company:me.company||'', dept:me.dept||''};
-    if(!priv && me.role==='admin' && REC.scope==='exec')
-      sc={company:'그룹', dept:'전사 경영진'};
-    else if(!priv && (REC.scope||'').startsWith('x:')){
-      const [c,d]=REC.scope.slice(2).split('|');
-      sc={company:c||sc.company, dept:d||''};      // 부서가 비면 회사 공용
+    const name=`jobs/${kid||Date.now()}_web.${ext}`;   // 이름은 영문·숫자만 (한글 불가)
+    const job=recJobOf(ext);
+    job.audio_path=name;
+    REC.title=job.title;
+    await wkMeta(kid, {state:'stopped', job, dur:REC.dur||0});
+    if(kid){
+      const got=await wkBlob(kid, type);
+      if(got && got.n>=WK.seq && got.blob.size>=blob.size) blob=got.blob;
     }
-    // 제목을 「날짜 · 회사 · 부서 · 내용」 으로 통일합니다 (2026-08-26 규칙)
-    REC.title = mkTitle(REC.title, sc.company, '');
-    const extra = priv ? {visibility:'private',
-      note_label: REC.type==='idea' ? '아이디어 노트' : REC.type==='interview' ? '개인 면담' : '지시사항',
-      share_ids: REC.shares||[],
-      share_companies: REC.shco||[],
-      share_depts: REC.shdp||[]} : {};
-    const {error:e2}=await SB.from('hd_job').insert({
-      title:REC.title, participants:REC.parts||'',
-      audio_path:name, kind:'audio', orig_name:`${REC.title}.${ext}`,
-      device:'웹 녹음', created_by:me.id, created_name:me.name,
-      started_at:new Date(REC.t0).toISOString(),
-      ended_at:new Date(REC.t0 + (REC.dur||0)*1000).toISOString(),
-      cal_uid:(REC.cal&&REC.cal.uid)||'', room:(REC.cal&&REC.cal.room)||'',
-      agenda_md:(REC.agenda||''),
-      ...sc, ...extra});
-    if(e2){ toast(upErr('row', e2), 9000); renderRec(); return; }
+    const {error:e1}=await SB.storage.from('hd-audio').upload(name, blob, {upsert:true, contentType:type});
+    if(e1){ WK.id=null; toast(upErr('file', e1)+kept, 12000); renderRec(); return; }
+    await wkMeta(kid, {file:name});
+    const {error:e2}=await SB.from('hd_job').insert(job);
+    if(e2){ WK.id=null; toast(upErr('row', e2)+kept, 12000); renderRec(); return; }
+    await wkDrop(kid);
     // 다음 녹음 때 이 예약·참석자가 계속 남아 있지 않도록 비웁니다
     REC.cal=null; REC.preTitle=''; REC.attNames=[];
     REC.agenda=''; REC.agendaFrom='';
     toast(`<b>${esc(REC.title)}</b> (${recFmt(REC.dur||0)}) 올렸습니다.<br>처리가 끝나면 회의 목록에 나타납니다.`);
   }catch(e){
-    toast('올리지 못했습니다: '+esc(e.message||e), 8000);
+    toast('올리지 못했습니다: '+esc(e.message||e)+kept, 12000);
+    WK.id=null;   // 보관한 녹음은 그대로 두고, 다음 차례에 이어 올립니다
   }
   renderRec();
 }
