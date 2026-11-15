@@ -464,6 +464,16 @@ mark{background:var(--mark);color:var(--markt);padding:1px 3px;border-radius:0}
 .step.now{color:var(--tx);font-weight:600}
 .step.now .sd{border-color:var(--ac);background:var(--ac);animation:blink 1.6s var(--ease) infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.hcf{border:1px solid var(--ac);background:var(--acbg);margin:0 0 26px}
+.hcf-h{padding:14px 18px 10px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.hcf-h b{font-size:15px}.hcf-h span{font-size:12.5px;color:var(--tx2)}
+.hcf-row{display:flex;gap:14px;align-items:center;width:100%;text-align:left;font-family:inherit;color:var(--tx);
+  background:none;border:none;border-top:1px solid var(--line);padding:12px 18px;cursor:pointer;font-size:14px}
+.hcf-row:hover{background:var(--s2)}
+.hcf-row .d{flex:none;color:var(--tx3);font-size:12.5px;width:44px}
+.hcf-row b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.hcf-row .go{flex:none;font-size:12.5px;color:var(--ac);font-weight:600}
+@media(max-width:600px){.hcf-row .go{display:none}}
 .hask{display:flex;gap:8px;margin:14px 0 26px;align-items:stretch}
 .hask input{flex:1;height:48px;font-size:15px;padding:0 16px}
 .hask .btn{flex:none;height:48px;padding:0 20px}
@@ -1280,7 +1290,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:12px">웹 v21.5</span>
+       <span class="sub" style="margin:0;font-size:12px">웹 v21.6</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">로그아웃</button>
@@ -1724,8 +1734,10 @@ async function renderHome(){
     <div class="hask">
       <input id="hq" class="full" maxlength="500" autocomplete="off" placeholder="무엇이든 물어보세요 — 문장으로 물으면 AI가 답하고, 낱말만 넣으면 그 낱말이 나온 회의를 찾습니다">
       <button class="btn p" id="hqgo">물어보기</button></div>
+    <div id="h-cf"></div>
     <div id="h-tl"></div>
     <div id="h-rec" class="hrec"><div class="sub">내 회의를 불러오는 중…</div></div>`;
+  drawHomeConfirm();
   const hask=()=>{ const q=($('#hq').value||'').trim(); if(!q) return $('#hq').focus(); CHATQ=q; go('chat'); };
   $('#hqgo').onclick=hask; $('#hq').onkeydown=e=>{ if(e.key==='Enter' && !e.isComposing) hask(); };
   drawHomeTL();
@@ -2638,6 +2650,7 @@ function drawMeeting(){
   el.innerHTML = `${coFixHtml(m)}
   <div class="row" style="margin-bottom:12px"><button class="btn" id="back">← 목록</button>
     ${okd?'<span class="tag t-reported">✓ 확정</span>':''}
+    ${(!okd && m.confirm_rule && m.visibility!=='private' && m.status==='review')?`<span class="tag t-draft" title="담당자가 회의록을 확인해 [회의 확정]을 누르기 전입니다">초안 · ${m.confirm_owner_name?'담당자 '+esc(m.confirm_owner_name)+' 확정 전':'확정 전 (담당자 미정)'}</span>`:''}
     ${m.source?`<span class="tag" style="background:var(--warnbg);color:var(--warn)">${esc(m.source)} 사용 회의</span>`:''}
     ${m.status==='archived'?'<span class="tag t-draft">보관</span>':''}
     ${m.visibility==='private'?'<span class="tag" style="background:var(--errbg);color:var(--warn)">나만 보기</span>':''}</div>
@@ -2716,8 +2729,8 @@ function drawMeeting(){
     <button class="btn" id="barmoreb" title="보관 · 내보내기 · 삭제">⋯ 더보기</button>
     <span class="sep"></span>
     <button class="btn" id="cancel" style="display:none">취소</button>
-    ${m.visibility!=='private'
-      ?`<button class="btn ${okd?'':'g'}" id="mok">${okd?'확정 해제':'확정'}</button>`:''}
+    ${(m.visibility!=='private' && cfCan(m))
+      ?`<button class="btn ${okd?'':'g'}" id="mok">${okd?'확정 해제':(m.confirm_rule?'회의 확정':'확정')}</button>`:''}
     <button class="btn p" id="edit">편집</button></div>`;
 
   // 「더보기」 — 자주 쓰지 않는 단추는 접어 둡니다 (2026-09-09 대표님 지적)
@@ -3008,9 +3021,22 @@ function drawMeeting(){
   const okb=$('#mok');
   if(okb) okb.onclick=async()=>{
     const undo = m.status==='confirmed' || m.status==='reported';
+    // 2026-11-15 회의 확정 의무 — 담당자가 내용을 확인했다는 표시입니다
+    const mineCf = m.confirm_rule && (!m.confirm_owner_id || m.confirm_owner_id===me.id);
+    if(!undo && m.confirm_rule){
+      const open=(cur.acts||[]).filter(a=>a.state==='open').length;
+      const ask = mineCf
+        ? '회의록을 확정합니다.\n\n요약과 할 일'+(open?` ${open}건`:'')+'을 확인하셨나요?\n확정하면 참석자에게 초안이 아닌 확정본으로 보입니다.'
+        : `이 회의의 담당자는 ${m.confirm_owner_name||'다른 분'}입니다.\n담당자 대신 확정할까요?`;
+      if(!confirm(ask)) return;
+    }
     okb.disabled=true;
-    const {error}=await SB.from('hd_meeting')
-      .update({status: undo?'review':'confirmed'}).eq('id',m.id);
+    const up = undo ? {status:'review'} : {status:'confirmed'};
+    if(!undo && m.confirm_rule){
+      up.confirm_by=me.id; up.confirm_at=new Date().toISOString();
+      if(!m.confirm_owner_id){ up.confirm_owner_id=me.id; up.confirm_owner_name=me.name; }   // 담당자가 없던 회의는 확정한 사람이 담당자
+    }
+    const {error}=await SB.from('hd_meeting').update(up).eq('id',m.id);
     okb.disabled=false;
     if(error) return toast('실패: '+esc(error.message), 6000);
     if(undo){ toast('확정을 해제했습니다'); return openMeeting(m.id); }
@@ -3049,6 +3075,31 @@ function drawMeeting(){
   })();
 }
 
+// 회의 확정 단추를 누구에게 보여줄지 (2026-11-15)
+//   예전 회의(confirm_rule 없음)는 지금까지처럼 모두에게.
+//   새 회의는 담당자에게, 담당자가 없으면 누구나(확정한 사람이 담당자가 됩니다). 관리자·대표·팀장은 대신 확정할 수 있습니다.
+function cfCan(m){
+  if(!m.confirm_rule) return true;
+  if(!m.confirm_owner_id || m.confirm_owner_id===me.id) return true;
+  return ['admin','ceo','manager'].includes(me.role);
+}
+// 홈 — 내가 담당자인데 아직 확정하지 않은 회의
+async function drawHomeConfirm(){
+  const box=$('#h-cf'); if(!box) return;
+  try{
+    const {data,error}=await SB.from('hd_meeting').select('id,title,held_on,summary_md')
+      .eq('confirm_rule',true).eq('confirm_owner_id',me.id).eq('status','review')
+      .neq('visibility','private').order('held_on',{ascending:false}).limit(5);
+    if(error || !$('#h-cf')) return;
+    const list=(data||[]).filter(m=>!isEmptyMeet(m));
+    if(!list.length){ box.innerHTML=''; return; }
+    box.innerHTML=`<div class="hcf"><div class="hcf-h"><b>확정할 회의 ${list.length}건</b>
+        <span>내가 담당자인 회의입니다. 회의록을 확인하고 [회의 확정]을 눌러 주세요 · 확정 전에는 참석자에게 초안으로 보입니다</span></div>
+      ${list.map(m=>`<button class="hcf-row" data-id="${m.id}"><span class="d">${esc((m.held_on||'').slice(5).replace('-','/'))}</span>
+        <b>${esc(titleParts(m).name||m.title||'회의')}</b><span class="go">확인하고 확정하기 →</span></button>`).join('')}</div>`;
+    box.querySelectorAll('.hcf-row').forEach(b=>b.onclick=()=>openMeeting(b.dataset.id));
+  }catch(e){}
+}
 // 이 회의를 고칠 수 있는 사람인지 — 편집 단추와 「눌러서 고치기」 양쪽에서 씁니다
 function canEditMeeting(){
   if(!cur || !cur.m) return {ok:false, why:''};
