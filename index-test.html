@@ -1291,7 +1291,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:12px">웹 v22.0</span>
+       <span class="sub" style="margin:0;font-size:12px">웹 v22.1</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">로그아웃</button>
@@ -2782,6 +2782,8 @@ function drawMeeting(){
     <button class="btn" id="cancel" style="display:none">취소</button>
     ${(m.visibility!=='private' && cfCan(m))
       ?`<button class="btn ${okd?'':'g'}" id="mok">${okd?'확정 해제':(m.confirm_rule?'회의 확정':'확정')}</button>`:''}
+    ${(YGG_ON && okd && m.ygg_state==='held' && (m.ygg_items||[]).length && cfCan(m))
+      ?`<button class="btn" id="ygre" title="확정할 때 골라 둔 항목입니다">이그드라실로 보내기 (보관 ${m.ygg_items.length}건)</button>`:''}
     <button class="btn p" id="edit">편집</button></div>`;
 
   // 「더보기」 — 자주 쓰지 않는 단추는 접어 둡니다 (2026-09-09 대표님 지적)
@@ -3069,6 +3071,8 @@ function drawMeeting(){
   // 확정 — 사람이 회의록을 확인했다는 표시입니다.
   // 회의록이 만들어질 때 이미 참석자·팀장에게 슬랙이 나갔으므로,
   // 고친 내용이 있을 때만 다시 보낼지 물어봅니다.
+  const ygre=$('#ygre');
+  if(ygre) ygre.onclick=async()=>{ ygre.disabled=true; ygre.textContent='보내는 중…'; await yggSend(m, m.ygg_items); openMeeting(m.id); };
   const okb=$('#mok');
   if(okb) okb.onclick=async()=>{
     const undo = m.status==='confirmed' || m.status==='reported';
@@ -3201,7 +3205,10 @@ async function yggConfirmOpen(m, openActs, done){
       if(!r.error && Array.isArray(r.data)) match=new Map(r.data.map(d=>[d.text,d])); }catch(e){} }
     const mk=(x,f)=>{ const d=match&&match.get(x[f]); if(!d) return '';
       if(d.auto) return ' <span class="sub" style="margin:0;font-size:11.5px">✓ 이그드라실에 있음</span>';
-      return ` <span class="sub" style="margin:0;font-size:11.5px">${(d.candidates||[]).length?'비슷한 이름 '+d.candidates.length+'건 · 이그드라실에서 확인':'새 이름'}</span>`; };
+      const cs=(d.candidates||[]).slice(0,5);
+      if(!cs.length) return ` <span class="sub" style="margin:0;font-size:11.5px">${x.type==='followup'?'이그드라실에 없는 이름 · 이대로는 등록되지 않습니다':'이그드라실에 없는 이름 · 확인 대기로 올라갑니다'}</span>`;
+      return ` <select data-ym="${items.indexOf(x)}" data-ymf="${f}" style="font-size:12px;max-width:190px" title="이그드라실에 있는 비슷한 이름">
+        <option value="">적힌 이름 그대로</option>${cs.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}${c.kind?' ('+esc(c.kind)+')':''}</option>`).join('')}</select>`; };
     const inp=(i,f,ph,w)=>`<input data-yi="${i}" data-yf="${f}" value="${esc(items[i][f]||'')}" placeholder="${ph}" style="flex:${w||1};min-width:90px">`;
     const row=(x,i)=>{
       let body='';
@@ -3209,8 +3216,8 @@ async function yggConfirmOpen(m, openActs, done){
       else if(x.type==='contact') body=inp(i,'person','이름')+inp(i,'title','직함')+inp(i,'org','소속',1.4)+mk(x,'org');
       else if(x.type==='relation') body=inp(i,'subject','누가')
         +`<select data-yi="${i}" data-yf="verb">${Object.entries(YGG_VERB).map(([k,l])=>`<option value="${k}"${k===x.verb?' selected':''}>${l}</option>`).join('')}</select>`
-        +inp(i,'object','누구와·무엇을')+(x.stance==='contradicts'?' <span class="sub" style="margin:0;font-size:11.5px">바뀜·끝남</span>':'');
-      else body=inp(i,'org','거래처')+inp(i,'title','할 일·다음 약속',2)+`<input type="date" data-yi="${i}" data-yf="due_on" value="${esc(x.due_on||'')}">`;
+        +inp(i,'object','누구와·무엇을')+mk(x,'subject')+mk(x,'object')+(x.stance==='contradicts'?' <span class="sub" style="margin:0;font-size:11.5px">바뀜·끝남</span>':'');
+      else body=inp(i,'org','거래처')+inp(i,'title','할 일·다음 약속',2)+`<input type="date" data-yi="${i}" data-yf="due_on" value="${esc(x.due_on||'')}">`+mk(x,'org');
       return `<div style="border-top:1px solid var(--line);padding:9px 0">
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <input type="checkbox" data-yc="${i}"${(x.confidence==null||x.confidence>=0.5)?' checked':''} title="보내지 않으려면 체크를 푸세요">${body}${(x.confidence!=null&&x.confidence<0.5)?' <span class="sub" style="margin:0;font-size:11.5px">확신 낮음 · 체크 풂</span>':''}</div>
@@ -3226,12 +3233,16 @@ async function yggConfirmOpen(m, openActs, done){
     wide(); wire(); $('#yg-ask').onclick=ask;
     const box=$('#bkbox');
     box.querySelectorAll('[data-yf]').forEach(e=>e.onchange=()=>{ const it=items[+e.dataset.yi];
-      if((it[e.dataset.yf]||'')!==e.value){ it[e.dataset.yf]=e.value.trim(); it.edited=true; it.extracted_by='human'; } });
+      if((it[e.dataset.yf]||'')!==e.value){ it[e.dataset.yf]=e.value.trim(); it.edited=true; it.extracted_by='human';
+        if(['name','org','subject','object'].includes(e.dataset.yf)){ delete it[e.dataset.yf+'_id']; it.edited_name=true;
+          const sel=box.querySelector(`[data-ym="${e.dataset.yi}"][data-ymf="${e.dataset.yf}"]`); if(sel) sel.value=''; } } });
     const go=$('#yg-go'); if(go) go.onclick=()=>{
       const pick=items.filter((x,i)=>{ const c=box.querySelector(`[data-yc="${i}"]`); return c&&c.checked; })
         .filter(x=> x.type==='org_link'?x.name : x.type==='contact'?x.person : x.type==='relation'?(x.subject&&x.object) : x.title);
       // 맞추기에서 확실하게 잡힌 이름은 엔티티 id 를 같이 보냅니다
       if(match) pick.forEach(x=>['name','org','subject','object'].forEach(f=>{ const d=x[f]&&match.get(x[f]); if(d&&d.auto) x[f+'_id']=d.auto; }));
+      // 비슷한 이름 가운데 사람이 고른 것 — 회의록 글자는 이그드라실이 별칭으로 기억합니다
+      box.querySelectorAll('[data-ym]').forEach(e=>{ const it=items[+e.dataset.ym]; if(it && e.value && !it.edited_name) it[e.dataset.ymf+'_id']=e.value; });
       bookClose(); done(pick);
     };
   };
@@ -3252,7 +3263,10 @@ async function yggSend(m, pick){
   }
   await SB.from('hd_meeting').update({ygg_state:'sent', ygg_items:pick, ygg_result:r.data, ygg_err:''}).eq('id',m.id);
   const res=(r.data.items||[]); const cnt=k=>res.filter(x=>x.result===k).length;
-  toast(`이그드라실로 ${pick.length}건을 보냈습니다 · 새로 ${cnt('created')} · 근거 추가 ${cnt('attached')} · 이름 확인 대기 ${cnt('needs_match')}`, 8000);
+  const rej=res.filter(x=>x.result==='rejected');
+  toast(`이그드라실로 ${pick.length}건을 보냈습니다 · 새로 ${cnt('created')} · 근거 추가 ${cnt('attached')} · 이름 확인 대기 ${cnt('needs_match')}`
+    +(cnt('duplicate')?` · 이미 보낸 것 ${cnt('duplicate')}`:'')
+    +(rej.length?`<br>등록되지 않은 것 ${rej.length}건 · ${esc(rej.map(x=>x.reason||'').filter(Boolean).slice(0,2).join(' / '))}`:''), rej.length?12000:8000);
 }
 
 // 회의 확정 단추를 누구에게 보여줄지 (2026-11-15)
