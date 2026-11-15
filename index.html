@@ -464,6 +464,10 @@ mark{background:var(--mark);color:var(--markt);padding:1px 3px;border-radius:0}
 .step.now{color:var(--tx);font-weight:600}
 .step.now .sd{border-color:var(--ac);background:var(--ac);animation:blink 1.6s var(--ease) infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.hask{display:flex;gap:8px;margin:14px 0 26px;align-items:stretch}
+.hask input{flex:1;height:48px;font-size:15px;padding:0 16px}
+.hask .btn{flex:none;height:48px;padding:0 20px}
+@media(max-width:600px){.hask{margin:12px 0 20px}.hask .btn{padding:0 14px}}
 .hcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:13px;margin:18px 0 26px}
 .hcard{background:var(--s1);border:1px solid var(--line);border-radius:0;padding:22px 20px;
  cursor:pointer;text-align:left;font-family:inherit;color:var(--tx);
@@ -771,6 +775,18 @@ input:focus,textarea:focus,select:focus{border-color:var(--verm);box-shadow:none
 .ht-bk span{color:var(--tx3);font-size:11px}
 .ht-bk.mine{border-color:var(--ac);background:var(--acbg)}
 .ht-bk.past{opacity:.55}
+.ht-bk.other{cursor:default;border-style:dashed;color:var(--tx3);
+  background:repeating-linear-gradient(135deg,transparent 0 6px,var(--line2) 6px 7px)}
+.ht-bk.other b{font-weight:500;color:var(--tx3)}
+.ht-legend i.o{border-style:dashed;background:repeating-linear-gradient(135deg,transparent 0 3px,var(--line2) 3px 4px)}
+.hm-hd{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 10px}
+.hm-hd h1{font-size:17px;margin:0}
+.hm-row{display:flex;align-items:center;gap:12px;padding:12px 4px;border-top:1px solid var(--line2);cursor:pointer}
+.hm-row:hover{background:var(--s2)}
+.hm-when{flex:0 0 132px;font-size:12.5px;color:var(--tx2);font-variant-numeric:tabular-nums}
+.hm-tt{flex:1;min-width:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hm-tt small{display:block;font-weight:400;color:var(--tx3);font-size:12px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:640px){.hm-row{flex-wrap:wrap;gap:4px 10px}.hm-when{flex-basis:100%}}
 .ht-bk.mine.past{opacity:.8}
 .ht-now{position:absolute;top:0;bottom:0;width:2px;background:var(--verm);z-index:2;pointer-events:none}
 .ht-nowlb{position:absolute;top:4px;transform:translateX(-50%);background:var(--verm);color:#fff;font-size:11.5px;font-weight:600;padding:1px 7px;white-space:nowrap;z-index:3}
@@ -1240,7 +1256,7 @@ function shell(){
     ['',      [['home','홈']]],
     ['쓰기',   [['rec','녹음'],['upload','업로드']]],
     ['보기',   [['cal','일정'],['list','회의록']]],
-    ['찾기',   [['chat','물어보기'],['search','검색']]],
+    ['찾기',   [['chat','물어보기']]],
   ];
   const admin = [];
   if(['admin','ceo','dev'].includes(me.role)) admin.push(['brief','브리핑']);
@@ -1264,7 +1280,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:12px">웹 v21.1</span>
+       <span class="sub" style="margin:0;font-size:12px">웹 v21.4</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">로그아웃</button>
@@ -1445,7 +1461,33 @@ function watchStuck(el){
   }, 12000);
 }
 
+// 2026-11-15 뒤로 가기가 헤임달을 벗어나던 문제 (홍석진 대표) —
+// 화면이 바뀔 때마다 주소에 #/list · #m/<회의번호> 를 남겨, 브라우저의 뒤로·앞으로가 헤임달 안에서 움직이게 합니다.
+// 회의 화면 안의 탭·편집 상태까지는 남기지 않습니다 (화면 단위만).
+function navPush(h){
+  try{
+    if(location.hash===h) return;
+    // 처음 들어온 주소(빈 주소·로그인 직후)는 기록을 쌓지 않고 바꿔 둡니다
+    const first=!/^#(\/|m\/)/.test(location.hash||'');
+    history[first?'replaceState':'pushState'](null,'',location.pathname+location.search+h);
+  }catch(e){}
+}
 function go(v){
+  if(v==='search') v='chat';            // 검색은 물어보기 화면에 합쳤습니다
+  navPush('#/'+v); goDraw(v);
+}
+function route(){
+  const h=(location.hash||'').replace(/^#\/?/,'');
+  const mt=h.match(/^m\/([0-9a-fA-F-]{16,})$/);
+  if(mt) return meetDraw(mt[1]);
+  let v=h==='search'?'chat':h;
+  // 메뉴에 없는 화면(권한 밖)이나 모르는 주소는 홈으로
+  const ok=v && $('#p-'+v) && (document.querySelector('.nav[data-v="'+v+'"]') || ['home','projects','actions'].includes(v));
+  if(!ok){ v='home'; try{ history.replaceState(null,'',location.pathname+location.search+'#/home'); }catch(e){} }
+  goDraw(v);
+}
+function openMeeting(id){ navPush('#m/'+id); return meetDraw(id); }
+function goDraw(v){
   view=v; cur=null;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.nav').forEach(b=>b.setAttribute('aria-current', b.dataset.v===v || (v==='projects' && b.dataset.v==='list')));
@@ -1648,45 +1690,19 @@ async function renderHome(){
            : hour<18 ? '좋은 오후예요'
            : hour<22 ? '오늘 하루도 수고 많으셨습니다'
            : '늦은 밤까지 고생 많으시네요';
+  // 2026-11-15 홍석진 대표 — 녹음·예약 카드는 뺍니다 (녹음은 왼쪽 메뉴, 예약은 시간표의 [+ 예약]).
+  // 순서: 인사 → 물어보는 입력창 → 회의실 일정 → 내 회의
   el.innerHTML=`<h1>${hi}, ${esc(me.name)}님</h1>
-    <div class="sub">무엇을 하시겠어요?</div>
-    <div class="hcards">
-      <button class="hcard" data-go="rec">
-        <div class="hic" style="background:var(--errbg);color:var(--err)">${svgIco('rec')}</div>
-        <h2>녹음하기</h2><p>회의나 아이디어를 바로 녹음합니다.<br>회의록은 자동으로 만들어집니다</p></button>
-      <button class="hcard" id="hbook">
-        <div class="hic" style="background:var(--acbg);color:var(--ac)">${svgIco('cal')}</div>
-        <h2>회의실 예약</h2><p>빈 시간을 골라 예약하면<br>건물 캘린더에도 같이 적힙니다</p></button>
-      <button class="hcard" data-go="chat">
-        <div class="hic" style="background:var(--okbg);color:var(--ok)">${svgIco('chat')}</div>
-        <h2>물어보기</h2><p>"지난주 홍 대표님이 뭐라고 하셨지?"<br>회의 내용을 AI에게 질문합니다</p></button>
-    </div>
+    <div class="hask">
+      <input id="hq" class="full" maxlength="500" autocomplete="off" placeholder="무엇이든 물어보세요 — 문장으로 물으면 AI가 답하고, 낱말만 넣으면 그 낱말이 나온 회의를 찾습니다">
+      <button class="btn p" id="hqgo">물어보기</button></div>
     <div id="h-tl"></div>
-    <div id="h-rec" class="hrec"><div class="sub">최근 회의를 불러오는 중…</div></div>`;
-  el.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
-  $('#hbook').onclick=()=>bookOpen({day: (HT.day && HT.day>=ymd(new Date())) ? HT.day : ymd(new Date())});
+    <div id="h-rec" class="hrec"><div class="sub">내 회의를 불러오는 중…</div></div>`;
+  const hask=()=>{ const q=($('#hq').value||'').trim(); if(!q) return $('#hq').focus(); CHATQ=q; go('chat'); };
+  $('#hqgo').onclick=hask; $('#hq').onkeydown=e=>{ if(e.key==='Enter' && !e.isComposing) hask(); };
   drawHomeTL();
 
-  const [mres]=await Promise.all([
-    SB.from('hd_meeting')
-      .select('id,title,held_on,status,duration_sec,company,dept,visibility')
-      .neq('status','archived').order('held_on',{ascending:false}).limit(15)]);
-  const box=$('#h-rec'); if(!box) return;
-  const rows=(mres.data||[]).filter(m=>!isEmptyMeet(m)).slice(0,5);
-  // 「내가 할 일」 은 화면에서 뺐습니다 (2026-09-01).
-  // 할 일은 「물어보기」 에서 확인합니다. 액션아이템 자료 자체는 계속 쌓입니다.
-  box.innerHTML=`
-    <h1 style="font-size:17px">최근 회의</h1>
-    ${rows.length? rows.map(m=>{const tp=titleParts(m); return `<div class="card" data-id="${m.id}">
-        <div class="ct"><span class="mtag">${esc(tp.tag)}</span> ${esc(tp.name)}</div>
-        <div class="cm">
-          ${(m.status==='confirmed'||m.status==='reported')?'<span class="tag t-reported">✓ 확정</span>':''}
-          ${m.visibility==='private'?'<span style="color:var(--warn)">나만 보기</span>':''}
-          ${m.dept?`<span>${esc(m.dept)}</span>`:''}</div>
-      </div>`;}).join('')
-      : '<div class="empty">아직 회의가 없습니다. 위의 「녹음하기」로 시작해보세요.</div>'}`;
-  box.querySelectorAll('.card').forEach(c=>c.onclick=()=>openMeeting(c.dataset.id));
-  box.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
+  drawHomeMy();
 }
 
 // 녹음 내용이 거의 없어 회의록을 만들지 못한 회의 (11-03 UI 점검) — 제목으로 알아봅니다. 홈에서는 빼고, 회의록 목록은 맨 아래에 접어 둡니다
@@ -1806,7 +1822,7 @@ function bookBox(html){
 }
 function bookClose(){ clearTimeout(bookClose.t); const b=$('#bkbox'); if(b) b.remove(); }
 // 요청을 넣고 처리 서버의 답을 기다립니다 (보통 2~5초)
-async function bookSend(meta, label){
+async function bookSend(meta, label, waitMs){
   const ins=await SB.from('hd_job').insert({
     title:label, participants:me.name, audio_path:'book/none', kind:'book', orig_name:'',
     device:'웹 예약', created_by:me.id, created_name:me.name, room:meta.room||'',
@@ -1819,7 +1835,7 @@ async function bookSend(meta, label){
     const {data:j}=await SB.from('hd_job').select('status,error,stage').eq('id',id).maybeSingle();
     if(j && j.status==='done') return {ok:true, msg:j.stage||'처리되었습니다'};
     if(j && j.status==='failed') return {ok:false, msg:j.error||'처리하지 못했습니다'};
-    if(Date.now()-t0>45000) return {ok:false, wait:true,
+    if(Date.now()-t0>(waitMs||45000)) return {ok:false, wait:true,
       msg:'처리 서버의 답이 늦습니다. 잠시 뒤 일정 화면에서 예약이 들어갔는지 확인해주세요.'};
   }
 }
@@ -1847,11 +1863,27 @@ function bookOpen(keep){
     <div class="row" style="margin-bottom:10px;align-items:center">
       <select id="bkst" style="flex:1">${opt(T.slice(0,-1), st)}</select><span>~</span>
       <select id="bken" style="flex:1">${opt(T.slice(1), en)}</select></div>
+    <div class="shsec">반복</div>
+    <select id="bkrep" class="full" style="margin:6px 0 6px">
+      <option value="">한 번</option><option value="weekly">매주</option><option value="monthly">매월</option></select>
+    <div id="bkrepx" style="display:none">
+      <div class="row" style="align-items:center;margin-bottom:4px">
+        <span class="sub" style="margin:0;font-size:12px;flex:none">언제까지</span>
+        <input id="bkuntil" type="date" style="flex:1" min="${today}"></div>
+      <div id="bkreps" class="sub" style="margin:0 0 6px;font-size:12px"></div>
+    </div>
+    <div style="height:4px"></div>
     <div class="shsec">회의 이름</div>
     <input id="bktitle" class="full" maxlength="80" placeholder="예: AX팀 주간회의"
       value="${esc(k.title||'')}" style="margin:6px 0 4px">
     <div class="sub" style="margin:0 0 10px;font-size:12px">캘린더에는
       <b id="bkprev"></b> 로 적힙니다</div>
+    <div class="shsec">참석자</div>
+    <div id="bkatt" style="margin:6px 0 10px"></div>
+    <div class="shsec">회의 담당자 <span style="font-weight:400;text-transform:none;letter-spacing:0">(1명 · 필수)</span></div>
+    <select id="bkown" class="full" style="margin:6px 0 4px"></select>
+    <div class="sub" style="margin:0 0 10px;font-size:12px">담당자는 회의가 끝난 뒤 회의록을 확인하는 사람입니다.
+      참석자·담당자는 헤임달에만 남고, 건물 캘린더에는 적히지 않습니다</div>
     <div class="shsec">사전 안건 <span style="font-weight:400;text-transform:none;letter-spacing:0">(선택)</span></div>
     <textarea id="bknote" class="full" rows="3" maxlength="4000" style="margin:6px 0 12px"
       placeholder="적어 두면 녹음할 때 사전 안건으로 들어옵니다">${esc(k.note||'')}</textarea>
@@ -1867,6 +1899,32 @@ function bookOpen(keep){
   $('#bkst').onchange=()=>{ const i=T.indexOf($('#bkst').value);
     if($('#bken').value<=$('#bkst').value) $('#bken').value=T[Math.min(T.length-1,i+2)]; };
   $('#bkx').onclick=bookClose;
+  // 반복 — 석 달 뒤까지만. 날짜마다 따로 예약되고, 겹치는 날은 빠집니다.
+  const repMax=ymd(new Date(Date.now()+90*86400000));
+  $('#bkuntil').max=repMax; $('#bkuntil').value=repMax;
+  const repDraw=()=>{
+    const rep=$('#bkrep').value, d=$('#bkday').value;
+    const o=[...$('#bkrep').options], wd=d?bookRepeatLabel(d):null;
+    o[1].textContent=wd?'매주 '+wd.w+'요일':'매주'; o[2].textContent=wd?'매월 '+wd.n+' '+wd.w+'요일':'매월';
+    $('#bkrepx').style.display=rep?'block':'none';
+    if(!rep || !d) return;
+    const L=bookRepeatDays(d, rep, $('#bkuntil').value||repMax, repMax);
+    const md=x=>(+x.slice(5,7))+'/'+(+x.slice(8,10));
+    $('#bkreps').textContent = L.length<2 ? '그 기간에는 한 번만 들어갑니다. 「언제까지」 를 늘려 주세요.'
+      : '총 '+L.length+'회 · '+L.slice(0,4).map(md).join(', ')+(L.length>4?' … '+md(L[L.length-1]):'')
+        +' · 다른 예약과 겹치는 날은 빠지고, 빠진 날을 알려드립니다';
+  };
+  $('#bkrep').onchange=repDraw; $('#bkday').onchange=repDraw; $('#bkuntil').onchange=repDraw; repDraw();
+  // 참석자 (나는 처음부터 들어 있습니다) → 담당자는 그중 한 명. 고르지 않으면 예약하는 사람입니다.
+  const bkAtt=attInput($('#bkatt'), [me.name]);
+  const bkPeople=()=>{ const seen=new Set([me.id]), out=[{id:me.id,name:me.name}];
+    bkAtt.value().forEach(n=>{ const m=findMember(n); if(m && !seen.has(m.id)){ seen.add(m.id); out.push({id:m.id,name:m.name}); } });
+    return out; };
+  const bkOwnFill=()=>{ const sel=$('#bkown'); if(!sel) return; const cur=sel.value||me.id, ps=bkPeople();
+    sel.innerHTML=ps.map(p=>`<option value="${p.id}"${p.id===cur?' selected':''}>${esc(p.name)}${p.id===me.id?' (나)':''}</option>`).join('');
+    if(!ps.some(p=>p.id===cur)) sel.value=me.id; };
+  bkOwnFill();
+  $('#bkown').onpointerdown=bkOwnFill; $('#bkown').onfocus=bkOwnFill;
   const say=t=>{ const m=$('#bkmsg'); if(!m) return; m.style.display=t?'block':'none'; m.textContent=t||''; };
   $('#bkok').onclick=async()=>{
     const room=$('#bkroom').value, d=$('#bkday').value, a=$('#bkst').value, b=$('#bken').value;
@@ -1876,27 +1934,76 @@ function bookOpen(keep){
     if(b<=a) return say('끝나는 시각이 시작보다 늦어야 합니다.');
     const s1=new Date(d+'T'+a+':00+09:00'), e1=new Date(d+'T'+b+':00+09:00');
     if(e1<=new Date()) return say('이미 지난 시간입니다.');
+    bkOwnFill();
+    const people=bkPeople(), owner=$('#bkown').value||me.id;
     say(''); const btn=$('#bkok'); btn.disabled=true; btn.textContent='예약하는 중…';
-    const r=await bookSend({op:'book', room, title, note, start:s1.toISOString(), end:e1.toISOString()},
-      '회의실 예약 · '+title);
+    const rep=$('#bkrep').value, until=$('#bkuntil').value||repMax;
+    const meta={op:'book', room, title, note, start:s1.toISOString(), end:e1.toISOString(),
+        owner, members:people.map(p=>p.id)};
+    if(rep){ meta.repeat=rep; meta.until=until; }
+    const r=await bookSend(meta, '회의실 예약 · '+title+(rep?' (반복)':''), rep?120000:45000);
     if(!$('#bkbox')) return;
     if(r.ok){
-      bookClose(); toast(esc(r.msg), 5000);
+      bookClose(); toast(esc(r.msg), rep?9000:5000);
       CAL.anchor=new Date(d+'T12:00:00+09:00');
       if($('#cbook')) renderCal();
-      if($('#h-tl')){ HT.day=d; drawHomeTL(); }
+      if($('#h-tl')){ HT.day=d; drawHomeTL(); drawHomeMy(); }
       return;
     }
     btn.disabled=false; btn.textContent='예약하기'; say(r.msg);
   };
 }
+// 반복 예약 계산 (처리 서버 worker._book_repeat 와 같은 규칙 — 화면에는 미리 보기로만 씁니다)
+function bookRepeatLabel(d){
+  return {w:'일월화수목금토'[new Date(d+'T00:00:00Z').getUTCDay()],
+          n:['첫째','둘째','셋째','넷째','다섯째'][Math.floor((+d.slice(8,10)-1)/7)]};
+}
+function bookRepeatDays(d, rep, until, max){
+  const out=[d], last=(until && until<max)?until:max;
+  const D=s=>new Date(s+'T00:00:00Z'), S=t=>t.toISOString().slice(0,10);
+  if(rep==='weekly'){
+    for(let k=1;k<60 && out.length<26;k++){ const t=D(d); t.setUTCDate(t.getUTCDate()+7*k);
+      if(S(t)>last) break; out.push(S(t)); }
+  }else if(rep==='monthly'){
+    const a=D(d), nth=Math.floor((a.getUTCDate()-1)/7); let y=a.getUTCFullYear(), m=a.getUTCMonth();
+    for(let i=0;i<24 && out.length<26;i++){
+      m++; if(m>11){ y++; m=0; }
+      const f=new Date(Date.UTC(y,m,1));
+      if(S(f)>last) break;
+      const t=new Date(Date.UTC(y,m,1+((a.getUTCDay()-f.getUTCDay()+7)%7)+7*nth));
+      if(t.getUTCMonth()!==m) continue;
+      if(S(t)>last) break;
+      out.push(S(t));
+    }
+  }
+  return out;
+}
 async function bookCancel(uid, title){
-  if(!confirm('이 예약을 취소할까요?\n\n'+title+'\n\n구글 캘린더에서도 지워집니다.')) return;
+  // 반복 예약이면 이 회의만 / 이 회의부터 뒤 전부 중에 고릅니다
+  let ser='';
+  try{ const q=await SB.from('hd_cal_event').select('series_id').eq('uid',uid).maybeSingle();
+    ser=(q && !q.error && q.data && q.data.series_id)||''; }catch(e){}
+  let all=false;
+  if(ser){
+    const pick=await new Promise(res=>{
+      bookBox(`<span class="eyebrow">반복 예약</span>
+        <h1 style="font-size:17px;margin:6px 0 8px">${esc(title)}</h1>
+        <div class="sub" style="margin:0 0 16px">반복으로 잡은 예약입니다. 어디까지 취소할까요? 구글 캘린더에서도 지워집니다.</div>
+        <div class="row" style="flex-wrap:wrap"><button class="btn p" id="bc-one">이 회의만 취소</button>
+          <button class="btn" id="bc-all">이 회의부터 뒤 반복 모두 취소</button>
+          <button class="btn" id="bc-x">닫기</button></div>`);
+      $('#bc-one').onclick=()=>res('one'); $('#bc-all').onclick=()=>res('all'); $('#bc-x').onclick=()=>res('');
+    });
+    bookClose();
+    if(!pick) return;
+    all=(pick==='all');
+  }else if(!confirm('이 예약을 취소할까요?\n\n'+title+'\n\n구글 캘린더에서도 지워집니다.')) return;
   toast('예약을 취소하는 중…', 2500);
-  const r=await bookSend({op:'cancel', uid}, '회의실 예약 취소 · '+title);
+  const r=await bookSend(all?{op:'cancel', uid, series:true}:{op:'cancel', uid},
+    '회의실 예약 취소 · '+title+(all?' (반복 전체)':''), all?120000:45000);
   toast(esc(r.msg), r.ok?4000:8000);
   if(r.ok && $('#cbook')) renderCal();
-  if(r.ok && $('#h-tl')) drawHomeTL();
+  if(r.ok && $('#h-tl')){ drawHomeTL(); drawHomeMy(); }
 }
 
 function shiftCal(n){
@@ -2025,6 +2132,71 @@ async function drawTodayCal(){
 // 지금은 우리 그룹 예약만 그립니다 — 다른 회사 예약은 서버에 들어오지 않아 빈 칸으로 보이고,
 // 겹치는지는 예약할 때 처리 서버가 구글 캘린더를 직접 읽어 막습니다.
 const HT={day:null, scope:'all', H0:9, H1:20};
+// 예약 줄 읽기 — 담당자·참석자 칸(2026-11-14)이 있으면 함께 읽습니다
+const CALX={full:true};
+const calSel=()=>SB.from('hd_cal_event').select('uid,title,room,starts_at,ends_at,all_day'
+  +(CALX.full?',owner_id,owner_name,member_ids,member_names':''));
+// 내 회의인지 — 내가 예약했거나, 담당자이거나, 참석자로 들어가 있거나
+const calMine=e=>MYBOOK.has(e.uid) || e.owner_id===me.id || (e.member_ids||[]).includes(me.id);
+
+// ─────────────────────────── 홈 · 내 회의 (다가오는 / 지난)
+const HM={tab:'next'};
+async function drawHomeMy(){
+  const box=$('#h-rec'); if(!box) return;
+  const now=new Date(), tab=HM.tab;
+  const head=n=>`<div class="hm-hd"><h1>내 회의</h1>
+      <div class="ht-seg"><button data-t="next" class="${tab==='next'?'on':''}">다가오는</button><button data-t="past" class="${tab==='past'?'on':''}">지난</button></div>
+      <span class="sub" style="margin:0">${tab==='next'?'내가 예약했거나 담당자·참석자로 들어간 회의':'내가 참석한 회의 · 누르면 회의록이 열립니다'}</span></div>`;
+  let rows='', list=[];
+  if(tab==='next'){
+    const to=new Date(now.getTime()+30*86400000).toISOString();
+    let r=await calSel().gte('ends_at',now.toISOString()).lte('starts_at',to).order('starts_at').limit(400);
+    if(r.error && CALX.full){ CALX.full=false;
+      r=await calSel().gte('ends_at',now.toISOString()).lte('starts_at',to).order('starts_at').limit(400); }
+    await loadMyBooks();
+    if(!$('#h-rec') || HM.tab!==tab) return;
+    list=(r.data||[]).filter(e=>!e.all_day && calMine(e)).slice(0,6);
+    rows=list.length? list.map((e,i)=>{
+      const live=new Date(e.starts_at)<=now;
+      const d=KSTF({month:'numeric',day:'numeric',weekday:'short'}).format(new Date(e.starts_at));
+      return `<div class="hm-row" data-n="${i}">
+        <div class="hm-when">${esc(d)} ${hmOf(e.starts_at)}~${hmOf(e.ends_at)}</div>
+        <div class="hm-tt">${esc(htName(e))}<small>${esc(e.room||'')}${e.owner_name?' · 담당 '+esc(e.owner_name):''}</small></div>
+        ${live?'<span class="tag t-reported">진행 중</span>':(e.owner_id===me.id?'<span class="tag t-draft">내가 담당</span>':'')}</div>`;
+    }).join('') : '<div class="empty">다가오는 내 회의가 없습니다. 위 시간표에서 빈 곳을 눌러 예약해 보세요.</div>';
+  } else {
+    const [at,ow]=await Promise.all([
+      SB.from('hd_attendee').select('meeting_id').eq('member_id',me.id).limit(400),
+      SB.from('hd_meeting').select('id').eq('owner_id',me.id).neq('status','archived')
+        .order('held_on',{ascending:false}).limit(40)]);
+    const ids=[...new Set([...(at.data||[]).map(x=>x.meeting_id), ...(ow.data||[]).map(x=>x.id)])].slice(0,300);
+    let ms=[];
+    if(ids.length){
+      const r=await SB.from('hd_meeting').select('id,title,held_on,status,dept,visibility,started_at,ended_at')
+        .in('id',ids).neq('status','archived').order('held_on',{ascending:false}).limit(30);
+      ms=r.data||[];
+    }
+    if(!$('#h-rec') || HM.tab!==tab) return;
+    list=ms.filter(m=>!isEmptyMeet(m)).slice(0,6);
+    rows=list.length? list.map((m,i)=>{ const tp=titleParts(m);
+      return `<div class="hm-row" data-n="${i}">
+        <div class="hm-when">${esc(m.held_on||'')}${timeText(m)?' '+esc(timeText(m)):''}</div>
+        <div class="hm-tt">${esc(tp.name)}<small>${esc(tp.tag||'')}${m.dept?' · '+esc(m.dept):''}</small></div>
+        ${(m.status==='confirmed'||m.status==='reported')?'<span class="tag t-reported">✓ 확정</span>':'<span class="tag t-draft">초안</span>'}
+        ${m.visibility==='private'?'<span style="color:var(--warn);font-size:12px">나만 보기</span>':''}</div>`;
+    }).join('') : '<div class="empty">아직 참석한 회의가 없습니다.</div>';
+  }
+  box.innerHTML=head()+rows
+    +`<div class="row" style="margin-top:12px"><button class="btn" data-go="list">회의록 전체 보기</button></div>`;
+  box.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{ HM.tab=b.dataset.t; drawHomeMy(); });
+  box.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
+  box.querySelectorAll('.hm-row').forEach(r=>r.onclick=async()=>{
+    const x=list[+r.dataset.n];
+    if(tab==='past') return openMeeting(x.id);
+    const {data}=await SB.from('hd_meeting').select('id').eq('cal_uid',x.uid).neq('status','archived').limit(1);
+    htOpen(x, ((data||[])[0]||{}).id||'');
+  });
+}
 function htRoom(e){
   const pick=t=>{ t=(t||'').toUpperCase().replace(/\s/g,'');
     if(/5F|F5/.test(t)) return 0;
@@ -2043,10 +2215,15 @@ async function drawHomeTL(){
   const kd=HT.day;
   const from=new Date(kd+'T00:00:00+09:00').toISOString();
   const to  =new Date(kd+'T23:59:59+09:00').toISOString();
-  const [cal,mtg]=await Promise.all([
-    SB.from('hd_cal_event').select('uid,title,room,starts_at,ends_at,all_day')
-      .gte('starts_at',from).lte('starts_at',to).order('starts_at'),
-    SB.from('hd_meeting').select('id,cal_uid').not('cal_uid','is',null).eq('held_on',kd)]);
+  let [cal,mtg,bz]=await Promise.all([
+    calSel().gte('starts_at',from).lte('starts_at',to).order('starts_at'),
+    SB.from('hd_meeting').select('id,cal_uid').not('cal_uid','is',null).eq('held_on',kd),
+    SB.from('hd_cal_busy').select('uid,room,starts_at,ends_at').gte('starts_at',from).lte('starts_at',to)]);
+  if(cal.error && CALX.full){            // 새 칸이 아직 없는 DB — 예전 칸만으로 다시 읽습니다
+    CALX.full=false;
+    cal=await calSel().gte('starts_at',from).lte('starts_at',to).order('starts_at');
+  }
+  const busy=(bz && !bz.error && bz.data) || [];
   await loadMyBooks();
   if(!$('#h-tl') || HT.day!==kd) return;
   const evs=(cal.data||[]).filter(e=>!e.all_day);
@@ -2067,13 +2244,21 @@ async function drawHomeTL(){
     h+=`<div class="ht-row"><div class="ht-rm">${esc(r)}</div><div class="ht-track${kd<today?' off':''}" data-room="${i}">`;
     evs.forEach((e,n)=>{
       if(htRoom(e)!==i) return;
-      const mine=MYBOOK.has(e.uid);
+      const mine=calMine(e);
       if(HT.scope==='mine' && !mine) return;
       const a=pct(mins(e.starts_at)), b=pct(mins(e.ends_at));
       if(b<=a) return;
       h+=`<div class="ht-bk${mine?' mine':''}${new Date(e.ends_at)<now?' past':''}" data-n="${n}"
         style="left:${a.toFixed(3)}%;width:calc(${(b-a).toFixed(3)}% - 2px)" title="${esc(e.title)}">
         <b>${esc(htName(e))}</b><span>${hmOf(e.starts_at)}~${hmOf(e.ends_at)}${done.has(e.uid)?' · 회의록 있음':''}</span></div>`;
+    });
+    if(HT.scope!=='mine') busy.forEach(e=>{
+      if(htRoom({room:e.room,title:''})!==i) return;
+      const a=pct(mins(e.starts_at)), b=pct(mins(e.ends_at));
+      if(b<=a) return;
+      h+=`<div class="ht-bk other${new Date(e.ends_at)<now?' past':''}"
+        style="left:${a.toFixed(3)}%;width:calc(${(b-a).toFixed(3)}% - 2px)" title="다른 법인 예약 · 내용은 보이지 않습니다">
+        <b>다른 법인 예약</b><span>${hmOf(e.starts_at)}~${hmOf(e.ends_at)}</span></div>`;
     });
     if(nowOn) h+=`<div class="ht-now" style="left:${pct(nowM).toFixed(3)}%"></div>`;
     h+='</div></div>';
@@ -2082,15 +2267,16 @@ async function drawHomeTL(){
 
   box.innerHTML=`<div class="ht-hd"><h1>회의실 일정</h1>
       <div class="ht-nav">
-        <div class="ht-seg"><button data-s="all" class="${HT.scope==='all'?'on':''}">전체 회의실</button><button data-s="mine" class="${HT.scope==='mine'?'on':''}">내 예약만</button></div>
+        <div class="ht-seg"><button data-s="all" class="${HT.scope==='all'?'on':''}">전체 회의실</button><button data-s="mine" class="${HT.scope==='mine'?'on':''}">내 회의만</button></div>
         <button class="btn" id="ht-prev" aria-label="전날">‹</button><b>${esc(label)}</b><button class="btn" id="ht-next" aria-label="다음날">›</button>
         ${kd!==today?'<button class="btn" id="ht-today">오늘</button>':''}
         <button class="btn p" id="ht-book">+ 예약</button>
       </div></div>
     ${cal.error?`<div class="empty">예약을 불러오지 못했습니다 · ${esc(cal.error.message)}</div>`:`
     <div class="ht-tl"><div class="ht-in">${h}</div>
-      <div class="ht-legend"><span><i class="m"></i>내가 예약한 회의</span><span><i></i>우리 그룹 회의</span>
-        <span>빈 곳을 누르면 그 시간으로 예약 · 다른 회사 예약은 여기 보이지 않고, 겹치면 예약할 때 알려드립니다</span></div>
+      <div class="ht-legend"><span><i class="m"></i>내 회의</span><span><i></i>우리 그룹 회의</span>
+        <span><i class="o"></i>다른 법인 예약 (내용은 보이지 않음)</span>
+        <span>빈 곳을 누르면 그 시간으로 예약</span></div>
     </div>`}
     ${lost.length?`<div class="sub" style="margin:-16px 0 22px">회의실을 알 수 없는 예약 ${lost.length}건 · ${lost.map(e=>esc(hmOf(e.starts_at)+' '+htName(e))).join(' · ')}</div>`:''}`;
 
@@ -2100,7 +2286,9 @@ async function drawHomeTL(){
   if($('#ht-today')) $('#ht-today').onclick=()=>{ HT.day=today; drawHomeTL(); };
   $('#ht-book').onclick=()=>bookOpen({day: kd<today?today:kd});
   box.querySelectorAll('.ht-seg button').forEach(b=>b.onclick=()=>{ HT.scope=b.dataset.s; drawHomeTL(); });
-  box.querySelectorAll('.ht-bk').forEach(b=>b.onclick=ev=>{ ev.stopPropagation(); htOpen(evs[+b.dataset.n], done.get(evs[+b.dataset.n].uid)||''); });
+  box.querySelectorAll('.ht-bk.other').forEach(b=>b.onclick=ev=>{ ev.stopPropagation();
+    toast('다른 법인이 예약한 시간입니다. 내용은 보이지 않습니다', 3000); });
+  box.querySelectorAll('.ht-bk[data-n]').forEach(b=>b.onclick=ev=>{ ev.stopPropagation(); htOpen(evs[+b.dataset.n], done.get(evs[+b.dataset.n].uid)||''); });
   box.querySelectorAll('.ht-track[data-room]').forEach(t=>t.onclick=ev=>{
     if(ev.target!==t) return;
     if(kd<today) return toast('지난 날짜에는 예약할 수 없습니다', 3000);
@@ -2116,9 +2304,11 @@ function htOpen(e, mid){
   if(mid) return openMeeting(mid);
   const past=new Date(e.ends_at)<new Date();
   const mine=MYBOOK.has(e.uid);
+  const who=(e.member_names||[]).filter(Boolean);
   const day=KSTF({month:'long',day:'numeric',weekday:'short'}).format(new Date(e.starts_at));
   bookBox(`<span class="eyebrow">${esc(day)} · ${hmOf(e.starts_at)}~${hmOf(e.ends_at)}${e.room?' · '+esc(e.room):''}</span>
     <h1 style="font-size:18px;margin:6px 0 10px">${esc(htName(e))}</h1>
+    ${e.owner_name?`<div class="sub" style="margin:0 0 6px">담당자 <b>${esc(e.owner_name)}</b>${who.length?' · 참석자 '+esc(who.join(', ')):''}</div>`:''}
     <div class="sub" style="margin:0 0 16px">${past?'이 회의는 아직 회의록이 없습니다. 녹음 파일이 있으면 올려 주세요.'
       :'회의가 시작되면 여기서 바로 녹음할 수 있습니다. 회의실 태블릿에서 녹음해도 됩니다.'}</div>
     <div class="row"><button class="btn p" id="ht-rec">${past?'녹음 파일 올리기':'이 회의 녹음하기'}</button>
@@ -2291,7 +2481,7 @@ async function renderList(){
 }
 
 // ─────────────────────────── 회의 상세
-async function openMeeting(id){
+async function meetDraw(id){
   editing=false;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   const el=$('#p-meeting'); el.classList.add('on'); el.innerHTML='<div class="sub">불러오는 중…</div>';
@@ -3579,23 +3769,54 @@ let chatBusy=false, rooms=[], curRoom=null;
 async function renderChat(){
   const el=$('#p-chat');
   el.innerHTML=`<h1>물어보기</h1>
-    <div class="sub">회의 기록을 근거로 답합니다. 대화는 방마다 이어집니다.</div>
+    <div class="sub">문장으로 물으면 회의 기록을 근거로 AI가 답하고, 낱말만 넣으면 그 낱말이 나온 회의록을 찾아 줍니다. 대화는 방마다 이어집니다.</div>
     <div class="chatwrap">
       <div class="rooms" id="rooms"></div>
       <div class="chatmain">
         <div class="chips" id="chatchips">${SUGGEST.map(q=>`<button class="chip sg">${esc(q)}</button>`).join('')}</div>
         <div class="chat" id="chatlog"></div>
         <div class="ask">
-          <textarea id="qq" placeholder="예: 어제 더올마이티 회의 핵심만 간략하게 보고해주세요"></textarea>
+          <textarea id="qq" placeholder="문장으로 묻기 — 예: 어제 더올마이티 회의 핵심만 간략하게 보고해주세요 · 낱말로 찾기 — 예: 리드타임"></textarea>
           <button class="btn p" id="send">보내기</button>
         </div>
       </div>
     </div>`;
   el.querySelectorAll('.sg').forEach(b=>b.onclick=()=>{$('#qq').value=b.textContent;$('#qq').focus();});
-  $('#send').onclick=ask;
-  $('#qq').onkeydown=e=>{if(e.key==='Enter'&&(e.metaKey||e.ctrlKey))ask();};
+  $('#send').onclick=()=>ask();
+  // 엔터로 보냅니다 (줄바꿈은 Shift+Enter). 한글 조합 중의 엔터는 넘깁니다
+  $('#qq').onkeydown=e=>{ if(e.key==='Enter' && !e.shiftKey && !e.isComposing){ e.preventDefault(); ask(); } };
   curRoom=null; chatFresh=true;      // 메뉴로 들어오면 새 대화로 시작합니다 (11-03 UI 점검) — 예전 대화는 왼쪽 목록에서
+  const first=CHATQ; CHATQ='';
   await loadRooms();
+  if(first && $('#qq')){ $('#qq').value=first; ask(); }
+}
+// 홈의 입력창에서 넘어온 질문 (물어보기 화면이 뜨면 바로 보냅니다)
+let CHATQ='';
+// 낱말만 넣었는지 — 띄어쓰기 두 덩이 이하이고, 묻는 말투가 아니면 검색으로 봅니다
+function isWordQuery(q){
+  const t=q.trim();
+  if(!t || t.length>30 || /[?？\n]/.test(t)) return false;
+  if(t.split(/\s+/).length>2) return false;
+  return !/(요|까|죠|줘|니|나요|는지|해라|하라|알려줘|뭐야|뭐지|누구야|어때|인가|할까|됐어|했어|했지)$/.test(t);
+}
+// 낱말 검색 결과를 대화 칸에 보여줍니다 (예전 「검색」 화면이 하던 일)
+async function wordSearch(q){
+  const log=$('#chatlog'); if(!log) return;
+  curRoom=null; drawRooms();
+  log.innerHTML=`<div class="msg q">${esc(q)}</div><div class="msg a" id="wsres"><div class="sub" style="margin:0">찾는 중…</div></div>`;
+  const {data,error}=await SB.rpc('hd_search',{q, lim:80});
+  const box=$('#wsres'); if(!box) return;
+  const askBtn=`<div class="row" style="margin-top:12px"><button class="btn" id="wsask">「${esc(q)}」 를 AI에게 물어보기</button></div>`;
+  if(error) box.innerHTML=`<div class="md"><p>찾지 못했습니다 · ${esc(error.message)}</p></div>`+askBtn;
+  else if(!data.length) box.innerHTML=`<div class="md"><p>「${esc(q)}」 가 나온 회의록이 없습니다. 볼 수 있는 회의만 찾습니다.</p></div>`+askBtn;
+  else{
+    const re=new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');
+    box.innerHTML=`<div class="sub" style="margin:0 0 8px">「${esc(q)}」 가 나온 발언 ${data.length}건 · 누르면 그 회의록이 열립니다</div>`+data.map(r=>
+      `<div class="hit" data-id="${r.meeting_id}"><div class="h">${esc(r.title)} · ${r.held_on} · ${hms(r.start_sec)}${r.speaker?' · '+esc(r.speaker):''}</div>
+       <div>${esc(r.body).replace(re,'<mark>$1</mark>')}</div></div>`).join('')+askBtn;
+    box.querySelectorAll('.hit').forEach(h=>h.onclick=()=>openMeeting(h.dataset.id));
+  }
+  $('#wsask').onclick=()=>{ log.innerHTML=''; ask(q); };
 }
 
 let chatFresh=false;
@@ -3700,9 +3921,10 @@ async function watch(id){
     a.textContent='답이 오지 않습니다. 사무실 처리 컴퓨터가 켜져 있는지 확인해주세요.';
 }
 
-async function ask(){
+async function ask(force){
   if(chatBusy) return;
-  const t=$('#qq'); const q=t.value.trim(); if(!q) return;
+  const t=$('#qq'); const q=(typeof force==='string' ? force : t.value).trim(); if(!q) return;
+  if(typeof force!=='string' && isWordQuery(q)){ t.value=''; return wordSearch(q); }
   chatBusy=true; t.value=''; $('#send').disabled=true;
 
   try{
@@ -5664,7 +5886,10 @@ async function boot(){
   // 계정에 저장된 밝기가 있으면 그것이 이깁니다 (다른 컴퓨터에서도 같게 보입니다)
   if(data.theme) applyTheme(data.theme);
   shell(); checkPending();
-  if(!openFromHash()) go('home');
+  // 로그인 직후 주소에 남는 토큰(#access_token=…)은 바로 지웁니다 — 주소를 복사해 보내면 그 계정으로 들어올 수 있습니다
+  if(/access_token=|refresh_token=|provider_token=/.test(location.hash||''))
+    try{ history.replaceState(null,'',location.pathname+location.search+'#/home'); }catch(e){}
+  route();
 }
 
 // 회의실 태블릿 전용 계정인가 — 이름이나 로그인 주소로 알아봅니다.
@@ -5691,15 +5916,8 @@ function roomAcctPage(m){
 }
 
 // 주소 뒤에 #m/<회의번호> 가 붙어 있으면 그 회의를 바로 엽니다
-function openFromHash(){
-  const h=(location.hash||'').replace(/^#/,'');
-  const mt=h.match(/^m\/([0-9a-fA-F-]{16,})$/);
-  if(!mt) return false;
-  history.replaceState(null,'',location.pathname+location.search);
-  openMeeting(mt[1]);
-  return true;
-}
-window.addEventListener('hashchange', ()=>{ if(me) openFromHash(); });
+// (2026-11-15 주소를 지우지 않습니다 — 새로고침·공유해도 그 회의가 열립니다. 위 route() 가 맡습니다)
+window.addEventListener('popstate', ()=>{ if(me && !AUTH_DEAD && $('#p-home')) route(); });
 SB.auth.onAuthStateChange((e)=>{
   if(e==='PASSWORD_RECOVERY'){ RECOVERY=true; return recoveryPage(''); }
   if(e==='SIGNED_IN'||e==='SIGNED_OUT') boot();
