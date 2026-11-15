@@ -1203,7 +1203,7 @@ function profilePage(row, msg=''){
 
     <div style="text-align:left;font-size:13px;font-weight:700;color:var(--tx2)">구글 캘린더 계정</div>
     <div class="sub" style="text-align:left;margin:2px 0 6px;font-size:12px">
-      회의실 예약을 내 것으로 알아봅니다</div>
+      회의실 예약을 내 예약으로 인식합니다</div>
     <input class="full" id="gml" type="email" placeholder="${esc(row.email||'')}"
       value="${esc(row.google_email||'')}" style="margin-bottom:12px">
 
@@ -1291,7 +1291,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:12px">웹 v22.2</span>
+       <span class="sub" style="margin:0;font-size:12px">웹 v22.3</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">로그아웃</button>
@@ -1355,7 +1355,7 @@ function shell(){
         ${esc(me.company||'')} ${esc(me.dept||'')} · ${ROLE[me.role]||me.role}</div>
       <div class="shsec">구글 캘린더 계정</div>
       <div class="sub" style="margin:2px 0 6px;font-size:12px">회의실 예약을
-        내 것으로 알아봅니다. 로그인 아이디와 같으면 비워두세요</div>
+        내 예약으로 인식합니다. 로그인 아이디와 같으면 비워두세요</div>
       <input id="mygml" type="email" placeholder="${esc(me.email)}"
         value="${esc(me.google_email||'')}" class="full" style="margin-bottom:6px">
       <button class="btn full" id="acsave-g" style="margin-bottom:6px">구글 캘린더 계정 저장</button>
@@ -2018,7 +2018,7 @@ function bookOpen(keep){
   $('#bkok').onclick=async()=>{
     const room=$('#bkroom').value, d=$('#bkday').value, a=$('#bkst').value, b=$('#bken').value;
     const title=($('#bktitle').value||'').trim(), note=($('#bknote').value||'').trim();
-    if(!d) return say('날짜를 골라주세요.');
+    if(!d) return say('날짜를 선택해 주세요.');
     if(!title) return say('회의 이름을 적어주세요.');
     if(b<=a) return say('끝나는 시각이 시작보다 늦어야 합니다.');
     const s1=new Date(d+'T'+a+':00+09:00'), e1=new Date(d+'T'+b+':00+09:00');
@@ -2529,7 +2529,7 @@ async function renderList(){
           ? `<div class="csum">${esc(oneLine(m.summary_md))}</div>`
           : '<div class="csum none">요약 없음</div>'}</div>`; };
   const up = await upcomingHtml().catch(()=>'');
-  el.innerHTML = `<h1>회의록</h1>${up}<div class="sub">${shown.length}건 · ${ROLE[me.role]} 권한으로 볼 수 있는 회의만 보여 드립니다 · 아래에서 폴더를 골라 좁혀 보실 수 있습니다
+  el.innerHTML = `<h1>회의록</h1>${up}<div class="sub">${shown.length}건 · ${ROLE[me.role]} 권한으로 볼 수 있는 회의만 보여 드립니다 · 아래에서 폴더를 선택해 범위를 좁히실 수 있습니다
     ${canArch?`<label style="margin-left:12px;cursor:pointer"><input type="checkbox" id="sharch"
       ${showArch?'checked':''} style="width:14px;height:14px;vertical-align:-2px"> 보관된 회의 보기</label>`:''}</div>
     <div class="chips" style="margin:0 0 8px">${LB('폴더')}
@@ -2678,7 +2678,7 @@ async function coFixBind(){
   bindOrgSelects('cofx-co','cofx-dp','');
   $('#cofx-ok').onclick=async()=>{
     const c=co.value, d=($('#cofx-dp').value||'');
-    if(!c) return toast('회사를 골라주세요.');
+    if(!c) return toast('회사를 선택해 주세요.');
     if(!confirm('이 회의를 「'+c+(d?' · '+d:'')+'」 회의로 정할까요?\n\n그 회사·부서 사람들에게 보이고 슬랙 알림이 나갑니다.')) return;
     const m=cur.m;
     const t=(m.title||'').replace(/^(\d{6}\s+)미지정(\s|$)/, '$1'+c+'$2');
@@ -2783,7 +2783,7 @@ function drawMeeting(){
     ${(m.visibility!=='private' && cfCan(m))
       ?`<button class="btn ${okd?'':'g'}" id="mok">${okd?'확정 해제':(m.confirm_rule?'회의 확정':'확정')}</button>`:''}
     ${(YGG_ON && okd && m.ygg_state==='held' && (m.ygg_items||[]).length && cfCan(m))
-      ?`<button class="btn" id="ygre" title="확정할 때 골라 둔 항목입니다">이그드라실로 보내기 (보관 ${m.ygg_items.length}건)</button>`:''}
+      ?`<button class="btn" id="ygre" title="확정할 때 선택해 둔 항목입니다">이그드라실로 보내기 (보관 ${m.ygg_items.length}건)</button>`:''}
     <button class="btn p" id="edit">편집</button></div>`;
 
   // 「더보기」 — 자주 쓰지 않는 단추는 접어 둡니다 (2026-09-09 대표님 지적)
@@ -3214,18 +3214,18 @@ async function yggConfirmOpen(m, openActs, done){
       let body='';
       if(x.type==='org_link') body=inp(i,'name','거래처·브랜드·IP')+mk(x,'name');
       else if(x.type==='contact') body=inp(i,'person','이름')+inp(i,'title','직함')+inp(i,'org','소속',1.4)+mk(x,'org');
-      else if(x.type==='relation') body=inp(i,'subject','누가')
+      else if(x.type==='relation') body=inp(i,'subject','주체')
         +`<select data-yi="${i}" data-yf="verb">${Object.entries(YGG_VERB).map(([k,l])=>`<option value="${k}"${k===x.verb?' selected':''}>${l}</option>`).join('')}</select>`
-        +inp(i,'object','누구와·무엇을')+mk(x,'subject')+mk(x,'object')+(x.stance==='contradicts'?' <span class="sub" style="margin:0;font-size:11.5px">바뀜·끝남</span>':'');
+        +inp(i,'object','대상')+mk(x,'subject')+mk(x,'object')+(x.stance==='contradicts'?' <span class="sub" style="margin:0;font-size:11.5px">바뀜·끝남</span>':'');
       else body=inp(i,'org','거래처')+inp(i,'title','할 일·다음 약속',2)+`<input type="date" data-yi="${i}" data-yf="due_on" value="${esc(x.due_on||'')}">`+mk(x,'org');
       return `<div style="border-top:1px solid var(--line);padding:9px 0">
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <input type="checkbox" data-yc="${i}"${(x.confidence==null||x.confidence>=0.5)?' checked':''} title="보내지 않으려면 체크를 해제하세요">${body}${(x.confidence!=null&&x.confidence<0.5)?' <span class="sub" style="margin:0;font-size:11.5px">확신 낮음 · 체크 해제</span>':''}</div>
+          <input type="checkbox" data-yc="${i}"${(x.confidence==null||x.confidence>=0.5)?' checked':''} title="보내지 않으려면 체크를 해제하세요">${body}${(x.confidence!=null&&x.confidence<0.5)?' <span class="sub" style="margin:0;font-size:11.5px">신뢰도 낮음 · 체크 해제</span>':''}</div>
         ${x.quote?`<div class="sub" style="margin:5px 0 0 24px;font-size:12px">“${esc(x.quote)}”${x.at?' · '+esc(x.at):''}</div>`:''}</div>`; };
     const sec=Object.keys(YGG_KIND).map(k=>{ const idx=items.map((x,i)=>x.type===k?i:-1).filter(i=>i>=0);
       return idx.length?`<div style="margin-top:10px"><b style="font-size:13px">${YGG_KIND[k]} ${idx.length}</b>${idx.map(i=>row(items[i],i)).join('')}</div>`:''; }).join('');
     bookBox(head+(items.length
-      ?`<div class="sub" style="margin:6px 0 0;font-size:12px">AI가 회의록에서 추출한 후보입니다. 맞지 않는 항목은 체크를 해제하거나 수정해 주세요. 체크한 항목만 보냅니다. 확신이 낮은 항목은 미리 체크를 해제해 두었습니다.
+      ?`<div class="sub" style="margin:6px 0 0;font-size:12px">AI가 회의록에서 추출한 후보입니다. 맞지 않는 항목은 체크를 해제하거나 수정해 주세요. 체크한 항목만 보냅니다. 신뢰도가 낮은 항목은 미리 체크를 해제해 두었습니다.
           ${match?'':'<br>이그드라실의 이름 대조가 아직 준비 전이라, 적힌 이름 그대로 보내고 이그드라실에서 대조합니다.'}</div>${sec}
         <div style="margin-top:10px"><button class="btn" id="yg-ask" style="font-size:12px">다시 추출</button></div>`
       :`<div class="sub" style="margin:8px 0 10px">이 회의에서는 이그드라실로 보낼 내용을 찾지 못했습니다 (내부 회의 등).</div>
@@ -3827,7 +3827,7 @@ async function renderMembers(){
         <input id="mdet-gl" type="email" placeholder="${esc(m.email)} (헤임달과 같으면 비워두세요)"
           value="${esc(m.google_email||'')}" style="flex:1;min-width:240px;max-width:340px">
         <button class="btn p" id="mdet-glsave">저장</button>
-        <span class="sub" style="margin:0">회의실 예약을 이 사람 것으로 알아봅니다</span></div>
+        <span class="sub" style="margin:0">회의실 예약을 이 구성원의 예약으로 인식합니다</span></div>
       <div class="shsec">슬랙 계정 — 슬랙이 회사마다 다릅니다</div>
       <div class="sub" style="margin:8px 0 0">가입 이메일이 헤임달과 같으면 비워두셔도 됩니다.
         비워두면 로그인 이메일(${esc(m.email)})로 찾습니다.</div>
@@ -4501,7 +4501,7 @@ async function renderProjects(){
   el.innerHTML=`<h1>폴더 관리</h1>
     <div class="row" style="margin:0 0 10px"><button class="btn" id="pj-back">← 회의록으로</button></div>
     <div class="sub">폴더를 만들고, 이름을 바꾸고, 회의를 옮깁니다. 회사 ▸ 부서 ▸ 프로젝트 순으로 펼쳐보세요.
-      고른 폴더 범위의 회의가 아래에 모두 나옵니다</div>
+      선택한 폴더 범위의 회의가 아래에 모두 나옵니다</div>
 
     <div class="tree">
       <div class="tn">
@@ -5156,7 +5156,7 @@ async function loadCalPicks(){
     sel.innerHTML='<option value="">지금 시간대에 잡힌 회의실 예약이 없습니다</option>';
     sel.disabled=true;
     if(hint){ hint.innerHTML='예약이 있으면 여기서 고를 수 있습니다 · '
-      + '예약 제목에 <b>회사명</b>이 들어가야 우리 그룹 회의로 알아봅니다 '
+      + '예약 제목에 <b>회사명</b>이 들어가야 우리 그룹 회의로 인식합니다 '
       + '(예: [B1, 소회의실] 더올마이티 주간회의)'; hint.style.display=''; }
     return;
   }
@@ -6197,8 +6197,8 @@ const CS_ITEMS = [
      ['거부하면',`내가 참석한 회의는 ${csY('국내 처리 / 요약 없이 전사문만')}으로 회의록을 만듭니다.`]],
    y:'내 회의도 AI 요약이 붙습니다.', n:`내가 참석한 회의는 해외로 보내지 않고 ${csY('국내 처리')}합니다.`,
    my:{y:'동의 · 내 회의도 AI 요약', n:'동의 안 함 · 내 회의는 국내 처리'}},
-  {k:'c3', no:'③', short:'목소리', title:'목소리로 발언자 알아보기', sens:true,
-   desc:'목소리 특징을 등록해 두면 회의록에 내 이름이 자동으로 붙습니다. 특정 사람을 알아보는 정보라 다른 항목과 따로 동의를 받습니다.',
+  {k:'c3', no:'③', short:'목소리', title:'목소리로 발언자 식별', sens:true,
+   desc:'목소리 특징을 등록해 두면 회의록에 내 이름이 자동으로 붙습니다. 특정 개인을 식별하는 정보라 다른 항목과 따로 동의를 받습니다.',
    more:[['저장하는 것','목소리 특징값(숫자 묶음)만 저장하고, 등록할 때 읽은 녹음은 바로 지웁니다.'],
      ['등록 방법','로그인 후 「내 정보」에서 본인이 직접 정해진 문장을 읽어 등록합니다.'],
      ['쓰는 곳','내가 참석자로 들어간 회의의 발언자 이름 붙이기에만 씁니다.'],
@@ -6233,7 +6233,7 @@ function consentPage(next){
     <div class="sub" style="margin:0 0 4px;font-size:12px;letter-spacing:.08em">HEIMDALL · 처음 한 번</div>
     <h1 style="margin:0 0 4px">회의 녹음 안내와 동의</h1>
     <div class="sub" style="margin:0 0 14px;font-size:12.5px">${csY('법인명')} · 안내문 ${esc(CONSENT_VER)} · 시행 ${csY('2026-MM-DD')}</div>
-    <div class="sub" style="margin:0 0 8px">헤임달은 사내 회의를 녹음해 AI로 회의록을 만듭니다. 아래 네 가지는 모두 선택 동의이며, 항목마다 직접 골라 주시면 됩니다.</div>
+    <div class="sub" style="margin:0 0 8px">헤임달은 사내 회의를 녹음해 AI로 회의록을 만듭니다. 아래 네 가지는 모두 선택 동의이며, 항목마다 직접 선택해 주시면 됩니다.</div>
     <div style="border:1px solid var(--line);background:var(--s1);padding:12px 14px;margin:0 0 18px;font-size:13px;line-height:1.7">
       어느 항목에 동의하지 않으셔도 헤임달은 똑같이 쓰실 수 있고, 평가를 비롯한 어떤 불이익도 없습니다.
       ①에 동의하지 않으면 내가 참석한 회의는 녹음하지 않고, 그 회의는 미녹음 감점에서 빠집니다.
@@ -6309,7 +6309,7 @@ async function consentManage(){
     ${CS_ITEMS.map(it=>{ const v=row?row[it.k]:null;
       return `<div style="display:flex;gap:10px;align-items:center;border-top:1px solid var(--line);padding:10px 0">
         <div style="flex:1"><b style="font-size:13.5px">${it.no} ${esc(it.title)}</b>
-          <div class="sub" style="margin:2px 0 0;font-size:12.5px">${v?it.my[v]:'아직 고르지 않음'}</div></div>
+          <div class="sub" style="margin:2px 0 0;font-size:12.5px">${v?it.my[v]:'아직 선택하지 않음'}</div></div>
         ${v==='y'?'':`<button class="btn" data-csag="${it.k}">동의하기</button>`}</div>`; }).join('')}
     <div style="border:1px solid var(--line);padding:10px 12px;margin:12px 0;font-size:12.5px;line-height:1.7">
       <b>동의를 철회하려면 담당자에게 요청해 주세요.</b><br>
