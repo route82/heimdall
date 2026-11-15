@@ -1290,7 +1290,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:12px">웹 v21.6</span>
+       <span class="sub" style="margin:0;font-size:12px">웹 v21.7</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">로그아웃</button>
@@ -1803,6 +1803,7 @@ async function renderCal(){
        · 여기서 예약하면 건물 공용 구글 캘린더(★회의실★)에도 같이 적힙니다</div>
     <div class="row" style="margin-bottom:14px;flex-wrap:wrap">
       <button class="btn p" id="cbook">+ 회의실 예약</button>
+      <button class="btn" id="cissue">문제 신고</button>
       <button class="btn" id="cprev">←</button>
       <button class="btn" id="ctoday">오늘</button>
       <button class="btn" id="cnext">→</button>
@@ -1817,6 +1818,7 @@ async function renderCal(){
   $('#cnext').onclick=()=>{ shiftCal(1);  renderCal(); };
   $('#ctoday').onclick=()=>{ CAL.anchor=new Date(); renderCal(); };
   $('#cbook').onclick=()=>bookOpen();
+  $('#cissue').onclick=()=>issueOpen();
   el.querySelectorAll('[data-bcancel]').forEach(b=>b.onclick=ev=>{
     ev.stopPropagation(); bookCancel(b.dataset.bcancel, b.dataset.title); });
   el.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{ CAL.mode=b.dataset.mode; renderCal(); });
@@ -1861,6 +1863,48 @@ function bookBox(html){
   return b;
 }
 function bookClose(){ clearTimeout(bookClose.t); const b=$('#bkbox'); if(b) b.remove(); }
+// 2026-11-16 문제 신고 (홍석진 대표 · 회의실 예약 PRD 1-4) — 장비는 AX팀, 시설은 경영지원팀으로 슬랙 전달
+function issueOpen(room){
+  const rooms=[...BOOK_ROOMS,'그 밖의 곳'];
+  bookBox(`<h1 style="font-size:16px;margin:0 0 4px">문제 신고</h1>
+    <div class="sub" style="margin:0 0 12px;font-size:12px">회의실 장비나 시설에 문제가 있을 때 알려 주세요.
+      장비는 AX팀, 시설은 경영지원팀으로 바로 전달됩니다.</div>
+    <div class="shsec">어디</div>
+    <select id="isroom" class="full" style="margin:6px 0 10px">${rooms.map(x=>`<option${x===room?' selected':''}>${esc(x)}</option>`).join('')}</select>
+    <div class="shsec">무엇</div>
+    <select id="iskind" class="full" style="margin:6px 0 10px">
+      <option value="equip">장비 — 태블릿 · 마이크 · 화면 · 녹음</option>
+      <option value="facility">시설 — 냉난방 · 조명 · 청소 · 비품</option></select>
+    <div class="shsec">내용</div>
+    <textarea id="isbody" class="full" maxlength="500" rows="4" style="margin:6px 0 8px"
+      placeholder="어떤 문제인지 적어 주세요. 예: 태블릿 녹음 버튼을 눌러도 시작되지 않습니다"></textarea>
+    <label class="meta" style="display:flex;align-items:center;gap:7px;margin:0 0 14px;cursor:pointer">
+      <input type="checkbox" id="isurg"> 긴급 — 지금 회의를 못 하고 있습니다</label>
+    <div class="row" style="justify-content:flex-end">
+      <button class="btn" id="isno">닫기</button><button class="btn p" id="isok">신고하기</button></div>`);
+  $('#isno').onclick=bookClose;
+  $('#isok').onclick=async()=>{
+    const body=$('#isbody').value.trim();
+    if(body.length<4){ toast('어떤 문제인지 조금만 더 적어 주세요'); $('#isbody').focus(); return; }
+    const b=$('#isok'); b.disabled=true; b.textContent='보내는 중…';
+    const urgent=$('#isurg').checked;
+    const ins=await SB.from('hd_issue').insert({room:$('#isroom').value, kind:$('#iskind').value, urgent, body,
+      created_by:me.id, created_name:me.name, company:me.company||''});
+    if(ins.error){ b.disabled=false; b.textContent='신고하기';
+      return toast('신고를 남기지 못했습니다 · '+esc(ins.error.message), 8000); }
+    bookBox(`<h1 style="font-size:16px;margin:0 0 6px">신고를 접수했습니다</h1>
+      <div class="sub" style="margin:0 0 12px">담당자에게 슬랙으로 전달됩니다.
+        ${urgent?'긴급 신고는 30분 안에':'다음 근무일까지'} 답을 드립니다.</div>
+      <div class="shsec">그동안 이렇게 하실 수 있습니다</div>
+      <div class="sub" style="margin:6px 0 14px;font-size:12.5px;line-height:1.7">
+        · 태블릿 녹음이 안 되면 휴대폰이나 노트북의 헤임달 「녹음」 으로 녹음해도 똑같이 회의록이 만들어집니다<br>
+        · 회의실을 쓸 수 없으면 홈의 회의실 일정에서 빈 방을 찾아 새로 예약하세요</div>
+      <div class="row" style="justify-content:flex-end">
+        <button class="btn" id="isrec">녹음 화면으로</button><button class="btn p" id="isdone">확인</button></div>`);
+    $('#isdone').onclick=bookClose;
+    $('#isrec').onclick=()=>{ bookClose(); go('rec'); };
+  };
+}
 // 요청을 넣고 처리 서버의 답을 기다립니다 (보통 2~5초)
 async function bookSend(meta, label, waitMs){
   const ins=await SB.from('hd_job').insert({
@@ -2311,6 +2355,7 @@ async function drawHomeTL(){
         <button class="btn" id="ht-prev" aria-label="전날">‹</button><b>${esc(label)}</b><button class="btn" id="ht-next" aria-label="다음날">›</button>
         ${kd!==today?'<button class="btn" id="ht-today">오늘</button>':''}
         <button class="btn p" id="ht-book">+ 예약</button>
+        <button class="btn" id="ht-issue">문제 신고</button>
       </div></div>
     ${cal.error?`<div class="empty">예약을 불러오지 못했습니다 · ${esc(cal.error.message)}</div>`:`
     <div class="ht-tl"><div class="ht-in">${h}</div>
@@ -2325,6 +2370,7 @@ async function drawHomeTL(){
   $('#ht-next').onclick=()=>shift(1);
   if($('#ht-today')) $('#ht-today').onclick=()=>{ HT.day=today; drawHomeTL(); };
   $('#ht-book').onclick=()=>bookOpen({day: kd<today?today:kd});
+  $('#ht-issue').onclick=()=>issueOpen();
   box.querySelectorAll('.ht-seg button').forEach(b=>b.onclick=()=>{ HT.scope=b.dataset.s; drawHomeTL(); });
   box.querySelectorAll('.ht-bk.other').forEach(b=>b.onclick=ev=>{ ev.stopPropagation();
     toast('다른 법인이 예약한 시간입니다. 내용은 보이지 않습니다', 3000); });
