@@ -543,7 +543,9 @@ function idlePage(){
     + (ev    ? '<button class="ghost" id="adhoc">예약에 없는 회의 녹음하기</button>' : '')
     + (ADHOC && current()
              ? '<button class="ghost" id="unadhoc">예약된 회의로 돌아가기</button>' : '')
-    + '<button class="pillbtn" id="voice">목소리 등록 — 회의록에 내 이름이 붙습니다</button>'
+    // 2026-11-15 이 회의실의 회의가 진행 중이거나 20분 안에 시작하면 등록 단추를 감춥니다 (회의 시작을 막지 않게)
+    + (mine().some(e=>new Date(e.ends_at).getTime()>now && new Date(e.starts_at).getTime()-now<20*60000) ? ''
+        : '<button class="pillbtn" id="voice">목소리 등록 — 회의록에 내 이름이 붙습니다</button>')
     + '</div>'
     + (rest.length ? '<div class="list"><div class="h">다른 회의 고르기 — 누르면 위 카드가 바뀝니다 · '
         + '다른 회의실 예약도 여기 있습니다</div><div class="picks">'
@@ -1235,10 +1237,9 @@ function voicePick(){
     const ms=MEMBERS.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','ko'));
     app.innerHTML='<div></div><div class="mid">'
       + '<div class="mtitle">목소리 등록 — 누구 목소리인가요?</div>'
-      + '<div class="sub">본인 이름을 눌러주세요. 1분쯤 안내 글을 읽으면 끝납니다.<br>'
-      + '✓ 표시는 이 태블릿에서 이미 등록한 분입니다 (다시 등록하셔도 됩니다)</div>'
+      + '<div class="sub">본인 이름을 눌러주세요. 1분쯤 안내 글을 읽으면 끝납니다.</div>'
       + '<div class="who"><div class="pk"><div class="pkms"><div class="grid">'
-      + (ms.length ? ms.map(m=>'<button class="nm" data-id="'+m.id+'">'+esc(m.name)+(VOICED.has(m.id)?'<span class="reg">✓</span>':'')
+      + (ms.length ? ms.map(m=>'<button class="nm" data-id="'+m.id+'">'+esc(m.name)
           + '<span class="co">'+esc(m.dept&&m.dept!==NO_DEPT?m.dept:(m.company||''))+'</span></button>').join('')
           : '<span class="sub">구성원 명단을 불러오지 못했습니다 · 와이파이를 확인해주세요</span>')
       + '</div></div></div></div>'
@@ -1295,7 +1296,8 @@ async function voiceRec(){
   keepAwake();
   app.innerHTML='<div></div><div class="mid">'
     + '<div class="mtitle">'+esc(m.name)+' 님 — 아래 글을 평소 회의에서 말하듯 소리 내어 읽어주세요</div>'
-    + '<div class="vbox vread">'+VOICE_TEXT.map(t=>'<p>'+esc(t)+'</p>').join('')+'</div>'
+    + '<div class="vbox vread">'+(()=>{ const a=VOICE_TEXT.slice(1,-1); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=a[i]; a[i]=a[j]; a[j]=t; }
+        return [VOICE_TEXT[0]].concat(a,[VOICE_TEXT[VOICE_TEXT.length-1]]); })().map(t=>'<p>'+esc(t)+'</p>').join('')+'</div>'
     + '<div class="vrow"><span class="velapsed" id="vela">0:00</span><span class="lv" id="lv"></span></div>'
     + '<div class="vrow"><button class="ghost" id="vx">취소</button>'
     + '<button class="big go" id="vdone" disabled style="font-size:clamp(20px,3vh,28px)">'

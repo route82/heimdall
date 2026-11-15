@@ -1280,7 +1280,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:12px">웹 v21.4</span>
+       <span class="sub" style="margin:0;font-size:12px">웹 v21.5</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">로그아웃</button>
@@ -1360,7 +1360,8 @@ function shell(){
       <div class="shsec">목소리 등록</div>
       <div class="sub" style="margin:2px 0 8px;font-size:12px">1분쯤 안내 글을 읽어 두면
         회의록의 「화자 1」 자리에 내 이름이 붙습니다<span id="myvst"></span></div>
-      <button class="btn full" id="myvoice" style="margin-bottom:14px">내 목소리 등록하기</button>
+      <button class="btn full" id="myvoice" style="margin-bottom:6px">내 목소리 등록하기</button>
+      <button class="btn full" id="myvoicedel" style="margin-bottom:14px">내 목소리 지우기</button>
       <div class="shsec">화면 밝기</div>
       <div class="sub" style="margin:2px 0 8px;font-size:12px">이 계정의 기본값입니다.
         다른 컴퓨터에서 로그인해도 그대로 따라옵니다</div>
@@ -1376,6 +1377,26 @@ function shell(){
     document.body.appendChild(d);
     $('#pwclose').onclick=()=>d.remove();
     $('#myvoice').onclick=()=>{ d.remove(); voiceSelf(); };
+    // 2026-11-15 본인이 직접 지웁니다 — 이름이 아니라 내 계정 번호로 지워, 같은 이름의 다른 분은 건드리지 않습니다
+    $('#myvoicedel').onclick=async()=>{
+      if(!confirm('내 목소리 등록을 지웁니다.\n\n앞으로의 회의록에는 내 이름이 자동으로 붙지 않습니다. 다시 쓰려면 새로 등록해야 합니다.')) return;
+      const b=$('#myvoicedel'); b.disabled=true; b.textContent='지우는 중…';
+      const fin=(t,ms)=>{ if(b.isConnected){ b.disabled=false; b.textContent='내 목소리 지우기'; } toast(esc(t), ms||6000); };
+      const ins=await SB.from('hd_job').insert({
+        title:'목소리 등록 지우기 · '+me.name, participants:me.name, audio_path:'voice/none', kind:'voice', orig_name:'',
+        device:'웹 목소리 등록', created_by:me.id, created_name:me.name, room:'', visibility:'private',
+        note_label:'목소리 등록', text_body:JSON.stringify({op:'delete', member_id:me.id, name:me.name}),
+      }).select('id').single();
+      if(ins.error) return fin('요청을 남기지 못했습니다 · '+ins.error.message, 8000);
+      const t0=Date.now();
+      for(;;){
+        await new Promise(r=>setTimeout(r,2500));
+        const {data:j}=await SB.from('hd_job').select('status,error,stage').eq('id',ins.data.id).maybeSingle();
+        if(j && j.status==='done'){ const x=$('#myvst'); if(x) x.textContent=''; return fin(j.stage||'지웠습니다'); }
+        if(j && j.status==='failed') return fin(j.error||'지우지 못했습니다', 8000);
+        if(Date.now()-t0>4*60*1000) return fin('요청을 올렸습니다. 처리 PC 가 다른 회의록을 만드는 중이라, 순서가 되면 지워집니다', 9000);
+      }
+    };
     voiceSelfLast().then(t=>{ const x=$('#myvst'); if(x && t) x.innerHTML=' · 최근 등록 <b>'+esc(t)+'</b>'; });
     d.querySelectorAll('[data-thm]').forEach(b=>b.onclick=async()=>{
       await saveTheme(b.dataset.thm);
@@ -1517,12 +1538,19 @@ const VS_TEXT=[
   '마지막으로, 회의가 끝나면 결정된 내용과 담당자를 정리해서 바로 공유하겠습니다.',
   '질문이 있으시면 편하게 말씀해 주세요. 감사합니다.',
 ];
+// 2026-11-15 대본은 매번 순서를 섞습니다 — 첫 줄(인사)과 끝 줄(맺음)은 그대로 둡니다
+function vsScript(){
+  const mid=VS_TEXT.slice(1,-1);
+  for(let i=mid.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [mid[i],mid[j]]=[mid[j],mid[i]]; }
+  return [VS_TEXT[0], ...mid, VS_TEXT[VS_TEXT.length-1]];
+}
 // 이 계정으로 웹에서 등록한 마지막 날 (태블릿에서 한 등록은 여기서 보이지 않습니다)
 async function voiceSelfLast(){
   try{
-    const {data}=await SB.from('hd_job').select('done_at,created_at').eq('kind','voice').eq('status','done')
+    const {data}=await SB.from('hd_job').select('done_at,created_at,text_body').eq('kind','voice').eq('status','done')
       .eq('created_by',me.id).order('created_at',{ascending:false}).limit(1);
     const j=(data||[])[0]; if(!j) return '';
+    if(/"op":"delete"/.test(j.text_body||'')) return '';      // 마지막이 「지우기」 였으면 등록이 없는 상태입니다
     const d=new Date(j.done_at||j.created_at);
     return (d.getMonth()+1)+'/'+d.getDate();
   }catch(e){ return ''; }
@@ -1590,7 +1618,7 @@ async function voiceSelfRec(){
   voiceSelfBox(`<h1 style="font-size:16px;margin:0 0 4px">아래 글을 소리 내어 읽어주세요</h1>
     <div class="sub" style="margin:0 0 10px;font-size:12px">평소 회의에서 말하듯 읽으시면 됩니다</div>
     <div style="border:1px solid var(--line);padding:12px 14px;font-size:15px;line-height:1.75;
-      max-height:46vh;overflow-y:auto">${VS_TEXT.map(t=>'<p style="margin:0 0 8px">'+esc(t)+'</p>').join('')}</div>
+      max-height:46vh;overflow-y:auto">${vsScript().map(t=>'<p style="margin:0 0 8px">'+esc(t)+'</p>').join('')}</div>
     <div style="display:flex;align-items:center;gap:10px;margin:12px 0">
       <b id="vsela" style="font-variant-numeric:tabular-nums">0:00</b>
       <div style="flex:1;height:6px;background:var(--line)"><div id="vslv" style="height:6px;width:0;background:var(--ac)"></div></div>
