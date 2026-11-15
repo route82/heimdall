@@ -3213,12 +3213,12 @@ async function yggConfirmOpen(m, openActs, done){
       else body=inp(i,'org','거래처')+inp(i,'title','할 일·다음 약속',2)+`<input type="date" data-yi="${i}" data-yf="due_on" value="${esc(x.due_on||'')}">`;
       return `<div style="border-top:1px solid var(--line);padding:9px 0">
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <input type="checkbox" data-yc="${i}" checked title="빼려면 끄세요">${body}</div>
+          <input type="checkbox" data-yc="${i}"${(x.confidence==null||x.confidence>=0.5)?' checked':''} title="빼려면 끄세요">${body}${(x.confidence!=null&&x.confidence<0.5)?' <span class="sub" style="margin:0;font-size:11.5px">확신 낮음 · 꺼 둠</span>':''}</div>
         ${x.quote?`<div class="sub" style="margin:5px 0 0 24px;font-size:12px">“${esc(x.quote)}”${x.at?' · '+esc(x.at):''}</div>`:''}</div>`; };
     const sec=Object.keys(YGG_KIND).map(k=>{ const idx=items.map((x,i)=>x.type===k?i:-1).filter(i=>i>=0);
       return idx.length?`<div style="margin-top:10px"><b style="font-size:13px">${YGG_KIND[k]} ${idx.length}</b>${idx.map(i=>row(items[i],i)).join('')}</div>`:''; }).join('');
     bookBox(head+(items.length
-      ?`<div class="sub" style="margin:6px 0 0;font-size:12px">AI가 회의록에서 뽑은 후보입니다. 틀린 것은 끄거나 고쳐 주세요. 켜 둔 것만 보냅니다.
+      ?`<div class="sub" style="margin:6px 0 0;font-size:12px">AI가 회의록에서 뽑은 후보입니다. 틀린 것은 끄거나 고쳐 주세요. 켜 둔 것만 보냅니다. 확신이 낮은 것은 꺼 두었습니다.
           ${match?'':'<br>이그드라실의 이름 맞추기가 아직 준비 전이라, 이름 글자 그대로 보내고 이그드라실에서 맞춥니다.'}</div>${sec}
         <div style="margin-top:10px"><button class="btn" id="yg-ask" style="font-size:12px">다시 뽑기</button></div>`
       :`<div class="sub" style="margin:8px 0 10px">이 회의에서는 이그드라실로 보낼 내용을 찾지 못했습니다 (내부 회의 등).</div>
