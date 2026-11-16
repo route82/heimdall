@@ -6451,7 +6451,7 @@ async function consentManage(){
         ${v==='y'?'':`<button class="btn" data-csag="${it.k}">동의하기</button>`}</div>`; }).join('')}
     <div style="border:1px solid var(--line);padding:10px 12px;margin:12px 0;font-size:12.5px;line-height:1.7">
       <b>동의를 철회하려면 담당자에게 요청해 주세요.</b><br>
-      개인정보 담당 ${csY('이름')} · 슬랙 ${csY('DM 또는 채널')} · ${csY('이메일')}<br>
+      개인정보 보호책임자 정원하 대표 · 문의 김현우 (슬랙 DM · brooks@thealmighty.co.kr)<br>
       요청을 받으면 바로 처리하고 결과를 알려 드립니다. 철회해도 불이익은 없습니다.</div>
     <div class="shsec">변경 이력</div>
     <div class="sub" style="margin:6px 0 14px;font-size:12.5px;line-height:1.7">${logs.length?logs.map(l=>`${esc(csWhen(l.at))} · ${line(l)}`).join('<br>'):'아직 없음'}</div>
