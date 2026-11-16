@@ -4935,8 +4935,9 @@ let MEMBERS = null;
 async function loadMembers(){
   if(MEMBERS) return MEMBERS;
   const {data}=await SB.from('hd_member')
-    .select('id,name,company,dept').eq('approved',true).order('name');
-  MEMBERS=(data||[]).filter(m=>(m.name||'').trim());
+    .select('id,name,company,dept,status').eq('approved',true).order('name');
+  // 2026-11-16 퇴사자·하나로 합친 계정은 참석자·예약 고르기에 나오지 않게 뺍니다
+  MEMBERS=(data||[]).filter(m=>(m.name||'').trim() && (m.status||'active')!=='left');
   let dl=document.getElementById('hd-mnames');
   if(!dl){ dl=document.createElement('datalist'); dl.id='hd-mnames'; document.body.appendChild(dl); }
   dl.innerHTML=MEMBERS.map(m=>`<option value="${esc(m.name)}">`).join('');

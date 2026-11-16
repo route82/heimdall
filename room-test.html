@@ -659,8 +659,12 @@ async function cgNorec(ev, A, title, room){
 async function consentGate(ev){
   clearInterval(tick);
   const ids=ev.member_ids||[], names=ev.member_names||[];
-  CG.ev=ev;
-  CG.A=ids.map((id,i)=>({id, name:names[i]||'참석자', st:'wait', via:''}));
+  CG.ev=ev; CG.pre=null;
+  // 2026-11-16 6번 시험 — 하나로 합친 계정·퇴사자가 예약에 남아 같은 이름이 두 번 나왔습니다.
+  //   지금 명단(재직자)에 있는 사람만, 한 번씩만 묻습니다. 명단을 못 읽었으면 예약에 적힌 그대로 둡니다.
+  const act=new Set(MEMBERS.map(m=>m.id)), seen=new Set();
+  CG.A=ids.map((id,i)=>({id, name:names[i]||'참석자', st:'wait', via:''}))
+    .filter(a=>!seen.has(a.id) && seen.add(a.id) && (!act.size || act.has(a.id)));
   app.innerHTML='<div></div><div class="mid"><div class="sub">참석자 동의를 확인하는 중…</div></div><div></div>';
   const st=await cgStates(ids);
   CG.A.forEach(a=>{ a.st=st.get(a.id)||'wait'; if(a.st!=='wait') a.via='미리 선택'; });
@@ -912,6 +916,13 @@ async function startRec(ev){
   // 2026-11-16 점검: 지난 녹음의 상태를 비웁니다 (예약 초과 확인 시각·자동 정지·폐기 표시·담당자)
   REC.askAt=0; REC.askShown=0; REC.autoStop=false; REC.lastSound=0; REC.discard=false; REC.norecA=null; REC.owner=null;
   PICKED=null; ADHOC=false;
+  // 2026-11-16 6번 시험 — 동의 확인 화면에서 동의한 직원은 이미 와 있는 사람이므로 참석자로 바로 넣습니다
+  //   (전에는 녹음 화면에서 「아직 아무도 누르지 않았습니다」 로 다시 고르게 했습니다)
+  if(ev && CG.pre && CG.ev===ev){
+    const byId=new Map(MEMBERS.map(m=>[m.id,m]));
+    CG.pre.forEach(a=>{ const m=!a.guest && a.st==='ok' && byId.get(a.id);
+      if(m) pickIn(m.id, m.company||'', m.dept||NO_DEPT); });
+  }
   REC.agenda=((ev&&ev.note)||'').trim();
   REC.room=cfg.room||'';
   REC.mr = mime ? new MediaRecorder(stream,{mimeType:mime, audioBitsPerSecond:64000})
