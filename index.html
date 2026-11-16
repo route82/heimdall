@@ -1309,6 +1309,9 @@ const ICO = {
 const svgIco = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
   stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[k]||''}</svg>`;
 
+// 2026-11-16 김현우 팀장 — 같은 건물을 쓰는 다른 그룹 법인은 회의실 예약만 씁니다 (녹음·회의록 없음)
+const BOOK_ONLY_COS = ['마이옵티멀'];
+const isBookOnly = () => !!(me && BOOK_ONLY_COS.includes((me.company||'').trim()));
 function shell(){
   // 사이드바는 묶음으로 보여줍니다 — 자주 쓰는 것 → 정리 → 관리 순
   // 「쓰기 → 보기 → 물어보기」 순서. 하는 일 기준으로 묶습니다.
@@ -1327,6 +1330,7 @@ function shell(){
   if(isAdminish(me.role)) admin.push(['server','처리서버']);
   if(admin.length) groups.push(['관리', admin]);
   groups.push(['도움말', [['guide','사용 매뉴얼']]]);
+  if(isBookOnly()){ groups.length=0; groups.push(['',[['home','홈']]], ['보기',[['cal','일정']]], ['도움말',[['guide','사용 매뉴얼']]]); }
 
   const brand = `<div class="brand"><img src="./assets/logo-horizontal.svg" alt="HEIMDALL" class="lgh"></div>`;
 
@@ -1571,7 +1575,7 @@ function route(){
   if(mt) return meetDraw(mt[1]);
   let v=h==='search'?'chat':h;
   // 메뉴에 없는 화면(권한 밖)이나 모르는 주소는 홈으로
-  const ok=v && $('#p-'+v) && (document.querySelector('.nav[data-v="'+v+'"]') || ['home','projects','actions'].includes(v));
+  const ok=v && $('#p-'+v) && (document.querySelector('.nav[data-v="'+v+'"]') || (!isBookOnly() && ['home','projects','actions'].includes(v)));
   if(!ok){ v='home'; try{ history.replaceState(null,'',location.pathname+location.search+'#/home'); }catch(e){} }
   goDraw(v);
 }
@@ -1790,11 +1794,13 @@ async function renderHome(){
   // 순서: 인사 → 물어보는 입력창 → 회의실 일정 → 내 회의
   el.innerHTML=`<h1>${hi}, ${esc(me.name)}님</h1>
     <div class="hask">
-      <input id="hq" class="full" maxlength="500" autocomplete="off" placeholder="무엇이든 물어보세요 — 문장으로 물으면 AI가 답하고, 단어만 넣으면 그 단어이 나온 회의를 찾습니다">
+      <input id="hq" class="full" maxlength="500" autocomplete="off" placeholder="무엇이든 물어보세요 — 문장으로 물으면 AI가 답하고, 단어만 넣으면 그 단어가 나온 회의를 찾습니다">
       <button class="btn p" id="hqgo">물어보기</button></div>
     <div id="h-cf"></div>
     <div id="h-tl"></div>
     <div id="h-rec" class="hrec"><div class="sub">내 회의를 불러오는 중…</div></div>`;
+  // 회의실 예약만 쓰는 법인은 물어보기·확정 카드를 숨깁니다
+  if(isBookOnly()){ const a=el.querySelector('.hask'); if(a) a.remove(); const c=$('#h-cf'); if(c) c.remove(); drawHomeTL(); drawHomeMy(); return; }
   drawHomeConfirm();
   const hask=()=>{ const q=($('#hq').value||'').trim(); if(!q) return $('#hq').focus(); CHATQ=q; go('chat'); };
   $('#hqgo').onclick=hask; $('#hq').onkeydown=e=>{ if(e.key==='Enter' && !e.isComposing) hask(); };
@@ -2395,6 +2401,11 @@ async function drawHomeTL(){
     cal=await calSel().gte('starts_at',from).lte('starts_at',to).order('starts_at');
   }
   const busy=(bz && !bz.error && bz.data) || [];
+  // 2026-11-16 회의실 예약만 쓰는 법인은 그룹 예약의 제목을 받지 못하므로, 시간과 법인명만 따로 받아 「다른 법인」 칸으로 그립니다
+  if(isBookOnly()){
+    try{ const sl=await SB.rpc('hd_cal_slots',{p_from:from, p_to:to});
+      (sl.data||[]).filter(x=>!x.mine).forEach(x=>busy.push({uid:x.uid, room:x.room, starts_at:x.starts_at, ends_at:x.ends_at, label:x.label})); }catch(e){}
+  }
   await loadMyBooks();
   if(!$('#h-tl') || HT.day!==kd) return;
   const evs=(cal.data||[]).filter(e=>!e.all_day);
@@ -4165,7 +4176,7 @@ let chatBusy=false, rooms=[], curRoom=null;
 async function renderChat(){
   const el=$('#p-chat');
   el.innerHTML=`<h1>물어보기</h1>
-    <div class="sub">문장으로 물으면 회의 기록을 근거로 AI가 답하고, 단어만 넣으면 그 단어이 나온 회의록을 찾아 줍니다. 대화는 방마다 이어집니다.</div>
+    <div class="sub">문장으로 물으면 회의 기록을 근거로 AI가 답하고, 단어만 넣으면 그 단어가 나온 회의록을 찾아 줍니다. 대화는 방마다 이어집니다.</div>
     <div class="chatwrap">
       <div class="rooms" id="rooms"></div>
       <div class="chatmain">
@@ -6368,6 +6379,7 @@ async function boot(){
   const enter=()=>{ shell(); checkPending(); route(); };
   // 2026-11-16 처음 로그인하거나 안내문이 바뀌면 회의 녹음 안내와 동의를 먼저 받습니다 (시험용 화면에서만)
   // 2026-11-16 미리보기 — 주소 끝 ?onboard=1 이면 첫 사용 단계를 처음부터 보여 주되 아무것도 기록하지 않습니다
+  if(isBookOnly()) return enter();                 // 회의실 예약만 쓰는 법인은 녹음 동의·목소리 등록 단계가 없습니다
   if(CONSENT_ON && OB_PREVIEW){ await consentVerLoad(); CONSENT_PREV=''; return consentPage(enter); }
   if(CONSENT_ON && await consentNeeded()) return consentPage(enter);
   // 2026-11-16 홍석진 대표 — ③에 동의하셨는데 목소리가 아직 없으면 등록부터 마칩니다 (태블릿에서 다시 묻지 않게)
