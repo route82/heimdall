@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>회의 녹음 동의</title>
+<!-- 2026-11-16 손님 녹음 동의 페이지 (홍석진 대표 11/15 · 시안 guest-mock.html)
+     회의 안내 메일의 링크로 엽니다. 로그인이 없고, 링크에 든 긴 표시(t=…)를 아는 사람만 자기 것을 봅니다.
+     노란 칸은 회사가 정해 채울 값이고 법무 검토 전입니다. -->
+<style>
+:root{--bg:#f6f5f2;--s1:#fff;--tx:#161616;--tx2:#6b6b6b;--line:#dcd9d2;--ac:#161616;--mark:#fdecae}
+@media (prefers-color-scheme:dark){:root{--bg:#111;--s1:#1a1a1a;--tx:#f2f2f2;--tx2:#a0a0a0;--line:#333;--ac:#f2f2f2;--mark:#5a4a12}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.65 -apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+.wrap{max-width:640px;margin:0 auto;padding:28px 16px 60px}
+h1{font-size:21px;margin:0 0 6px;line-height:1.35}
+.sub{color:var(--tx2);font-size:13.5px}
+.card{background:var(--s1);border:1px solid var(--line);padding:16px 18px;margin:14px 0}
+.card h2{font-size:15.5px;margin:0 0 6px}
+.dis{opacity:.45;pointer-events:none}
+label.opt{display:inline-flex;gap:7px;align-items:center;margin:10px 18px 0 0;cursor:pointer}
+dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:10px 0 0;font-size:13px}
+dt{color:var(--tx2);white-space:nowrap}dd{margin:0}
+details summary{cursor:pointer;color:var(--tx2);font-size:13px;margin-top:8px}
+mark{background:var(--mark);color:inherit;padding:0 3px}
+button{font:inherit;font-weight:700;padding:13px 22px;border:1px solid var(--ac);background:var(--ac);color:var(--bg);cursor:pointer}
+button:disabled{opacity:.4;cursor:default}
+.note{font-size:13px;color:var(--tx2);margin-top:14px}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><p class="sub">불러오는 중…</p></div>
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+const SB = createClient('https://dwoiobqucmikbtikfjwk.supabase.co', 'sb_publishable_K6BW26u2jRkTBDwuMqaaFA_3HkfnOc9', {auth:{persistSession:false, autoRefreshToken:false}});
+const app = document.getElementById('app');
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const Y = t => `<mark title="회사가 정해 채울 값 · 법무 검토 전">{${t}}</mark>`;
+const token = new URLSearchParams(location.search).get('t') || '';
+const kst = (t,o) => new Intl.DateTimeFormat('ko-KR', Object.assign({timeZone:'Asia/Seoul'}, o)).format(new Date(t));
+const when = g => g.starts_at ? kst(g.starts_at,{month:'numeric',day:'numeric',weekday:'short'})+' '+kst(g.starts_at,{hour:'2-digit',minute:'2-digit',hour12:false})
+  + (g.ends_at?'–'+kst(g.ends_at,{hour:'2-digit',minute:'2-digit',hour12:false}):'') : '';
+function fail(t){ app.innerHTML = `<h1>회의 녹음 동의</h1><div class="card">${esc(t)}</div>`; }
+
+async function load(){
+  if(token.length < 40) return fail('링크가 올바르지 않습니다. 메일에 있는 링크를 다시 눌러 주세요.');
+  const r = await SB.rpc('hd_guest_get', {p_token: token});
+  if(r.error || !r.data) return fail('안내를 찾지 못했습니다. 링크가 바뀌었거나 예약이 취소되었을 수 있습니다. 회의 담당자에게 문의해 주세요.');
+  draw(r.data);
+}
+function draw(g){
+  const co = esc(g.company || '');
+  if(g.closed) return app.innerHTML = `<h1>${esc(g.name)} 님</h1><div class="card">이미 끝난 회의입니다. 궁금한 점은 회의 담당자${g.owner_name?' '+esc(g.owner_name)+' 님':''}에게 문의해 주세요.</div>`;
+  app.innerHTML = `
+    <div class="sub">${co} · 회의 녹음 동의</div>
+    <h1>${esc(g.name)} 님, 녹음 동의 여부를 선택해 주세요</h1>
+    <div class="sub">${esc(when(g))} · ${esc(g.title||'회의')}${g.room?' · '+esc(g.room):''}${g.owner_name?' · 담당 '+esc(g.owner_name):''}</div>
+    <div class="card" style="font-size:13.5px">동의하지 않으셔도 회의는 그대로 진행하고, 녹음만 하지 않습니다.
+      마음이 바뀌시면 회의 담당자나 ${Y('개인정보 담당 이메일')}로 알려 주세요.${g.answered_at?'<br><b>이미 선택하신 내용이 있습니다. 회의가 끝나기 전까지는 바꾸실 수 있습니다.</b>':''}</div>
+
+    <div class="card" id="b1"><h2>① 회의 녹음과 회의록 작성</h2>
+      회의를 녹음해 전사문과 요약을 만듭니다. 발언은 「화자 1, 2」로만 구분하고, 목소리로 사람을 식별하는 기능은 손님께 쓰지 않습니다.
+      <details><summary>자세히 보기</summary><dl>
+        <dt>처리 항목</dt><dd>이름, 이메일, 회의 음성, 전사문, 요약</dd>
+        <dt>목적</dt><dd>회의록 작성, 합의 사항·후속 일정 관리</dd>
+        <dt>열람 범위</dt><dd>${co||Y('법인명')}의 회의 참석자와 담당자</dd>
+        <dt>보관 기간</dt><dd>녹음 원본은 회의록 확정 후 ${Y('90일')}, 회의록은 ${Y('N년')}</dd>
+        <dt>동의하지 않으면</dt><dd>이 회의는 녹음하지 않습니다. 참석하셨다는 사실과 동의하지 않으셨다는 기록만 남습니다.</dd></dl></details>
+      <div><label class="opt"><input type="radio" name="g1" value="y"> 동의합니다</label>
+        <label class="opt"><input type="radio" name="g1" value="n"> 동의하지 않습니다</label></div></div>
+
+    <div class="card" id="b2"><h2>② 회의록 요약용으로 해외 AI에 회의 글 보내기</h2>
+      요약에 Anthropic(미국)의 AI를 씁니다. 전사문만 보내고 음성은 보내지 않으며, AI 학습에 쓰지 않습니다.
+      동의하지 않으시면 ${Y('국내 처리 / 요약 없이 전사문만')}으로 만듭니다.
+      <div><label class="opt"><input type="radio" name="g2" value="y"> 동의합니다</label>
+        <label class="opt"><input type="radio" name="g2" value="n"> 동의하지 않습니다</label></div></div>
+
+    <div class="card" id="b3"><h2>③ 회의 요약을 이메일로 받기</h2>
+      담당자가 회의록을 확정하면 요약과 합의 사항을 ${g.email?'<b>'+esc(g.email)+'</b>':'메일'}로 보내 드립니다. 내부 검토용 내용은 담당자가 빼고 보냅니다.
+      <div><label class="opt"><input type="radio" name="g3" value="y"> 받겠습니다</label>
+        <label class="opt"><input type="radio" name="g3" value="n"> 받지 않겠습니다</label></div></div>
+
+    <button id="go" disabled>제출하기</button>
+    <div class="note" id="msg"></div>
+    <div class="note">개인정보 보호책임자 ${Y('이름·연락처')} · 이 페이지는 회의 안내를 위한 것이며 홍보에 쓰지 않습니다.</div>`;
+  const pick = n => (document.querySelector(`input[name=${n}]:checked`)||{}).value || '';
+  for(const k of ['g1','g2','g3']) if(g[k]){ const e=document.querySelector(`input[name=${k}][value=${g[k]}]`); if(e) e.checked=true; }
+  const check = () => { const g1=pick('g1');
+    document.getElementById('b2').classList.toggle('dis', g1!=='y'); document.getElementById('b3').classList.toggle('dis', g1!=='y');
+    document.getElementById('go').disabled = !(g1==='n' || (g1==='y' && pick('g2') && pick('g3'))); };
+  app.addEventListener('change', check); check();
+  document.getElementById('go').onclick = async () => {
+    const b=document.getElementById('go'), m=document.getElementById('msg'); b.disabled=true; b.textContent='제출하는 중…';
+    const g1=pick('g1');
+    const r = await SB.rpc('hd_guest_answer', {p_token:token, p_g1:g1, p_g2:g1==='y'?pick('g2'):null, p_g3:g1==='y'?pick('g3'):null});
+    b.textContent='제출하기';
+    if(r.error || !r.data || !r.data.ok){ b.disabled=false; m.textContent='제출하지 못했습니다 · '+((r.data&&r.data.reason)||(r.error&&r.error.message)||'잠시 뒤 다시 눌러 주세요'); return; }
+    app.innerHTML = `<h1>제출했습니다</h1><div class="card">${g1==='y'?'회의 당일 뵙겠습니다.':'이 회의는 녹음하지 않습니다. 회의는 그대로 진행합니다.'}
+      <br>회의가 끝나기 전까지는 같은 링크에서 바꾸실 수 있습니다.</div>`;
+  };
+}
+load();
+</script>
+</body>
+</html>

@@ -654,6 +654,8 @@ async function consentGate(ev){
   app.innerHTML='<div></div><div class="mid"><div class="sub">참석자 동의를 확인하는 중…</div></div><div></div>';
   const st=await cgStates(ids);
   CG.A.forEach(a=>{ a.st=st.get(a.id)||'wait'; if(a.st!=='wait') a.via='미리 선택'; });
+  try{ const gr=await SB.rpc('hd_guest_state',{p_cal_uid:ev.uid||''});
+    (gr.data||[]).forEach(g=>CG.A.push({gid:g.id, name:g.name, guest:true, booked:true, st:g.g1==='y'?'ok':g.g1==='n'?'no':'wait', via:g.g1==='wait'?'':'메일'})); }catch(e){}
   cgDraw();
 }
 function cgDraw(){
@@ -669,7 +671,7 @@ function cgDraw(){
     + '<div style="width:100%;text-align:left">'
     + A.map((a,i)=>'<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r1);margin-bottom:8px;background:var(--s1)">'
         + '<div style="flex:1"><div style="font-size:1.15em;font-weight:800">'+esc(a.name)+'</div>'
-        + '<div class="sub" style="margin:2px 0 0;font-size:.85em">'+(a.guest?'손님 · 오늘 추가':'직원')+(a.via?' · '+esc(a.via)+(a.at?' '+a.at:''):'')+'</div></div>'
+        + '<div class="sub" style="margin:2px 0 0;font-size:.85em">'+(a.guest?(a.booked?'손님':'손님 · 오늘 추가'):'직원')+(a.via?' · '+esc(a.via)+(a.at?' '+a.at:''):'')+'</div></div>'
         + B[a.st]+(a.st!=='ok'?'<button class="pillbtn" data-cga="'+i+'">여기서 동의 받기</button>':'')+'</div>').join('')
     + (A.length?'':'<div class="sub">이 예약에는 참석자가 적혀 있지 않습니다. 아래에서 참석자를 추가해 주세요.</div>')
     + '<button class="pillbtn" id="cgadd">+ 등록 안 된 참석자 추가</button></div>'
@@ -688,7 +690,9 @@ function cgDraw(){
   $('#cgback').onclick=()=>idlePage();
   $('#cgadd').onclick=()=>{ const n=(prompt('참석자 이름')||'').trim(); if(!n) return; A.push({name:n, guest:true, st:'wait', via:''}); cgDraw(); };
   app.querySelectorAll('[data-cga]').forEach(b=>b.onclick=()=>{ const a=A[+b.dataset.cga];
-    cgAsk(a.name, async r=>{ if(a.guest){ a.st=r; } else { const s=await cgSave(a.id, r); if(!s) return; a.st=s; }
+    cgAsk(a.name, async r=>{ if(a.guest){ a.st=r;
+        if(a.gid){ try{ await SB.rpc('hd_guest_tablet',{p_id:a.gid, p_g1:r==='ok'?'y':'n'}); }catch(e){} } }
+      else { const s=await cgSave(a.id, r); if(!s) return; a.st=s; }
       a.via='태블릿'; a.at=cgHm(); cgDraw(); }); });
   const go=$('#cgstart'); if(go) go.onclick=async()=>{ CG.pre=A.slice(); await startRec(ev); };
   const nr=$('#cgnorec'); if(nr) nr.onclick=async()=>{ nr.disabled=true;

@@ -1291,7 +1291,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:12px">웹 v22.11</span>
+       <span class="sub" style="margin:0;font-size:12px">웹 v22.12</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">로그아웃</button>
@@ -1973,6 +1973,11 @@ function bookOpen(keep){
     <div class="shsec">참석자</div>
     <div id="bkatt" style="margin:6px 0 10px"></div>
     <div id="bkcs" class="sub" style="margin:-4px 0 10px;font-size:12px;display:none"></div>
+    ${CONSENT_ON?`<div class="shsec">외부 손님 <span style="font-weight:400;text-transform:none;letter-spacing:0">(선택 · 한 분씩)</span></div>
+    <div id="bkguests" style="margin:6px 0 4px"></div>
+    <button class="btn" type="button" id="bkgadd" style="font-size:12.5px;margin-bottom:4px">+ 손님 추가</button>
+    <div class="sub" style="margin:0 0 10px;font-size:12px">손님마다 따로 녹음 동의 메일을 보냅니다. 함께 오시는 분도 한 분씩 넣어 주세요.
+      메일 주소를 모르면 이름만 넣으세요. 당일 회의실 태블릿에서 동의를 받습니다</div>`:''}
     <div class="shsec">회의 담당자 <span style="font-weight:400;text-transform:none;letter-spacing:0">(1명 · 필수)</span></div>
     <select id="bkown" class="full" style="margin:6px 0 4px"></select>
     <div class="sub" style="margin:0 0 10px;font-size:12px">담당자는 회의가 끝난 뒤 회의록을 확인하는 사람입니다.
@@ -2030,6 +2035,13 @@ function bookOpen(keep){
     if(no) L.push(`참석자 중 ${no}명이 녹음에 동의하지 않아, 이대로면 이 회의는 녹음하지 않습니다.`);
     box.style.display=L.length?'block':'none'; box.innerHTML=L.join('<br>'); };
   $('#bkatt').addEventListener('focusout',()=>setTimeout(bkCs,150)); $('#bkatt').addEventListener('click',()=>setTimeout(bkCs,150)); bkCs();
+  // 2026-11-16 외부 손님 — 이름과 이메일을 한 분씩 (시험용 화면에서만)
+  const bkGadd=()=>{ const box=$('#bkguests'); if(!box || box.children.length>=10) return;
+    const r=document.createElement('div'); r.className='row'; r.style.cssText='margin-bottom:6px;align-items:center';
+    r.innerHTML='<input class="bkgn" maxlength="40" placeholder="이름" style="flex:1;min-width:80px"><input class="bkge" type="email" maxlength="120" placeholder="이메일 (모르면 비워 두기)" style="flex:1.6;min-width:120px"><button class="btn" type="button" style="font-size:12px">빼기</button>';
+    r.querySelector('button').onclick=()=>r.remove(); box.appendChild(r); r.querySelector('.bkgn').focus(); };
+  if($('#bkgadd')) $('#bkgadd').onclick=bkGadd;
+  const bkGuests=()=>[...document.querySelectorAll('#bkguests .row')].map(r=>({name:r.querySelector('.bkgn').value.trim(), email:r.querySelector('.bkge').value.trim()})).filter(g=>g.name);
   const say=t=>{ const m=$('#bkmsg'); if(!m) return; m.style.display=t?'block':'none'; m.textContent=t||''; };
   $('#bkok').onclick=async()=>{
     const room=$('#bkroom').value, d=$('#bkday').value, a=$('#bkst').value, b=$('#bken').value;
@@ -2046,6 +2058,10 @@ function bookOpen(keep){
     const meta={op:'book', room, title, note, start:s1.toISOString(), end:e1.toISOString(),
         owner, members:people.map(p=>p.id)};
     if(rep){ meta.repeat=rep; meta.until=until; }
+    const guests=bkGuests();
+    const badMail=guests.find(g=>g.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(g.email));
+    if(badMail){ btn.disabled=false; btn.textContent='예약하기'; return say(`${badMail.name} 님의 이메일 주소를 확인해 주세요.`); }
+    if(guests.length) meta.guests=guests;
     const r=await bookSend(meta, '회의실 예약 · '+title+(rep?' (반복)':''), rep?120000:45000);
     if(!$('#bkbox')) return;
     if(r.ok){
