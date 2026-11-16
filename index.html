@@ -1291,7 +1291,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:12px">웹 v22.9</span>
+       <span class="sub" style="margin:0;font-size:12px">웹 v22.10</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">로그아웃</button>
@@ -2613,20 +2613,18 @@ async function meetDraw(id){
 }
 
 // 이그드라실(거래처 관계 DB)에 이어진 회의면 그 거래처로 바로 갑니다 (11-02).
-// 타임라인에 연결된 회사 → 회사 화면, 확인 대기에 올라간 것 → 확인 대기. 이어진 것이 없으면(내부 회의 등) 보이지 않습니다.
+// 타임라인에 연결된 회사 → 회사 화면. 이어진 것이 없으면(내부 회의 등) 보이지 않습니다.
+// 2026-11-16 이그드라실 「확인 대기」 화면이 없어져 그쪽 링크는 뺐습니다.
 const YGG_URL='https://thealmightycorp.github.io/pantheon/';
 async function drawYgg(m){
   const box=$('#ygg'); if(!box || !m) return;
   try{
-    const [ev,rq]=await Promise.all([
-      SB.from('pt_rel_event').select('entity_id').eq('source_system','heimdall').eq('source_ref',m.id),
-      SB.from('pt_review_queue').select('id').eq('kind','meeting').eq('status','pending').eq('payload->>meeting_id',m.id).limit(1)]);
+    const ev=await SB.from('pt_rel_event').select('entity_id').eq('source_system','heimdall').eq('source_ref',m.id);
     const ids=[...new Set((ev.data||[]).map(x=>x.entity_id).filter(Boolean))];
     const ents=ids.length ? ((await SB.from('pt_entity').select('id,name').in('id',ids)).data||[]) : [];
-    if(cur.m.id!==m.id || (!ents.length && !(rq.data||[]).length)) return;
+    if(cur.m.id!==m.id || !ents.length) return;
     box.innerHTML=`<span style="font-size:13px;color:var(--tx2)">이그드라실</span>
-      ${ents.map(e=>`<a class="pjbtn" style="text-decoration:none" href="${YGG_URL}#entities/${encodeURIComponent(e.id)}" target="_blank" rel="noopener" title="이그드라실에서 ${esc(e.name)} 보기">${esc(e.name)} ↗</a>`).join('')}
-      ${(rq.data||[]).length?`<a class="pjbtn none" style="text-decoration:none" href="${YGG_URL}#review" target="_blank" rel="noopener" title="이그드라실 확인 대기에서 거래처에 연결">확인 대기에서 거래처 연결 ↗</a>`:''}`;
+      ${ents.map(e=>`<a class="pjbtn" style="text-decoration:none" href="${YGG_URL}#entities/${encodeURIComponent(e.id)}" target="_blank" rel="noopener" title="이그드라실에서 ${esc(e.name)} 보기">${esc(e.name)} ↗</a>`).join('')}`;
     box.style.display='flex';
   }catch(e){}
 }
