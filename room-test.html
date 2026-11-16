@@ -160,6 +160,13 @@ button{font-family:inherit}
 .pillbtn{background:transparent;border:1px solid var(--line2);color:var(--mut);
  border-radius:999px;font-size:clamp(11px,1.35vh,13px);padding:5px 13px;cursor:pointer}
 .pillbtn:active{background:var(--s2)}
+/* 2026-11-16 대기 화면의 목소리 등록·문제 신고 — 작아서 안 보인다는 의견으로 크게 (김현우 팀장) */
+.subrow{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-top:6px}
+.subbtn{background:var(--s1);border:1.5px solid var(--line2);color:var(--tx);border-radius:999px;
+ font-size:clamp(16px,2.3vh,21px);font-weight:700;padding:clamp(12px,1.8vh,16px) clamp(22px,2.4vw,30px);cursor:pointer;
+ display:inline-flex;align-items:center;gap:10px}
+.subbtn small{font-weight:500;color:var(--mut);font-size:.8em}
+.subbtn:active{background:var(--s2)}
 
 /* ── 목소리 등록 (2026-11-14) */
 .vbox{width:min(100%,860px);text-align:left;background:var(--s2);border:1px solid var(--line2);
@@ -544,9 +551,11 @@ function idlePage(){
     + (ADHOC && current()
              ? '<button class="ghost" id="unadhoc">예약된 회의로 돌아가기</button>' : '')
     // 2026-11-15 이 회의실의 회의가 진행 중이거나 20분 안에 시작하면 등록 단추를 감춥니다 (회의 시작을 막지 않게)
+    + '<div class="subrow">'
     + (mine().some(e=>new Date(e.ends_at).getTime()>now && new Date(e.starts_at).getTime()-now<20*60000) ? ''
-        : '<button class="pillbtn" id="voice">목소리 등록 — 회의록에 내 이름이 붙습니다</button>')
-    + '<button class="pillbtn" id="issue" style="margin-left:8px">문제 신고</button>'
+        : '<button class="subbtn" id="voice">🎙 목소리 등록 <small>회의록에 내 이름이 붙습니다</small></button>')
+    + '<button class="subbtn" id="issue">🛠 문제 신고</button>'
+    + '</div>'
     + '</div>'
     + (rest.length ? '<div class="list"><div class="h">다른 회의 선택 — 누르면 위 카드가 바뀝니다 · '
         + '다른 회의실 예약도 여기 있습니다</div><div class="picks">'
