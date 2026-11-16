@@ -1291,7 +1291,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:12px">웹 v22.3</span>
+       <span class="sub" style="margin:0;font-size:12px">웹 v22.4</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">로그아웃</button>
@@ -6173,6 +6173,9 @@ async function boot(){
 // 운영 화면에서는 꺼져 있습니다 — 동의를 받지도, 녹음을 막지도 않습니다.
 const CONSENT_ON = /index-test\.html|full\.html/.test(location.pathname);
 const CONSENT_VER = 'v1.0-시험';
+const CONSENT_FROM = '2026-11-16';        // 안내문 시행일
+// 안내문의 법인명 — 로그인한 사람의 소속 법인 (동의서는 법인마다 그 법인 이름으로 받습니다). 소속이 비어 있으면 더올마이티
+const csCo = () => esc((me && me.company) || '더올마이티');
 const csY = t => `<mark title="회사가 정해 채울 값 · 법무 검토 전">{${t}}</mark>`;
 const CS_ITEMS = [
   {k:'c1', no:'①', short:'녹음·회의록', title:'회의 녹음과 회의록 작성', sens:false,
@@ -6208,7 +6211,7 @@ const CS_ITEMS = [
    my:{y:'동의 · 목소리 등록 가능', n:'동의 안 함 · 화자 1, 2로 표시'}},
   {k:'c4', no:'④', short:'시스템 연결', title:'회의록을 회사 다른 시스템에 연결', sens:false,
    desc:`회의 담당자가 확정한 할 일·거래처·후속 일정을 이그드라실(거래처·연락처 기록)${csY(', 프리그')}에 연결합니다.`,
-   more:[['받는 곳',`${csY('법인명')}의 이그드라실${csY(', 프리그')}`],
+   more:[['받는 곳',`⟦법인⟧의 이그드라실${csY(', 프리그')}`],
      ['보내는 항목','회의 제목·일시, 참석자 이름, 할 일, 회의 담당자가 확정한 거래처·관계 기록·후속 일정'],
      ['목적','거래처·업무 이력 관리'],['보관 기간','회의록과 같음'],
      ['거부하면','연결 기록에서 내 이름이 빠집니다. 회의록 자체는 그대로입니다.']],
@@ -6232,7 +6235,7 @@ function consentPage(next){
   $('#app').innerHTML=`<div style="max-width:680px;margin:0 auto;padding:28px 16px 60px">
     <div class="sub" style="margin:0 0 4px;font-size:12px;letter-spacing:.08em">HEIMDALL · 처음 한 번</div>
     <h1 style="margin:0 0 4px">회의 녹음 안내와 동의</h1>
-    <div class="sub" style="margin:0 0 14px;font-size:12.5px">${csY('법인명')} · 안내문 ${esc(CONSENT_VER)} · 시행 ${csY('2026-MM-DD')}</div>
+    <div class="sub" style="margin:0 0 14px;font-size:12.5px">${csCo()} · 안내문 ${esc(CONSENT_VER)} · 시행 ${CONSENT_FROM}</div>
     <div class="sub" style="margin:0 0 8px">헤임달은 사내 회의를 녹음해 AI로 회의록을 만듭니다. 아래 네 가지는 모두 선택 동의이며, 항목마다 직접 선택해 주시면 됩니다.</div>
     <div style="border:1px solid var(--line);background:var(--s1);padding:12px 14px;margin:0 0 18px;font-size:13px;line-height:1.7">
       어느 항목에 동의하지 않으셔도 헤임달은 똑같이 쓰실 수 있고, 평가를 비롯한 어떤 불이익도 없습니다.
@@ -6246,7 +6249,7 @@ function consentPage(next){
       <div class="sub" style="margin:6px 0 8px;line-height:1.65">${it.desc}</div>
       <details style="margin:0 0 10px"><summary class="sub" style="margin:0;cursor:pointer;font-size:12.5px">자세히 보기</summary>
         <dl style="display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:10px 0 0;font-size:12.5px;line-height:1.6">
-          ${it.more.map(([a,b])=>`<dt style="color:var(--tx2);white-space:nowrap">${a}</dt><dd style="margin:0">${b}</dd>`).join('')}</dl></details>
+          ${it.more.map(([a,b])=>`<dt style="color:var(--tx2);white-space:nowrap">${a}</dt><dd style="margin:0">${b.split('⟦법인⟧').join(csCo())}</dd>`).join('')}</dl></details>
       <div style="display:flex;gap:18px;flex-wrap:wrap">
         <label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="radio" name="${it.k}" value="y"> 동의합니다</label>
         <label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="radio" name="${it.k}" value="n"> 동의하지 않습니다</label></div>
@@ -6285,7 +6288,7 @@ function consentDone(row, next){
       <dl style="display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:0;font-size:13.5px">
         <dt style="color:var(--tx2)">이름</dt><dd style="margin:0">${esc(me.name)} · ${esc(me.dept||me.company||'')}</dd>
         <dt style="color:var(--tx2)">시각</dt><dd style="margin:0">${esc(csWhen(row.updated_at||new Date()))}</dd>
-        <dt style="color:var(--tx2)">안내문</dt><dd style="margin:0">${esc(row.version)}</dd>
+        <dt style="color:var(--tx2)">안내문</dt><dd style="margin:0">${esc(row.version)} · ${csCo()} · 시행 ${CONSENT_FROM}</dd>
         ${CS_ITEMS.map(it=>`<dt style="color:var(--tx2)">${it.no} ${it.short}</dt><dd style="margin:0">${csLab(row[it.k])}</dd>`).join('')}</dl></div>
     ${row.c3==='y'?`<div class="sub" style="margin:16px 0 8px">목소리를 지금 등록할까요? 정해진 문장을 1분쯤 읽으면 됩니다. 나중에 「내 정보」에서 해도 됩니다.</div>`:''}
     <div class="row" style="margin-top:16px">
