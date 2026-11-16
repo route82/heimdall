@@ -977,6 +977,7 @@ function recPage(){
   tick=setInterval(()=>{
     const a=$('#ela'); if(a) a.textContent=el((Date.now()-REC.t0)/1000);
     const c=$('#ck'); if(c) c.textContent=clk().hm;
+    overCheck();
   }, 500);
   bindPicker();
   $('#stop').onclick=stopRec;
@@ -1017,17 +1018,51 @@ function meter(stream){
       an.getByteFrequencyData(buf);
       let sum=0; for(let i=0;i<buf.length;i++) sum+=buf[i];
       const lv=$('#lv');
+      if((sum/buf.length)>2) REC.lastSound=Date.now();
       if(lv) lv.innerHTML = (sum/buf.length)>2 ? '<i></i>소리 들어오는 중' : '';
     }, 700);
     REC.ac=ac;
   }catch(e){}
 }
 
-function stopRec(){
+// ── 2026-11-16 예약 시간이 지난 녹음 — 끊지 않고 먼저 묻습니다 (김현우 팀장 결정)
+// 회의가 끝났는데 녹음이 계속 돌면, 나중에 들어온 다른 사람들의 대화가 녹음될 수 있습니다.
+// 그렇다고 예약 시간이 지났다고 바로 끊으면 길어진 회의가 잘립니다. 그래서:
+//   예약 종료 10분 뒤 「회의가 계속되고 있나요?」 를 띄웁니다.
+//   [계속 녹음] → 그대로 녹음하고 20분 뒤에 한 번 더 묻습니다.
+//   5분 동안 아무도 누르지 않았을 때 — 소리가 계속 들어오면 회의 중으로 보고 그대로 둡니다(20분 뒤 다시 묻기).
+//                                      3분 넘게 조용하면 녹음을 멈추고 그때까지의 녹음을 올립니다.
+// 예약 없이 시작한 녹음은 끝나는 시각을 모르므로 묻지 않습니다.
+const OVER={first:10*60000, again:20*60000, wait:5*60000, quiet:3*60000};
+function overCheck(){
+  if(!REC.mr || REC.mr.state!=='recording' || !REC.ev || !REC.ev.ends_at) return;
+  const now=Date.now();
+  if(!REC.askAt) REC.askAt=new Date(REC.ev.ends_at).getTime()+OVER.first;
+  const box=document.getElementById('oversheet');
+  if(!box){
+    if(now<REC.askAt) return;
+    REC.askShown=now;
+    const b=document.createElement('div'); b.className='sheet'; b.id='oversheet';
+    b.innerHTML='<div class="sheetcard"><div class="h">예약 시간이 지났습니다 · 회의가 계속되고 있나요?</div>'
+      + '<div class="sub" style="margin:0 0 14px">계속하시면 그대로 녹음합니다. 아무도 누르지 않고 회의실이 조용하면 녹음을 멈추고 회의록을 만듭니다.</div>'
+      + '<button class="rmopt on" id="ovgo">계속 녹음</button>'
+      + '<button class="rmopt" id="ovend">회의 종료</button></div>';
+    document.body.appendChild(b);
+    b.querySelector('#ovgo').onclick=()=>{ b.remove(); REC.askAt=Date.now()+OVER.again; };
+    b.querySelector('#ovend').onclick=()=>{ b.remove(); stopRec(true); };
+    return;
+  }
+  if(now-REC.askShown<OVER.wait) return;
+  if(now-(REC.lastSound||REC.t0)<OVER.quiet){ box.remove(); REC.askAt=now+OVER.again; return; }   // 말소리가 이어지는 중
+  box.remove(); REC.autoStop=true; stopRec(true);
+}
+
+function stopRec(auto){
   if(!REC.mr || REC.mr.state!=='recording') return;
   const sec=(Date.now()-REC.t0)/1000;
+  const ob=document.getElementById('oversheet'); if(ob) ob.remove();
   // 실수로 눌렀을 때를 걸러냅니다
-  if(sec<60 && !confirm('아직 '+Math.round(sec)+'초밖에 안 됐습니다.\n회의를 끝내고 올릴까요?')) return;
+  if(auto!==true && sec<60 && !confirm('아직 '+Math.round(sec)+'초밖에 안 됐습니다.\n회의를 끝내고 올릴까요?')) return;
   clearInterval(REC.meter); clearInterval(tick);
   REC.dur=Math.floor(sec);
   REC.mr.stop();
@@ -1045,7 +1080,7 @@ function finish(){
   if(REC.blob.size<4000){ msg('녹음이 비어 있습니다','마이크가 연결되어 있는지 확인해주세요'); return; }
   // 아무도 이름을 누르지 않았으면 한 번 더 여쭙니다.
   // 참석자가 곧 열람 권한이라 비워두면 팀장·관리자만 보게 됩니다.
-  if(!REC.who.size) return askWho();
+  if(!REC.who.size && !REC.autoStop) return askWho();
   upload();
 }
 
