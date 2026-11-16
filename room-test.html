@@ -471,7 +471,7 @@ async function loadEvents(){
   const from=new Date(now-2*3600*1000).toISOString();
   const to  =new Date(now+16*3600*1000).toISOString();
   const {data}=await SB.from('hd_cal_event')
-    .select('uid,title,room,starts_at,ends_at,all_day,note')
+    .select('uid,title,room,starts_at,ends_at,all_day,note,owner_id,owner_name')
     .gte('starts_at',from).lte('starts_at',to).order('starts_at');
   EVENTS=(data||[]).filter(e=>!e.all_day);
 }
@@ -536,7 +536,7 @@ function idlePage(){
     + (ev ? '<span class="sub2">'+esc(ev.title||'회의')+'</span>' : '')
     + '</span></button>'
     + '<div class="sub" style="font-size:14px">'
-    + (ev ? '위 회의로 녹음됩니다 · 다른 회의면 아래에서 골라주세요'
+    + (ev ? '위 회의로 녹음됩니다 · 다른 회의면 아래에서 선택해 주세요'
           : '누르면 바로 녹음이 시작됩니다')
     + ' · 참석자는 녹음 중에 이름을 누르시면 됩니다</div>'
     // 예약이 떠 있어도 예약에 없는 회의를 녹음할 수 있게 합니다.
@@ -546,8 +546,9 @@ function idlePage(){
     // 2026-11-15 이 회의실의 회의가 진행 중이거나 20분 안에 시작하면 등록 단추를 감춥니다 (회의 시작을 막지 않게)
     + (mine().some(e=>new Date(e.ends_at).getTime()>now && new Date(e.starts_at).getTime()-now<20*60000) ? ''
         : '<button class="pillbtn" id="voice">목소리 등록 — 회의록에 내 이름이 붙습니다</button>')
+    + '<button class="pillbtn" id="issue" style="margin-left:8px">문제 신고</button>'
     + '</div>'
-    + (rest.length ? '<div class="list"><div class="h">다른 회의 고르기 — 누르면 위 카드가 바뀝니다 · '
+    + (rest.length ? '<div class="list"><div class="h">다른 회의 선택 — 누르면 위 카드가 바뀝니다 · '
         + '다른 회의실 예약도 여기 있습니다</div><div class="picks">'
         + rest.slice(0,6).map((e,i)=>'<button class="pick" data-ev="'+i+'">'
           + '<span class="tm">'+hm(e.starts_at)+' ~ '+hm(e.ends_at)+'</span>'
@@ -571,6 +572,7 @@ function idlePage(){
   const ah=$('#adhoc');   if(ah) ah.onclick=()=>{ ADHOC=true;  PICKED=null; idlePage(); };
   const uh=$('#unadhoc'); if(uh) uh.onclick=()=>{ ADHOC=false; PICKED=null; idlePage(); };
   const vb=$('#voice');   if(vb) vb.onclick=voicePick;
+  const ib=$('#issue');   if(ib) ib.onclick=issueSheet;
   // 다른 회의를 누르면 바로 녹음하지 않고 위 카드만 바꿉니다.
   // 지나가다 잘못 눌러 진짜 회의가 시작되는 일을 막습니다.
   app.querySelectorAll('[data-ev]').forEach(b=>b.onclick=()=>{
@@ -892,12 +894,19 @@ function paintWho(){
     const ids=[...via.keys()].filter(id=>REC.who.has(id))
       .concat([...REC.who].filter(id=>!via.has(id)));          // 고른 순서대로
     const picked=ids.map(id=>byId.get(id)).filter(Boolean);
+    // 2026-11-16 회의 담당자 — 예약에서 정해지지 않은 회의는 여기서 정합니다 (기본은 처음 누른 사람)
+    const needOwn = !(REC.ev && REC.ev.owner_id);
+    if(needOwn && (!REC.owner || !REC.who.has(REC.owner))) REC.owner = picked.length ? picked[0].id : null;
     c.innerHTML = picked.length
       ? '<span class="cntn">참석 '+picked.length+'명</span>'
         + picked.map(m=>{ const v=via.get(m.id)||{co:m.company,dp:m.dept};
             const where=[v.co, v.dp && v.dp!==NO_DEPT ? v.dp : ''].filter(Boolean).join(' ');
+            const own = needOwn ? (m.id===REC.owner
+                ? '<span data-own="'+m.id+'" style="margin-left:8px;padding:2px 8px;border-radius:999px;background:#c8102e;color:#fff;font-size:.78em;font-weight:800">담당</span>'
+                : '<span data-own="'+m.id+'" style="margin-left:8px;padding:2px 8px;border-radius:999px;border:1px solid #888;color:#444;font-size:.78em">담당 지정</span>') : '';
             return '<button class="selp" data-un="'+m.id+'">'+esc(m.name)
-              +(where?'<span class="w">'+esc(where)+'</span>':'')+'<span class="x">×</span></button>'; }).join('')
+              +(where?'<span class="w">'+esc(where)+'</span>':'')+own+'<span class="x">×</span></button>'; }).join('')
+        + (needOwn ? '<div class="sub" style="width:100%;margin:6px 0 0;font-size:.8em">담당자는 회의록을 확인하고 확정하는 분입니다 · 「담당 지정」을 누르면 바뀝니다</div>' : '')
       : '아직 아무도 누르지 않았습니다';
   }
   paintUp();          // 참석자 확인 화면일 때만 동작합니다
@@ -906,6 +915,8 @@ function bindPicker(){
   const box=$('#pk'); if(!box) return;
   const c=$('#cnt');
   if(c) c.onclick=e=>{
+    const o=e.target.closest('[data-own]');
+    if(o){ REC.owner=o.dataset.own; paintWho(); return; }
     const b=e.target.closest('[data-un]'); if(!b) return;
     unpick(b.dataset.un);
     const keep=(box.querySelector('.pkms')||{}).scrollTop||0;
@@ -982,6 +993,43 @@ function recPage(){
   bindPicker();
   $('#stop').onclick=stopRec;
   const rb=$('#rmch'); if(rb) rb.onclick=roomPick;
+}
+
+// 2026-11-16 문제 신고 — 장비는 AX팀, 시설은 경영지원팀으로 슬랙 전달 (웹의 「문제 신고」 와 같은 표에 넣습니다)
+function issueSheet(){
+  const PRE={equip:['녹음이 시작되지 않습니다','태블릿 화면이 멈췄습니다','마이크 소리가 들어오지 않습니다','화면·TV 연결이 안 됩니다'],
+             facility:['냉난방이 안 됩니다','조명이 나갔습니다','청소가 필요합니다','비품이 부족합니다']};
+  const st={kind:'equip', urgent:false, pre:''};
+  const box=document.createElement('div'); box.className='sheet';
+  const draw=()=>{ box.innerHTML='<div class="sheetcard"><div class="h">문제 신고 · '+esc(cfg.room||'회의실')+'</div>'
+    + '<div style="display:flex;gap:8px;margin-bottom:12px">'
+    +   '<button class="rmopt'+(st.kind==='equip'?' on':'')+'" data-k="equip" style="margin:0">장비</button>'
+    +   '<button class="rmopt'+(st.kind==='facility'?' on':'')+'" data-k="facility" style="margin:0">시설</button></div>'
+    + PRE[st.kind].map((t,i)=>'<button class="rmopt'+(st.pre===t?' on':'')+'" data-p="'+i+'" style="font-weight:500">'+esc(t)+'</button>').join('')
+    + '<textarea id="istx" rows="2" maxlength="300" placeholder="더 알려 주실 내용이 있으면 적어 주세요 (선택)" '
+    +   'style="width:100%;margin:6px 0 10px;padding:12px;font-size:17px;background:var(--s2);color:var(--tx);border:1px solid var(--line);border-radius:var(--r1)">'+esc(st.tx||'')+'</textarea>'
+    + '<button class="rmopt'+(st.urgent?' on':'')+'" id="isurg" style="font-weight:500">긴급 — 지금 회의를 못 하고 있습니다'+(st.urgent?' ✓':'')+'</button>'
+    + '<div style="display:flex;gap:8px;margin-top:8px"><button class="ghost" id="isx" style="flex:1">닫기</button>'
+    + '<button class="rmopt on" id="isgo" style="flex:2;margin:0">신고하기</button></div></div>';
+    box.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{ st.tx=box.querySelector('#istx').value; st.kind=b.dataset.k; st.pre=''; draw(); });
+    box.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{ st.tx=box.querySelector('#istx').value; const t=PRE[st.kind][+b.dataset.p]; st.pre=st.pre===t?'':t; draw(); });
+    box.querySelector('#isurg').onclick=()=>{ st.tx=box.querySelector('#istx').value; st.urgent=!st.urgent; draw(); };
+    box.querySelector('#isx').onclick=()=>box.remove();
+    box.querySelector('#isgo').onclick=async()=>{
+      const body=[st.pre, box.querySelector('#istx').value.trim()].filter(Boolean).join(' · ');
+      if(!body){ alert('어떤 문제인지 하나 눌러 주시거나 적어 주세요.'); return; }
+      const go=box.querySelector('#isgo'); go.disabled=true; go.textContent='보내는 중…';
+      const ins=await SB.from('hd_issue').insert({room:cfg.room||'', kind:st.kind, urgent:st.urgent, body,
+        created_by:me.id, created_name:(cfg.room||'회의실')+' 태블릿', company:''});
+      if(ins.error){ go.disabled=false; go.textContent='신고하기'; alert('신고를 남기지 못했습니다 · '+ins.error.message); return; }
+      box.innerHTML='<div class="sheetcard"><div class="h">신고를 접수했습니다</div>'
+        + '<div class="sub" style="margin:0 0 16px">담당자에게 슬랙으로 전달했습니다. '+(st.urgent?'긴급 신고는 30분 안에':'다음 근무일까지')+' 답변드리겠습니다.<br>'
+        + '태블릿 녹음이 안 되면 휴대폰이나 노트북의 헤임달 「녹음」 으로 녹음하셔도 회의록은 똑같이 나옵니다.</div>'
+        + '<button class="rmopt on" id="isok">확인</button></div>';
+      box.querySelector('#isok').onclick=()=>box.remove();
+    };
+  };
+  draw(); document.body.appendChild(box);
 }
 
 // 녹음 중에 회의실을 바꿉니다 (예약한 곳과 실제 장소가 다를 때)
@@ -1177,6 +1225,7 @@ async function upload(){
       device:'회의실 태블릿', created_by:me.id, created_name:cfg.room||'회의실',
       company:company, dept:dept,
       cal_uid:(REC.ev&&REC.ev.uid)||'', room:REC.room||cfg.room||'',
+      owner_id:(!(REC.ev&&REC.ev.owner_id) && REC.owner && REC.who.has(REC.owner)) ? REC.owner : null,
       agenda_md:(REC.agenda||''),
       started_at:new Date(REC.t0).toISOString(),
       ended_at:new Date(REC.t0+(REC.dur||0)*1000).toISOString(),
