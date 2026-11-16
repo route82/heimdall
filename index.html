@@ -1291,7 +1291,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:12px">웹 v22.8</span>
+       <span class="sub" style="margin:0;font-size:12px">웹 v22.9</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">로그아웃</button>
@@ -3223,7 +3223,7 @@ async function yggConfirmOpen(m, openActs, done){
     const mk=(x,f)=>{ const d=match&&match.get(x[f]); if(!d) return '';
       if(d.auto) return ' <span class="sub" style="margin:0;font-size:11.5px">✓ 이그드라실에 있음</span>';
       const cs=(d.candidates||[]).slice(0,5);
-      if(!cs.length) return ` <span class="sub" style="margin:0;font-size:11.5px">${x.type==='followup'?'이그드라실에 없는 이름 · 이대로는 등록되지 않습니다':'이그드라실에 없는 이름 · 확인 대기로 올라갑니다'}</span>`;
+      if(!cs.length) return ` <span class="sub" style="margin:0;font-size:11.5px">이그드라실에 없는 이름 · 새로 등록됩니다</span>`;
       return ` <select data-ym="${items.indexOf(x)}" data-ymf="${f}" style="font-size:12px;max-width:190px" title="이그드라실에 있는 비슷한 이름">
         <option value="">적힌 이름 그대로</option>${cs.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}${c.kind?' ('+esc(c.kind)+')':''}</option>`).join('')}</select>`; };
     const inp=(i,f,ph,w)=>`<input data-yi="${i}" data-yf="${f}" value="${esc(items[i][f]||'')}" placeholder="${ph}" style="flex:${w||1};min-width:90px">`;
@@ -3281,7 +3281,7 @@ async function yggSend(m, pick){
   await SB.from('hd_meeting').update({ygg_state:'sent', ygg_items:pick, ygg_result:r.data, ygg_err:''}).eq('id',m.id);
   const res=(r.data.items||[]); const cnt=k=>res.filter(x=>x.result===k).length;
   const rej=res.filter(x=>x.result==='rejected');
-  toast(`이그드라실로 ${pick.length}건을 보냈습니다 · 새로 ${cnt('created')} · 근거 추가 ${cnt('attached')} · 이름 확인 대기 ${cnt('needs_match')}`
+  toast(`이그드라실로 ${pick.length}건을 보냈습니다 · 새 기록 ${cnt('created')} · 기존 기록에 추가 ${cnt('attached')}${res.some(x=>x.new_entity)?` · 새로 등록한 거래처 ${res.filter(x=>x.new_entity).length}`:''}`
     +(cnt('duplicate')?` · 이미 보낸 것 ${cnt('duplicate')}`:'')
     +(rej.length?`<br>등록되지 않은 것 ${rej.length}건 · ${esc(rej.map(x=>x.reason||'').filter(Boolean).slice(0,2).join(' / '))}`:''), rej.length?12000:8000);
 }
