@@ -793,7 +793,10 @@ input:focus,textarea:focus,select:focus{border-color:var(--verm);box-shadow:none
 .ht-bk.other b,.ht-bk.other span{display:inline-block;max-width:100%;background:var(--s1);padding:0 4px;font-size:11.5px;line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:top}
 .ht-bk.other b{font-weight:600;color:var(--tx2);max-height:none}
 .ht-bk.other span{color:var(--tx2);margin-top:2px}
-.ht-bk.other.slim b,.ht-bk.other.slim span{display:none}
+/* 좁은 칸(30분 안팎)은 두 줄로 「다른 / 법인」 만 적습니다 — 글자가 없으면 무엇인지 알 수 없다는 의견 */
+.ht-bk.other.slim{padding:3px 2px;text-align:center}
+.ht-bk.other.slim b{font-size:10.5px;line-height:1.25;padding:1px 2px;white-space:normal;letter-spacing:-.03em}
+.ht-bk.other.slim span,.ht-bk.other.slim br.nb{display:none}
 .ht-legend i.o{border:1px solid rgba(128,128,128,.75);background:repeating-linear-gradient(135deg,transparent 0 3px,rgba(128,128,128,.6) 3px 4.5px)}
 .hm-hd{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 10px}
 .hm-hd h1{font-size:17px;margin:0}
@@ -1297,7 +1300,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:12px">웹 v22.14</span>
+       <span class="sub" style="margin:0;font-size:12px">웹 v22.15</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">로그아웃</button>
@@ -2385,7 +2388,7 @@ async function drawHomeTL(){
       if(b<=a) return;
       h+=`<div class="ht-bk other${new Date(e.ends_at)<now?' past':''}${(b-a)<6.5?' slim':''}"
         style="left:${a.toFixed(3)}%;width:calc(${(b-a).toFixed(3)}% - 2px)" title="다른 법인 예약 ${hmOf(e.starts_at)}~${hmOf(e.ends_at)} · 내용은 보이지 않습니다">
-        <b>다른 법인</b><br><span>${hmOf(e.starts_at)}~${hmOf(e.ends_at)}</span></div>`;
+        <b>${(b-a)<6.5?'다른<br>법인':'다른 법인'}</b><br class="nb"><span>${(s1=>{ const e1=hmOf(e.ends_at); return (s1.endsWith(':00')&&e1.endsWith(':00')) ? (+s1.slice(0,2))+'~'+(+e1.slice(0,2))+'시' : s1+'~'+e1; })(hmOf(e.starts_at))}</span></div>`;
     });
     if(nowOn) h+=`<div class="ht-now" style="left:${pct(nowM).toFixed(3)}%"></div>`;
     h+='</div></div>';
