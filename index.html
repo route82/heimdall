@@ -1291,7 +1291,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:12px">웹 v22.10</span>
+       <span class="sub" style="margin:0;font-size:12px">웹 v22.11</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">로그아웃</button>
@@ -3152,8 +3152,8 @@ function drawMeeting(){
 // ─────────────────────────── 확정 화면 — 이그드라실로 보낼 내용 검토 (2026-11-16 · 홍석진 대표 11/14 지시)
 // 담당자가 [회의 확정]을 누르면, 회의에서 언급된 거래처 연결 · 새 연락처 · 관계 기록 · 후속 일정을
 // 하나씩 보고 빼거나 고친 뒤 확정합니다. 헤임달은 관계를 판단하지 않고 근거만 보냅니다 (이그드라실 PRD 6.2).
-// 이그드라실의 받는 함수(pt_entity_match · pt_evidence_ingest)가 운영에 올라오기 전이라 시험용 화면에서만 켭니다.
-const YGG_ON = /index-test\.html|full\.html/.test(location.pathname);
+// 2026-11-16 시험용 화면과 실제 호출로 확인을 마쳐 운영 화면에도 켰습니다 (김현우 팀장 결정). 끄려면 false.
+const YGG_ON = true;
 const YGG_VERB = {collaborates:'협업·콜라보', licenses:'라이선스', launches:'출시', exhibits:'전시·팝업', sells:'판매·입점',
   produces:'제작', distributes:'유통', invests:'투자', represents:'에이전트·대리', owns:'권리 보유', endorses:'광고모델·앰배서더',
   based_on:'원작·파생', shareholder_of:'주주', held_at:'행사 장소', worked_with_us:'우리와 거래', participant_in:'프로젝트 참여'};
