@@ -684,8 +684,9 @@ function cgDraw(){
         : wait ? '<div style="flex:1;text-align:left"><div style="font-size:1.2em;font-weight:800">'+wait+'명의 선택을 기다립니다</div>'
             + '<div class="sub" style="margin:2px 0 0">모두 동의해야 녹음을 시작할 수 있습니다</div></div>'
             + '<button class="big go" disabled style="font-size:20px;padding:16px 24px;opacity:.4">녹음 시작</button>'
-        : '<div style="flex:1;text-align:left"><div style="font-size:1.2em;font-weight:800">'+(A.length?'모두 동의했습니다':'참석자를 추가해 주세요')+'</div></div>'
-            + (A.length?'<button class="big go" id="cgstart" style="font-size:20px;padding:16px 24px">녹음 시작</button>':''))
+        : '<div style="flex:1;text-align:left"><div style="font-size:1.2em;font-weight:800">'+(A.length?'모두 동의했습니다':'예약에 참석자가 적혀 있지 않습니다')+'</div>'
+            + (A.length?'':'<div class="sub" style="margin:2px 0 0">녹음 중에 이름을 누르면 그때 동의를 확인합니다</div>')+'</div>'
+            + '<button class="big go" id="cgstart" style="font-size:20px;padding:16px 24px">녹음 시작</button>')
     + '</div><button class="ghost" id="cgback">돌아가기</button></div><div></div>';
   $('#cgback').onclick=()=>idlePage();
   $('#cgadd').onclick=()=>{ const n=(prompt('참석자 이름')||'').trim(); if(!n) return; A.push({name:n, guest:true, st:'wait', via:''}); cgDraw(); };
@@ -898,6 +899,8 @@ async function startRec(ev){
 
   REC.stream=stream; REC.chunks=[]; REC.t0=Date.now(); REC.ev=ev||null;
   REC.title=(ev&&ev.title)||''; REC.who=new Set(); REC.via=new Map();
+  // 2026-11-16 점검: 지난 녹음의 상태를 비웁니다 (예약 초과 확인 시각·자동 정지·폐기 표시·담당자)
+  REC.askAt=0; REC.askShown=0; REC.autoStop=false; REC.lastSound=0; REC.discard=false; REC.norecA=null; REC.owner=null;
   PICKED=null; ADHOC=false;
   REC.agenda=((ev&&ev.note)||'').trim();
   REC.room=cfg.room||'';
@@ -1290,6 +1293,7 @@ function finish(){
   const ext=type.indexOf('mp4')>=0?'mp4':type.indexOf('ogg')>=0?'ogg':'webm';
   REC.blob=new Blob(REC.chunks,{type}); REC.ext=ext; REC.type=type;
   REC.mr=null; REC.chunks=[];
+  if(LIVE.id){ try{ SB.from('hd_rec_live').update({last_part_at:new Date().toISOString(), updated_at:new Date().toISOString()}).eq('id',LIVE.id).then(()=>{},()=>{}); }catch(e){} }
   REC.up=true;      // 참석자 묻기·올리기가 끝날 때까지 2분마다 새로 읽기·새로고침을 쉽니다
   if(REC.blob.size<4000){ msg('녹음이 비어 있습니다','마이크가 연결되어 있는지 확인해주세요'); return; }
   // 아무도 이름을 누르지 않았으면 한 번 더 여쭙니다.
@@ -1317,6 +1321,10 @@ function askWho(){
   bindPicker();
   $('#up').onclick=upload;
   paintUp();
+  // 2026-11-16 점검: 10분 동안 아무도 누르지 않으면 이대로 올립니다 (모두 나간 뒤 녹음이 태블릿에만 남지 않게)
+  clearTimeout(askWho.t); const arm=()=>{ clearTimeout(askWho.t); askWho.t=setTimeout(()=>{ if($('#up')) upload(); }, 10*60000); };
+  app.onclick=arm; arm();
+  const h=$('#uphint'); if(h) h.insertAdjacentHTML('afterend','<div class="sub" style="font-size:12px;opacity:.75">10분 동안 아무도 누르지 않으면 이대로 올립니다</div>');
 }
 
 // 누른 인원에 따라 올리기 단추의 말을 바꿉니다
@@ -1367,6 +1375,7 @@ function meetingCoDept(){
 }
 
 async function upload(){
+  clearTimeout(askWho.t); if(app.onclick) app.onclick=null;
   REC.up=true;      // 올리는 동안·결과 화면에서는 스스로 새로고침하지 않습니다
   app.innerHTML='<div class="mid"><div class="done"><span class="ok">⏳</span>올리는 중입니다…</div></div>';
 
