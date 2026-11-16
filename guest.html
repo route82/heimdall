@@ -64,15 +64,16 @@ function draw(g){
       <details><summary>자세히 보기</summary><dl>
         <dt>처리 항목</dt><dd>이름, 이메일, 회의 음성, 전사문, 요약</dd>
         <dt>목적</dt><dd>회의록 작성, 합의 사항·후속 일정 관리</dd>
-        <dt>열람 범위</dt><dd>${co||Y('법인명')}의 회의 참석자와 담당자</dd>
-        <dt>보관 기간</dt><dd>녹음 원본은 회의록 확정 후 ${Y('90일')}, 회의록은 ${Y('N년')}</dd>
+        <dt>열람 범위</dt><dd>${co||'회의를 연 법인'}의 회의 참석자와 담당자</dd>
+        <dt>보관 기간</dt><dd>녹음 원본은 회의 확정 후 90일, 회의록은 작성일로부터 3년 보관 후 삭제</dd>
         <dt>동의하지 않으면</dt><dd>이 회의는 녹음하지 않습니다. 참석하셨다는 사실과 동의하지 않으셨다는 기록만 남습니다.</dd></dl></details>
       <div><label class="opt"><input type="radio" name="g1" value="y"> 동의합니다</label>
         <label class="opt"><input type="radio" name="g1" value="n"> 동의하지 않습니다</label></div></div>
 
     <div class="card" id="b2"><h2>② 회의록 요약용으로 해외 AI에 회의 글 보내기</h2>
-      요약에 Anthropic(미국)의 AI를 씁니다. 전사문만 보내고 음성은 보내지 않으며, AI 학습에 쓰지 않습니다.
-      동의하지 않으시면 ${Y('국내 처리 / 요약 없이 전사문만')}으로 만듭니다.
+      요약에 Anthropic(미국)의 AI를 씁니다. 회의록을 만들 때마다 전사문(발언 내용·참석자 이름)만 암호화된 통신으로 보내고 음성은 보내지 않습니다.
+      받는 곳은 Anthropic PBC (미국 · 548 Market St, PMB 90375, San Francisco, CA 94104 · 개인정보 문의 privacy@anthropic.com)이며, 요약에만 쓰고 AI 학습에 쓰지 않고 받은 날부터 30일 안에 삭제합니다(이용정책 위반 점검 등 예외 시 더 보관될 수 있음).
+      동의하지 않으시면 이 회의는 해외 AI로 보내지 않고, AI 요약 없이 전사문만으로 회의록을 만듭니다.
       <div><label class="opt"><input type="radio" name="g2" value="y"> 동의합니다</label>
         <label class="opt"><input type="radio" name="g2" value="n"> 동의하지 않습니다</label></div></div>
 

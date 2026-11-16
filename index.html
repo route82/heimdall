@@ -1771,7 +1771,7 @@ function voiceSelfResult(ok, head, sub){
     <div class="row">${ok?'':'<button class="btn p" id="vsre">다시 하기</button>'}
       <button class="btn${ok?' p':''}" id="vsx">닫기</button></div>`);
   const re=$('#vsre'); if(re) re.onclick=voiceSelf;
-  $('#vsx').onclick=voiceSelfClose;
+  $('#vsx').onclick=()=>{ voiceSelfClose(); if(ok && VS.onDone){ const f=VS.onDone; VS.onDone=null; f(); } };
 }
 
 async function renderHome(){
@@ -2389,7 +2389,7 @@ async function drawHomeTL(){
   let [cal,mtg,bz]=await Promise.all([
     calSel().gte('starts_at',from).lte('starts_at',to).order('starts_at'),
     SB.from('hd_meeting').select('id,cal_uid').not('cal_uid','is',null).eq('held_on',kd),
-    SB.from('hd_cal_busy').select('uid,room,starts_at,ends_at').gte('starts_at',from).lte('starts_at',to)]);
+    SB.from('hd_cal_busy').select('*').gte('starts_at',from).lte('starts_at',to)]);
   if(cal.error && CALX.full){            // 새 칸이 아직 없는 DB — 예전 칸만으로 다시 읽습니다
     CALX.full=false;
     cal=await calSel().gte('starts_at',from).lte('starts_at',to).order('starts_at');
@@ -2433,8 +2433,8 @@ async function drawHomeTL(){
       const s1=hmOf(e.starts_at), e1=hmOf(e.ends_at);
       const tm=(s1.endsWith(':00')&&e1.endsWith(':00')) ? (+s1.slice(0,2))+'~'+(+e1.slice(0,2))+'시' : s1+'~'+e1;
       h+=`<div class="ht-bk other${new Date(e.ends_at)<now?' past':''}"
-        style="left:${a.toFixed(3)}%;width:${(b-a).toFixed(3)}%" title="다른 법인 예약 ${s1}~${e1} · 내용은 보이지 않습니다">
-        <b>다른 법인</b><br class="nb"><span>${tm}</span></div>`;
+        style="left:${a.toFixed(3)}%;width:${(b-a).toFixed(3)}%" title="다른 법인 예약${e.label?' · '+esc(e.label):''} · ${s1}~${e1}">
+        <b>${esc(e.label||'다른 법인')}</b><br class="nb"><span>${tm}</span></div>`;
     });
     if(nowOn) h+=`<div class="ht-now" style="left:${pct(nowM).toFixed(3)}%"></div>`;
     h+='</div></div>';
@@ -2452,7 +2452,7 @@ async function drawHomeTL(){
     ${cal.error?`<div class="empty">예약을 불러오지 못했습니다 · ${esc(cal.error.message)}</div>`:`
     <div class="ht-tl"><div class="ht-in">${h}</div>
       <div class="ht-legend"><span><i class="m"></i>내 회의</span><span><i></i>우리 그룹 회의</span>
-        <span><i class="o"></i>다른 법인 예약 (내용은 보이지 않음)</span>
+        <span><i class="o"></i>다른 법인 예약 (법인·팀 이름만 보임)</span>
         <span>빈 곳을 누르면 그 시간으로 예약</span></div>
     </div>`}
     ${lost.length?`<div class="sub" style="margin:-16px 0 22px">회의실을 알 수 없는 예약 ${lost.length}건 · ${lost.map(e=>esc(hmOf(e.starts_at)+' '+htName(e))).join(' · ')}</div>`:''}`;
@@ -2465,7 +2465,7 @@ async function drawHomeTL(){
   $('#ht-issue').onclick=()=>issueOpen();
   box.querySelectorAll('.ht-seg button').forEach(b=>b.onclick=()=>{ HT.scope=b.dataset.s; drawHomeTL(); });
   box.querySelectorAll('.ht-bk.other').forEach(b=>b.onclick=ev=>{ ev.stopPropagation();
-    toast('다른 법인이 예약한 시간입니다. 내용은 보이지 않습니다', 3000); });
+    toast('다른 법인이 예약한 시간입니다. 법인·팀 이름만 보입니다', 3000); });
   box.querySelectorAll('.ht-bk[data-n]').forEach(b=>b.onclick=ev=>{ ev.stopPropagation(); htOpen(evs[+b.dataset.n], done.get(evs[+b.dataset.n].uid)||''); });
   box.querySelectorAll('.ht-track[data-room]').forEach(t=>t.onclick=ev=>{
     if(ev.target!==t) return;
@@ -3800,7 +3800,7 @@ async function renderMembers(){
   const data=mem.data, invites=(inv.data||[]).filter(i=>!i.used_at);
   const wait=data.filter(m=>!m.approved && m.status!=='left');
   const ok=data.filter(m=>m.approved && m.status!=='left');
-  const left=data.filter(m=>m.status==='left');
+  const left=data.filter(m=>m.status==='left' && !m.merged_into);   // 합친 계정은 퇴사 목록에서 뺍니다 (2026-11-16)
   // 인사 담당은 구성원 ↔ 부서 관리자(팀장)만 바꿉니다. 관리자·임원 계정은 고르지 못하게 둡니다 (서버도 막습니다)
   const limRole = me.role!=='admin' && me.role!=='ceo';
   const ROLE_OK = limRole ? {member:ROLE.member, manager:ROLE.manager} : ROLE;
@@ -4935,8 +4935,9 @@ let MEMBERS = null;
 async function loadMembers(){
   if(MEMBERS) return MEMBERS;
   const {data}=await SB.from('hd_member')
-    .select('id,name,company,dept').eq('approved',true).order('name');
-  MEMBERS=(data||[]).filter(m=>(m.name||'').trim());
+    .select('id,name,company,dept,status').eq('approved',true).order('name');
+  // 2026-11-16 퇴사자·하나로 합친 계정은 참석자·예약 고르기에 나오지 않게 뺍니다
+  MEMBERS=(data||[]).filter(m=>(m.name||'').trim() && (m.status||'active')!=='left');
   let dl=document.getElementById('hd-mnames');
   if(!dl){ dl=document.createElement('datalist'); dl.id='hd-mnames'; document.body.appendChild(dl); }
   dl.innerHTML=MEMBERS.map(m=>`<option value="${esc(m.name)}">`).join('');
@@ -5462,9 +5463,87 @@ function recJobOf(ext){
     ...sc, ...extra};
 }
 
+// ─────────────────────────── 웹 녹음 전 동의 확인 (2026-11-16 · 전원 동의제를 웹 녹음에도)
+// 회의실 태블릿과 같은 규칙입니다. 직원·손님 구분 없이 한 명이라도 동의하지 않으면 녹음하지 않습니다.
+// 참석자는 녹음하는 사람의 기기에서 본인 이름 옆 [여기서 동의 받기]를 직접 누릅니다. 누가 어느 기기에서 받았는지 기록에 남습니다.
+// 아이디어 노트·지시사항처럼 혼자 남기는 녹음은 묻지 않습니다. 시험판(index-test)에서만 켜져 있습니다.
+async function webConsentGate(){
+  const type=($('#rc-type')||{value:'meeting'}).value;
+  if(!CONSENT_ON || (type!=='meeting' && type!=='interview')) return true;
+  await loadMembers();
+  const title=($('#rc-title').value||'').trim()||'회의';
+  const cs=$('#rc-cal'), uid=(cs&&cs.value)||'';
+  const names=[...new Set([me.name, ...(REC.att?REC.att.value():[])].map(s=>String(s||'').trim()).filter(Boolean))];
+  const A=[], seen=new Set();
+  names.forEach(n=>{ const m = n===me.name ? me : findMember(n);
+    if(m){ if(!seen.has(m.id)){ seen.add(m.id); A.push({id:m.id, name:m.name, st:'wait', via:''}); } }
+    else A.push({name:n, guest:true, st:'wait', via:''}); });
+  try{ const r=await SB.rpc('hd_consent_state',{p_ids:A.filter(a=>a.id).map(a=>a.id)});
+    const st=new Map((r.data||[]).map(x=>[x.member_id, x.c1==='y'?'ok':x.c1==='n'?'no':'wait']));
+    A.forEach(a=>{ if(a.id){ a.st=st.get(a.id)||'wait'; if(a.st!=='wait') a.via='미리 선택'; } }); }catch(e){}
+  if(uid){ try{ const g=await SB.rpc('hd_guest_state',{p_cal_uid:uid});
+    (g.data||[]).forEach(x=>A.push({gid:x.id, name:x.name, guest:true, booked:true,
+      st:x.g1==='y'?'ok':x.g1==='n'?'no':'wait', via:x.g1==='wait'?'':'메일'})); }catch(e){} }
+  const hm=()=>new Date().toTimeString().slice(0,5);
+  return await new Promise(done=>{
+    const fin=v=>{ bookClose(); done(v); };
+    const B={ok:'<b style="color:#1a7f4b">동의</b>', no:'<b style="color:var(--err)">동의 안 함</b>', wait:'<b style="color:var(--tx3)">아직 선택 전</b>'};
+    const ask=i=>{ const a=A[i];
+      bookBox(`<h1 style="font-size:16px;margin:0 0 6px">${esc(a.name)} 님, 녹음에 동의하시나요?</h1>
+        <div class="sub" style="margin:0 0 14px;line-height:1.6">회의를 녹음해 회의록을 만듭니다. 동의하지 않으셔도 회의는 그대로 진행하고, 녹음만 하지 않습니다. 불이익은 없습니다.</div>
+        <button class="btn p full" id="wcy" style="margin-bottom:8px">동의합니다</button>
+        <button class="btn full" id="wcn" style="margin-bottom:8px">동의하지 않습니다</button>
+        <button class="btn full" id="wcx">닫기</button>`);
+      $('#wcx').onclick=draw;
+      const pick=async r=>{
+        try{
+          if(a.id){ const x=await SB.rpc('hd_consent_web',{p_member:a.id, p_c1:r==='ok'?'y':'n', p_title:title});
+            if(x.error) throw x.error; a.st=x.data==='y'?'ok':'no'; }
+          else { if(a.gid){ const x=await SB.rpc('hd_guest_web',{p_id:a.gid, p_g1:r==='ok'?'y':'n'}); if(x.error) throw x.error; }
+            a.st=r; }
+          a.via='이 기기'; a.at=hm();
+        }catch(e){ toast('기록하지 못했습니다 · '+esc(e.message||String(e)), 6000); }
+        draw(); };
+      $('#wcy').onclick=()=>pick('ok'); $('#wcn').onclick=()=>pick('no'); };
+    const draw=()=>{
+      const wait=A.filter(a=>a.st==='wait').length, no=A.filter(a=>a.st==='no').length;
+      bookBox(`<h1 style="font-size:16px;margin:0 0 4px">녹음 전 동의 확인</h1>
+        <div class="sub" style="margin:0 0 12px;font-size:12px">${esc(title)} · 직원·손님 모두 같은 규칙입니다. 한 명이라도 동의하지 않으면 녹음하지 않습니다.</div>
+        ${A.map((a,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line)">
+          <div style="flex:1"><b>${esc(a.name)}</b><div class="sub" style="margin:2px 0 0;font-size:12px">${a.guest?(a.booked?'손님':'손님 · 오늘 추가'):'직원'}${a.via?' · '+esc(a.via)+(a.at?' '+a.at:''):''}</div></div>
+          ${B[a.st]}${a.st!=='ok'?`<button class="btn" data-wca="${i}" style="font-size:12px">여기서 동의 받기</button>`:''}</div>`).join('')}
+        <div style="display:flex;gap:8px;margin:10px 0 4px;flex-wrap:wrap"><input id="wcnm" placeholder="참석자 추가 (명단에 없는 분)" style="flex:1;min-width:140px"><button class="btn" id="wcadd">추가</button></div>
+        <div style="border:1px solid var(--line2);padding:12px 14px;margin-top:10px">
+          ${no?`<b>이 회의는 녹음하지 않습니다</b><div class="sub" style="margin:2px 0 8px;font-size:12px">참석자 ${no}명이 동의하지 않았습니다. 다시 동의하면 녹음할 수 있습니다.</div>
+                 <button class="btn" id="wcnorec">녹음 없이 회의하기</button>`
+            : wait?`<b>${wait}명의 선택을 기다립니다</b><div class="sub" style="margin:2px 0 0;font-size:12px">모두 동의해야 녹음을 시작할 수 있습니다</div>`
+            : `<b>모두 동의했습니다</b><div style="margin-top:8px"><button class="btn p" id="wcgo">녹음 시작</button></div>`}
+        </div>
+        <div style="text-align:right;margin-top:12px"><button class="btn" id="wccancel">취소</button></div>`);
+      document.querySelectorAll('[data-wca]').forEach(b=>b.onclick=()=>ask(+b.dataset.wca));
+      $('#wcadd').onclick=()=>{ const n=($('#wcnm').value||'').trim(); if(!n) return;
+        const m=findMember(n); if(m && A.some(a=>a.id===m.id)) return draw();
+        A.push(m?{id:m.id, name:m.name, st:'wait', via:''}:{name:n, guest:true, st:'wait', via:''}); draw(); };
+      $('#wccancel').onclick=()=>fin(false);
+      const go=$('#wcgo'); if(go) go.onclick=()=>fin(true);
+      const nr=$('#wcnorec'); if(nr) nr.onclick=async()=>{ nr.disabled=true;
+        const ins=await SB.from('hd_norec').insert({cal_uid:uid, title, room:(cs&&cs.value&&cs.selectedOptions[0].dataset.room)||'',
+          starts_at:new Date().toISOString(), owner_name:me.name,
+          attendees:A.map(a=>({name:a.name, kind:a.guest?'손님':'직원', id:a.id||null, state:a.st==='ok'?'y':a.st==='no'?'n':'wait', via:a.via||'', at:a.at||''})),
+          reason:'참석자 미동의', created_by:me.id});
+        toast(ins.error?'기록하지 못했습니다 · '+esc(ins.error.message)
+          :'녹음하지 않고 진행합니다.<br>음성과 내용은 저장하지 않고, 참석자와 동의 여부만 기록했습니다.', 8000);
+        fin(false); };
+    };
+    draw();
+  });
+}
+
 async function recStart(){
   if(!(me.company||'').trim())
     return toast('계정에 소속(회사)이 등록되어 있지 않습니다.<br>관리자에게 소속 등록을 요청해주세요.', 7000);
+  if(REC.starting || (REC.mr && REC.mr.state==='recording')) return;
+  if(!(await webConsentGate())) return;           // 2026-11-16 녹음 전 동의 확인 (시험판)
   const title=($('#rc-title').value||'').trim() || '회의';
   // 시작 단추가 두 번 눌리면 녹음기가 둘 생겨 하나가 마이크를 쥔 채 남습니다 (회의실 태블릿에서 실제로 생긴 일)
   if(REC.starting || (REC.mr && REC.mr.state==='recording')) return;
@@ -6263,16 +6342,18 @@ async function boot(){
       return;}
     data = ins.data;
   }
-  if(!data.name || !data.company) return profilePage(data);
+  // 2026-11-16 퇴사·합친 계정은 프로필 입력보다 먼저 막습니다 (회사 칸이 빈 계정이 프로필 화면으로 새지 않게)
   if(data.status==='left'){
+    const merged=!!data.merged_into;
     $('#app').innerHTML=`<div class="auth"><div class="box" style="text-align:center">
-      <h1 style="font-size:17px">퇴사 처리된 계정입니다</h1>
-      <p class="sub">이 계정으로는 더 이상 헤임달을 쓸 수 없습니다.<br>
-        잘못 처리된 것이라면 관리자에게 문의해주세요.</p>
+      <h1 style="font-size:17px">${merged?'원래 계정으로 합쳐진 계정입니다':'퇴사 처리된 계정입니다'}</h1>
+      <p class="sub">${merged?'이 로그인은 원래 쓰시던 계정과 하나로 합쳤습니다.<br>로그아웃한 뒤 <b>슬랙으로 로그인</b>하거나 원래 이메일로 로그인해 주세요.'
+        :'이 계정으로는 더 이상 헤임달을 쓸 수 없습니다.<br>잘못 처리된 것이라면 관리자에게 문의해주세요.'}</p>
       <button class="btn full" onclick="localStorage.setItem('hd_auto','0');window.SBOUT()">로그아웃</button></div></div>`;
     window.SBOUT=async()=>{await SB.auth.signOut({scope:'local'});location.reload();};
     return;
   }
+  if(!data.name || !data.company) return profilePage(data);
   if(!data.approved) return pendingPage(data);
   // 회의실 태블릿 전용 계정은 이 화면을 열 수 없습니다 (2026-09-14)
   //   태블릿은 회의실에 놓여 있어 아무나 만질 수 있습니다. 로그인이 살아 있으므로
@@ -6286,16 +6367,21 @@ async function boot(){
     try{ history.replaceState(null,'',location.pathname+location.search+'#/home'); }catch(e){}
   const enter=()=>{ shell(); checkPending(); route(); };
   // 2026-11-16 처음 로그인하거나 안내문이 바뀌면 회의 녹음 안내와 동의를 먼저 받습니다 (시험용 화면에서만)
+  // 2026-11-16 미리보기 — 주소 끝 ?onboard=1 이면 첫 사용 단계를 처음부터 보여 주되 아무것도 기록하지 않습니다
+  if(CONSENT_ON && OB_PREVIEW){ await consentVerLoad(); CONSENT_PREV=''; return consentPage(enter); }
   if(CONSENT_ON && await consentNeeded()) return consentPage(enter);
+  // 2026-11-16 홍석진 대표 — ③에 동의하셨는데 목소리가 아직 없으면 등록부터 마칩니다 (태블릿에서 다시 묻지 않게)
+  if(CONSENT_ON){ try{ const r=await consentRow(); if(r && r.c3==='y' && !(await voiceRegistered())) return obVoice({saved:true, next:enter}); }catch(e){} }
   enter();
 }
 
 // ─────────────────────────── 회의 녹음 안내와 동의 (2026-11-16 · 홍석진 대표 11/15 지시)
 // 시안: heimdall-plan.vercel.app/consent-mock.html · consent-admin.html
-// 법무 검토 전이고 노란 칸(법인명·보관 기간 등)이 비어 있어, 시험용 화면에서만 켭니다.
+// 2026-11-16 노란 칸을 법령 원문 기준 값으로 채우고 운영에서 켰습니다.
 // 운영 화면에서는 꺼져 있습니다 — 동의를 받지도, 녹음을 막지도 않습니다.
-const CONSENT_ON = /index-test\.html|full\.html/.test(location.pathname);
-let CONSENT_VER = 'v1.0-시험';
+// 2026-11-16 운영 반영 (김현우 팀장 지시) — 안내문을 개인정보 보호법·통신비밀보호법 원문 기준으로 정비하고 모든 화면에서 켭니다
+const CONSENT_ON = true;
+let CONSENT_VER = 'v1.0';
 let CONSENT_FROM = '2026-11-16';          // 안내문 시행일
 let CONSENT_NOTE = '';                    // 개정판의 바뀐 점 요약
 // 담당자가 「안내문 개정판 등록」 으로 올린 최신 판을 읽습니다. 없으면 위 값을 씁니다.
@@ -6311,10 +6397,10 @@ const CS_ITEMS = [
    desc:'회의실 예약으로 잡은 회의와 업무 회의를 녹음해 회의록을 만듭니다. 인사 면담·징계·법무 회의는 녹음하지 않습니다. 참석자 한 명이라도 동의하지 않으면 그 회의는 녹음하지 않습니다(손님도 같은 규칙).',
    more:[['처리하는 정보','회의 음성, 전사문, 요약·할 일, 발언자 구분 표시, 참석자 이름·소속, 회의 일시·장소'],
      ['목적','회의록 작성·공유, 결정 사항과 할 일 관리, 지난 회의 검색, 회의실 이용 관리'],
-     ['근거','본인 동의 (개인정보 보호법 제15조제1항제1호)'],
+     ['근거','본인 동의 (개인정보 보호법 제15조제1항제1호). 참석자 전원이 동의한 회의만 녹음합니다 (통신비밀보호법 제3조·제14조 — 공개되지 않은 타인 간 대화의 녹음 금지).'],
      ['볼 수 있는 사람','그 회의 참석자, 회의 담당자, 소속 부서장. 시스템 관리자는 장애 처리 때만 보고 접근 기록이 남습니다.'],
-     ['보관 기간',`녹음 원본은 회의 확정 후 ${csY('90일')}, 회의록은 ${csY('N년')} 보관 후 자동 삭제`],
-     ['처리 위탁','전사: 사무실 처리 서버(외부 전송 없음) · 저장: Supabase (서울) · 요약 AI: ②에서 안내'],
+     ['보관 기간','녹음 원본은 회의 확정 후 90일, 회의록(전사문·요약)은 작성일로부터 3년 보관 후 삭제'],
+     ['처리 위탁','전사: 사무실 처리 서버(외부 전송 없음) · 저장: Supabase (서울) · 회의록 알림: Slack (Salesforce, 미국 · 회사 업무 메신저) · 요약 AI: ②에서 안내'],
      ['녹음 표시',`녹음 중에는 회의실 화면에 표시되고, 회의 중 언제든 일시 중지를 요청할 수 있습니다. 예약 시간이 10분 지나면 회의실 화면에서 계속 녹음할지 확인하고, 응답이 없고 회의실이 조용하면 녹음을 멈춥니다.`],
      ['거부·철회하면','내가 참석한 회의는 녹음하지 않고, 참석자·비동의·녹음 안 함 기록만 남깁니다. 참석자·팀 리드에게 가는 미녹음 알림에도 이름은 적지 않습니다. 철회는 담당자에게 요청하시면 되고, 요청 이후 회의부터 적용합니다.'],
      ['권리','본인이 나온 회의록의 열람·정정 요청. 처리 정지·삭제 요청은 법령이 정한 범위에서 처리합니다.']],
@@ -6322,30 +6408,32 @@ const CS_ITEMS = [
    my:{y:'동의 · 내가 참석한 회의 녹음', n:'동의 안 함 · 내가 참석한 회의는 녹음 안 함'}},
   {k:'c2', no:'②', short:'해외 AI', title:'회의록 요약용으로 해외 AI에 회의 글 보내기', sens:false,
    desc:'회의록 요약에 Anthropic(미국)의 AI를 씁니다. 전사문만 보내고 음성은 보내지 않으며, AI 학습에는 쓰지 않습니다.',
-   more:[['보내는 항목',`전사문(발언 내용, 발언자 구분, 참석자 이름). 음성 원본은 보내지 않음 ${csY('처리 서버 확인')}`],
-     ['받는 곳·국가',`Anthropic PBC, 미국 ${csY('개인정보 담당 연락처')}`],
+   more:[['보내는 항목','전사문(발언 내용, 발언자 구분, 참석자 이름). 음성 원본은 보내지 않습니다.'],
+     ['받는 곳·국가','Anthropic PBC (미국 · 548 Market St, PMB 90375, San Francisco, CA 94104 · 개인정보 문의 privacy@anthropic.com)'],
      ['시기·방법','회의록을 만들 때마다 암호화된 통신으로'],
-     ['받는 곳의 이용·보관',`요약 생성에만 사용, 학습에 쓰지 않음, ${csY('계약상 보관 기간')} 뒤 삭제`],
-     ['거부하면',`내가 참석한 회의는 ${csY('국내 처리 / 요약 없이 전사문만')}으로 회의록을 만듭니다.`]],
-   y:'내 회의도 AI 요약이 붙습니다.', n:`내가 참석한 회의는 해외로 보내지 않고 ${csY('국내 처리')}합니다.`,
-   my:{y:'동의 · 내 회의도 AI 요약', n:'동의 안 함 · 내 회의는 국내 처리'}},
+     ['받는 곳의 이용·보관','회의록 요약 생성에만 사용하고 AI 학습에 쓰지 않습니다(Anthropic 상용 약관). 받은 날부터 30일 안에 자동 삭제합니다(이용정책 위반 점검·법령상 보관 등 예외 시 더 보관될 수 있음).'],
+     ['근거','국외 이전에 대한 별도 동의 (개인정보 보호법 제28조의8제1항제1호)'],
+     ['거부하면','내가 참석한 회의는 해외 AI로 보내지 않고, AI 요약 없이 전사문만으로 회의록을 만듭니다. 이그드라실 자동 추출과 물어보기에도 그 회의는 쓰지 않습니다.']],
+   y:'내 회의도 AI 요약이 붙습니다.', n:'내가 참석한 회의는 해외 AI로 보내지 않고, AI 요약 없이 전사문만으로 회의록을 만듭니다.',
+   my:{y:'동의 · 내 회의도 AI 요약', n:'동의 안 함 · 내 회의는 AI 요약 없이 전사문만'}},
   {k:'c3', no:'③', short:'목소리', title:'목소리로 발언자 식별', sens:true,
    desc:'목소리 특징을 등록해 두면 회의록에 내 이름이 자동으로 붙습니다. 특정 개인을 식별하는 정보라 다른 항목과 따로 동의를 받습니다.',
    more:[['저장하는 것','목소리 특징값(숫자 묶음)만 저장하고, 등록할 때 읽은 녹음은 바로 지웁니다.'],
-     ['등록 방법','로그인 후 「내 정보」에서 본인이 직접 정해진 문장을 읽어 등록합니다.'],
+     ['등록 방법','처음 헤임달에 들어올 때(또는 「내 정보」에서) 본인이 직접 정해진 문장을 읽어 등록합니다. 회의실 태블릿에서도 등록할 수 있습니다.'],
      ['쓰는 곳','내가 참석자로 들어간 회의의 발언자 이름 붙이기에만 씁니다.'],
-     ['보관 기간',`철회하거나 퇴사할 때까지. 퇴사하면 ${csY('7일')} 안에 자동 삭제`],
+     ['근거','민감정보(생체인식정보)에 대한 별도 동의 (개인정보 보호법 제23조제1항제1호, 시행령 제18조제3호)'],
+     ['보관 기간','철회하거나 퇴사할 때까지. 퇴사하면 7일 안에, 등록하고 12개월이 지나면 자동 삭제합니다(다시 등록할 수 있습니다).'],
      ['거부·철회하면','내 발언은 「화자 1, 2」로 표시되고 참석자가 이름을 붙입니다. 철회는 담당자에게 요청하시면 되고, 요청을 받으면 특징값을 바로 지운 뒤 지워졌는지 알려 드립니다.']],
-   y:'완료 화면에서 목소리 등록으로 이어집니다(지금 안 해도 됩니다).', n:'목소리를 등록하지 않습니다. 회의록에는 「화자 1, 2」로 나옵니다.',
+   y:'다음 단계에서 목소리를 등록합니다(1분쯤 문장 읽기).', n:'목소리를 등록하지 않습니다. 회의록에는 「화자 1, 2」로 나옵니다.',
    my:{y:'동의 · 목소리 등록 가능', n:'동의 안 함 · 화자 1, 2로 표시'}},
   {k:'c4', no:'④', short:'시스템 연결', title:'회의록을 회사 다른 시스템에 연결', sens:false,
-   desc:`회의 담당자가 확정한 할 일·거래처·후속 일정을 이그드라실(거래처·연락처 기록)${csY(', 프리그')}에 연결합니다.`,
-   more:[['받는 곳',`⟦법인⟧의 이그드라실${csY(', 프리그')}`],
+   desc:'회의 담당자가 확정한 할 일·거래처·후속 일정을 같은 법인의 이그드라실(거래처·연락처 기록)에 연결합니다.',
+   more:[['받는 곳','⟦법인⟧의 이그드라실 (같은 회사 안의 다른 시스템 · 외부 제공 아님)'],
      ['보내는 항목','회의 제목·일시, 참석자 이름, 할 일, 회의 담당자가 확정한 거래처·관계 기록·후속 일정'],
      ['목적','거래처·업무 이력 관리'],['보관 기간','회의록과 같음'],
-     ['거부하면','연결 기록에서 내 이름이 빠집니다. 회의록 자체는 그대로입니다.']],
-   y:'확정한 항목을 연결합니다.', n:'연결 기록에서 내 이름이 빠집니다.',
-   my:{y:'동의 · 확정한 항목을 연결', n:'동의 안 함 · 연결 기록에서 내 이름 빠짐'}},
+     ['거부하면','내가 참석한 회의는 이그드라실로 자동 추출·연결하지 않습니다. 회의록 자체는 그대로입니다.']],
+   y:'확정한 항목을 연결합니다.', n:'내가 참석한 회의는 이그드라실로 연결하지 않습니다.',
+   my:{y:'동의 · 확정한 항목을 연결', n:'동의 안 함 · 내 회의는 연결하지 않음'}},
 ];
 const csWhen = t => t ? KSTF({month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(t)) : '-';
 const csLab = v => v==='y' ? '<b style="color:var(--ok,#1a7f4b)">동의</b>' : '<b style="color:var(--tx2)">동의 안 함</b>';
@@ -6359,11 +6447,57 @@ async function consentRow(){
 async function consentNeeded(){
   try{ await consentVerLoad(); const r=await consentRow(); CONSENT_PREV=r?r.version:''; return !r || r.version!==CONSENT_VER; }catch(e){ return false; }
 }
+// 첫 사용 단계 표시 — ① 안내·동의 ② 목소리 등록 ③ 완료 (2026-11-16 홍석진 대표: 네이버 가입처럼 처음에 한 번에)
+const OB_PREVIEW = /[?&]onboard=1/.test(location.search);
+function obSteps(n){
+  const L=['안내·동의','목소리 등록','완료'];
+  return `${OB_PREVIEW?'<div style="border:1px solid var(--line);background:var(--mark);color:var(--markt);padding:8px 12px;margin:0 0 12px;font-size:13px">미리보기입니다 · 선택해도 동의 기록이 바뀌지 않고, 목소리도 등록하지 않습니다</div>':''}<div style="display:flex;gap:6px;align-items:center;margin:0 0 14px;font-size:12.5px;flex-wrap:wrap">
+    <span class="sub" style="margin:0 8px 0 0;font-size:12px;letter-spacing:.08em">HEIMDALL · 처음 한 번</span>
+    ${L.map((t,i)=>`<span style="padding:3px 10px;border:1px solid var(--line);${i+1===n?'background:var(--tx);color:var(--bg);border-color:var(--tx)':i+1<n?'color:var(--tx2)':'color:var(--tx3)'}">${i+1<n?'✓ ':(i+1)+' '}${t}</span>`).join('<span style="color:var(--tx3)">›</span>')}</div>`;
+}
+async function voiceRegistered(){
+  try{ const r=await SB.rpc('hd_voice_registered'); return r.data===true; }catch(e){ return true; }   // 확인하지 못하면 막지 않습니다
+}
+// ② 목소리 등록 — ③에 동의한 분은 여기까지 마쳐야 헤임달을 씁니다.
+//   saved=false: 처음 동의하는 중 — 등록을 마치면 동의 기록을 남기고, [③ 다시 선택]으로 돌아갈 수 있습니다.
+//   saved=true : 이미 ③에 동의한 분 — 등록을 원하지 않으면 담당자에게 ③ 철회를 요청합니다 (본인 철회 단추는 두지 않습니다 · 11/15 결정).
+function obVoice(o){
+  $('#app').innerHTML=`<div style="max-width:620px;margin:0 auto;padding:28px 16px 60px">
+    ${obSteps(2)}
+    <h1 style="margin:0 0 6px">목소리 등록</h1>
+    <div class="sub" style="margin:0 0 14px;line-height:1.7">③ 목소리로 발언자 식별에 동의하셨습니다. 화면에 나오는 문장을 1분쯤 소리 내어 읽으면 등록이 끝납니다.
+      등록해 두면 회의록에 내 이름이 자동으로 붙고, 회의실 태블릿에서도 다시 묻지 않습니다.</div>
+    <div style="border:1px solid var(--line);background:var(--s1);padding:12px 14px;margin:0 0 18px;font-size:13px;line-height:1.7">
+      조용한 곳에서, 평소 회의에서 말하는 크기로 읽어 주세요. 읽은 녹음은 등록이 끝나면 바로 지우고, 목소리 특징값만 회사 처리 PC에 암호화해 보관합니다.</div>
+    <div class="row" style="flex-wrap:wrap;gap:8px">
+      <button class="btn p" id="obvgo">목소리 등록 시작</button>
+      ${o.saved?'':'<button class="btn" id="obvback">③ 다시 선택하기</button>'}
+      ${o.saved?'<button class="btn" id="obvout">로그아웃</button>':''}</div>
+    <div class="sub" style="margin:16px 0 0;font-size:12.5px;line-height:1.7">${o.saved
+      ?'등록을 원하지 않으시면 개인정보 문의 창구(김현우 · 슬랙 DM)에 ③ 동의 철회를 요청해 주세요. 철회해도 불이익은 없고, 회의록에는 「화자 1, 2」로 나옵니다.'
+      :'목소리 등록을 원하지 않으시면 [③ 다시 선택하기]에서 「동의하지 않습니다」를 고르셔도 됩니다. 불이익은 없습니다.'}</div>
+  </div>`;
+  VS.onDone=async()=>{
+    if(o.saved) return o.next();
+    const st=o.st;
+    const row={member_id:me.id, c1:st.c1, c2:st.c2, c3:st.c3, c4:st.c4, version:CONSENT_VER, via:'로그인'};
+    const up=await SB.from('hd_consent').upsert(row,{onConflict:'member_id'}).select().single();
+    if(up.error) return toast('동의를 기록하지 못했습니다 · '+esc(up.error.message), 8000);
+    await SB.from('hd_consent_log').insert({member_id:me.id, member_name:me.name, version:CONSENT_VER, item:'all',
+      value:CS_ITEMS.map(it=>st[it.k]).join(','), kind:'choose', via:'로그인', actor_id:me.id, actor_name:me.name});
+    consentDone(up.data, o.next);
+  };
+  $('#obvgo').onclick=()=>{ if(!OB_PREVIEW) return voiceSelf();
+    toast('미리보기라 목소리를 등록하지 않고 다음 단계로 넘어갑니다', 4000);
+    consentDone({...o.st, version:CONSENT_VER, updated_at:new Date().toISOString()}, o.next); };
+  const bk=$('#obvback'); if(bk) bk.onclick=()=>{ VS.onDone=null; consentPage(o.next); };
+  const out=$('#obvout'); if(out) out.onclick=async()=>{ localStorage.setItem('hd_auto','0'); await SB.auth.signOut({scope:'local'}); location.reload(); };
+}
 let CONSENT_PREV='';                      // 이 사람이 전에 답한 안내문 판 (처음이면 빈칸)
 function consentPage(next){
   const st={};
   $('#app').innerHTML=`<div style="max-width:680px;margin:0 auto;padding:28px 16px 60px">
-    <div class="sub" style="margin:0 0 4px;font-size:12px;letter-spacing:.08em">HEIMDALL · 처음 한 번</div>
+    ${obSteps(1)}
     <h1 style="margin:0 0 4px">회의 녹음 안내와 동의</h1>
     <div class="sub" style="margin:0 0 14px;font-size:12.5px">${csCo()} · 안내문 ${esc(CONSENT_VER)} · 시행 ${CONSENT_FROM}</div>
     ${CONSENT_PREV?`<div style="border:1px solid var(--line);background:var(--mark);color:var(--markt);padding:10px 14px;margin:0 0 12px;font-size:13px;line-height:1.7">
@@ -6401,7 +6535,12 @@ function consentPage(next){
   };
   $('#app').addEventListener('change',check); check();
   $('#csgo').onclick=async()=>{
-    const b=$('#csgo'); b.disabled=true; b.textContent='기록하는 중…';
+    const b=$('#csgo'); b.disabled=true; b.textContent='확인하는 중…';
+    // ③에 동의하셨으면 목소리 등록을 마친 뒤에 동의 기록을 함께 남깁니다 (등록 단계에서 ③을 다시 고를 수 있게)
+    if(OB_PREVIEW){ if(st.c3==='y') return obVoice({saved:false, st:{...st}, next});
+      return consentDone({...st, version:CONSENT_VER, updated_at:new Date().toISOString()}, next); }
+    if(st.c3==='y' && !(await voiceRegistered())) return obVoice({saved:false, st:{...st}, next});
+    b.textContent='기록하는 중…';
     const row={member_id:me.id, c1:st.c1, c2:st.c2, c3:st.c3, c4:st.c4, version:CONSENT_VER, via:'로그인'};
     const up=await SB.from('hd_consent').upsert(row,{onConflict:'member_id'}).select().single();
     if(up.error){ b.disabled=false; b.textContent='확인하고 시작하기';
@@ -6413,6 +6552,7 @@ function consentPage(next){
 }
 function consentDone(row, next){
   $('#app').innerHTML=`<div style="max-width:560px;margin:0 auto;padding:40px 16px">
+    ${obSteps(3)}
     <h1 style="margin:0 0 6px">준비됐습니다</h1>
     <div class="sub" style="margin:0 0 16px">선택하신 내용을 아래와 같이 기록했습니다. 이 기록은 회사가 동의 사실을 증빙할 때 씁니다.</div>
     <div style="border:1px solid var(--line);background:var(--s1);padding:16px 18px">
@@ -6422,12 +6562,9 @@ function consentDone(row, next){
         <dt style="color:var(--tx2)">시각</dt><dd style="margin:0">${esc(csWhen(row.updated_at||new Date()))}</dd>
         <dt style="color:var(--tx2)">안내문</dt><dd style="margin:0">${esc(row.version)} · ${csCo()} · 시행 ${CONSENT_FROM}</dd>
         ${CS_ITEMS.map(it=>`<dt style="color:var(--tx2)">${it.no} ${it.short}</dt><dd style="margin:0">${csLab(row[it.k])}</dd>`).join('')}</dl></div>
-    ${row.c3==='y'?`<div class="sub" style="margin:16px 0 8px">목소리를 지금 등록할까요? 정해진 문장을 1분쯤 읽으면 됩니다. 나중에 「내 정보」에서 해도 됩니다.</div>`:''}
-    <div class="row" style="margin-top:16px">
-      ${row.c3==='y'?'<button class="btn p" id="csvoice">목소리 등록하기</button><button class="btn" id="csnext">나중에</button>'
-                    :'<button class="btn p" id="csnext">시작하기</button>'}</div></div>`;
-  $('#csnext').onclick=()=>next();
-  const v=$('#csvoice'); if(v) v.onclick=()=>{ next(); voiceSelf(); };
+    <div class="sub" style="margin:14px 0 0">${row.c3==='y'?'목소리 등록까지 마쳤습니다. ':''}이제 회의실 태블릿에서는 따로 묻지 않고 바로 녹음합니다.</div>
+    <div class="row" style="margin-top:16px"><button class="btn p" id="csnext">헤임달 시작하기</button></div></div>`;
+  $('#csnext').onclick=()=>{ if(OB_PREVIEW) try{ history.replaceState(null,'',location.pathname+'#/home'); }catch(e){} next(); };
 }
 // 내 정보 › 동의 관리 — 동의하지 않은 항목은 여기서 동의할 수 있습니다. 철회 버튼은 두지 않습니다 (11/15 결정)
 async function consentManage(){
@@ -6448,7 +6585,7 @@ async function consentManage(){
         ${v==='y'?'':`<button class="btn" data-csag="${it.k}">동의하기</button>`}</div>`; }).join('')}
     <div style="border:1px solid var(--line);padding:10px 12px;margin:12px 0;font-size:12.5px;line-height:1.7">
       <b>동의를 철회하려면 담당자에게 요청해 주세요.</b><br>
-      개인정보 담당 ${csY('이름')} · 슬랙 ${csY('DM 또는 채널')} · ${csY('이메일')}<br>
+      개인정보 보호책임자 정원하 대표 · 문의 김현우 (슬랙 DM · brooks@thealmighty.co.kr)<br>
       요청을 받으면 바로 처리하고 결과를 알려 드립니다. 철회해도 불이익은 없습니다.</div>
     <div class="shsec">변경 이력</div>
     <div class="sub" style="margin:6px 0 14px;font-size:12.5px;line-height:1.7">${logs.length?logs.map(l=>`${esc(csWhen(l.at))} · ${line(l)}`).join('<br>'):'아직 없음'}</div>
@@ -6519,7 +6656,7 @@ function consentDraw(){
         <div class="sub" style="margin:6px 0 0;font-size:12px">녹음하지 않은 회의는 참석자와 팀 리드에게 알리되, 사유는 「참석자 비동의」로만 적습니다.</div></div>`:''}</div>`;
   el.innerHTML=`<h1>동의 관리</h1>
     <div class="sub">직원별 녹음·회의록 동의 현황입니다. 개인정보 담당자와 헤임달 관리자만 볼 수 있고, 팀장에게는 개인별 동의 여부를 보여 주지 않습니다
-      · 현재 안내문 ${esc(CONSENT_VER)} · <b>시험 중</b> (법무 검토 전이라 운영 화면에서는 동의를 받지 않습니다)</div>
+      · 현재 안내문 ${esc(CONSENT_VER)} · 시행 ${CONSENT_FROM} (개인정보 보호법·통신비밀보호법 원문 기준 정비)</div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin:0 0 14px">${stat}</div>
     ${impBox}
     <div class="row" style="margin-bottom:12px;flex-wrap:wrap">
@@ -6546,7 +6683,7 @@ function consentDraw(){
       · 관리자가 직원 대신 동의하지 않습니다. 철회는 본인이 담당자에게 요청한 경우에만, 요청 경로·시각과 함께 처리합니다<br>
       · 개인별 동의 여부를 팀장·평가에 넘기지 않습니다 · 기록은 지우지 않습니다<br>
       · 동의 요청은 미응답·이전 버전 동의인 분께만 슬랙으로 보냅니다. 같은 분께는 7일에 한 번만 보내고, 「동의 안 함」 을 고른 분께는 다시 보내지 않습니다<br>
-      · 지금은 시험 중이라 요청을 올려도 실제 발송은 하지 않습니다(「발송 대기」). 운영에서 동의 받기를 켜면 그때부터 나갑니다. 「나에게 시험 발송」 은 바로 갑니다<br>
+      · 슬랙 자동 발송을 켜기 전에는 요청이 「발송 대기」로 남고, 켜면 그때부터 나갑니다. 「나에게 시험 발송」 은 바로 갑니다<br>
       · 예약에 들어간 미응답 직원에게는 회의 전날 한 번 더 요청합니다 (운영에서 동의 받기를 켠 뒤부터)<br>
       · 안내문 개정판을 등록하면 다음 로그인 때 모두에게 다시 받습니다. 그 전까지는 이전 버전 동의로 처리합니다. 안내문 글 자체는 개발 담당이 화면에 반영합니다<br>
       · 이메일 발송은 메일 계정이 연결된 뒤 넣습니다</div>`;
@@ -6564,7 +6701,7 @@ function consentDraw(){
     toast(reason==='test'?'내 슬랙으로 시험 안내를 보냅니다. 30초쯤 걸립니다':`${ids.length}명의 동의 요청을 올렸습니다`, 6000);
     renderConsent(); };
   $('#cs-ask').onclick=()=>{ const ids=[...CSA.sel]; if(!ids.length) return;
-    if(confirm(`${ids.length}명에게 녹음 동의 요청을 올립니다.\n\n지금은 시험 중이라 실제 슬랙 발송은 하지 않고 「발송 대기」 로 남습니다.`)) sendReq(ids,'manual'); };
+    if(confirm(`${ids.length}명에게 녹음 동의 요청을 올립니다.\n\n슬랙 자동 발송을 켜기 전이면 실제 발송은 하지 않고 「발송 대기」 로 남습니다.`)) sendReq(ids,'manual'); };
   $('#cs-me').onclick=()=>sendReq([me.id],'test');
   $('#cs-ver').onclick=()=>{
     bookBox(`<h1 style="font-size:16px;margin:0 0 4px">안내문 개정판 등록</h1>

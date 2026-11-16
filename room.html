@@ -644,8 +644,9 @@ function drawBar(ev){
 // 직원·손님 구분 없이 한 명이라도 동의하지 않으면 그 회의는 녹음하지 않습니다.
 // 법무 검토 전이라 꺼 둔 채로 올립니다. 주소 끝에 ?consent=1 을 붙여 한 번 열면 이 태블릿에서 켜지고, ?consent=0 이면 꺼집니다.
 (()=>{ const m=location.search.match(/[?&]consent=([01])/); if(!m) return;
-  try{ m[1]==='1' ? localStorage.setItem('hd_cgate','1') : localStorage.removeItem('hd_cgate'); }catch(e){} })();
-const CGATE = (()=>{ try{ return localStorage.getItem('hd_cgate')==='1'; }catch(e){ return false; } })();
+  try{ localStorage.setItem('hd_cgate', m[1]); }catch(e){} })();
+// 2026-11-16 운영 반영 — 기본으로 켭니다. 이 태블릿에서 끄려면 주소 끝에 ?consent=0 을 붙여 한 번 엽니다
+const CGATE = (()=>{ try{ return localStorage.getItem('hd_cgate')!=='0'; }catch(e){ return true; } })();
 const CG={};
 const cgHm=()=>new Date().toTimeString().slice(0,5);
 async function cgStates(ids){

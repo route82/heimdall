@@ -2389,7 +2389,7 @@ async function drawHomeTL(){
   let [cal,mtg,bz]=await Promise.all([
     calSel().gte('starts_at',from).lte('starts_at',to).order('starts_at'),
     SB.from('hd_meeting').select('id,cal_uid').not('cal_uid','is',null).eq('held_on',kd),
-    SB.from('hd_cal_busy').select('uid,room,starts_at,ends_at').gte('starts_at',from).lte('starts_at',to)]);
+    SB.from('hd_cal_busy').select('*').gte('starts_at',from).lte('starts_at',to)]);
   if(cal.error && CALX.full){            // 새 칸이 아직 없는 DB — 예전 칸만으로 다시 읽습니다
     CALX.full=false;
     cal=await calSel().gte('starts_at',from).lte('starts_at',to).order('starts_at');
@@ -2433,8 +2433,8 @@ async function drawHomeTL(){
       const s1=hmOf(e.starts_at), e1=hmOf(e.ends_at);
       const tm=(s1.endsWith(':00')&&e1.endsWith(':00')) ? (+s1.slice(0,2))+'~'+(+e1.slice(0,2))+'시' : s1+'~'+e1;
       h+=`<div class="ht-bk other${new Date(e.ends_at)<now?' past':''}"
-        style="left:${a.toFixed(3)}%;width:${(b-a).toFixed(3)}%" title="다른 법인 예약 ${s1}~${e1} · 내용은 보이지 않습니다">
-        <b>다른 법인</b><br class="nb"><span>${tm}</span></div>`;
+        style="left:${a.toFixed(3)}%;width:${(b-a).toFixed(3)}%" title="다른 법인 예약${e.label?' · '+esc(e.label):''} · ${s1}~${e1}">
+        <b>${esc(e.label||'다른 법인')}</b><br class="nb"><span>${tm}</span></div>`;
     });
     if(nowOn) h+=`<div class="ht-now" style="left:${pct(nowM).toFixed(3)}%"></div>`;
     h+='</div></div>';
@@ -2452,7 +2452,7 @@ async function drawHomeTL(){
     ${cal.error?`<div class="empty">예약을 불러오지 못했습니다 · ${esc(cal.error.message)}</div>`:`
     <div class="ht-tl"><div class="ht-in">${h}</div>
       <div class="ht-legend"><span><i class="m"></i>내 회의</span><span><i></i>우리 그룹 회의</span>
-        <span><i class="o"></i>다른 법인 예약 (내용은 보이지 않음)</span>
+        <span><i class="o"></i>다른 법인 예약 (법인·팀 이름만 보임)</span>
         <span>빈 곳을 누르면 그 시간으로 예약</span></div>
     </div>`}
     ${lost.length?`<div class="sub" style="margin:-16px 0 22px">회의실을 알 수 없는 예약 ${lost.length}건 · ${lost.map(e=>esc(hmOf(e.starts_at)+' '+htName(e))).join(' · ')}</div>`:''}`;
@@ -2465,7 +2465,7 @@ async function drawHomeTL(){
   $('#ht-issue').onclick=()=>issueOpen();
   box.querySelectorAll('.ht-seg button').forEach(b=>b.onclick=()=>{ HT.scope=b.dataset.s; drawHomeTL(); });
   box.querySelectorAll('.ht-bk.other').forEach(b=>b.onclick=ev=>{ ev.stopPropagation();
-    toast('다른 법인이 예약한 시간입니다. 내용은 보이지 않습니다', 3000); });
+    toast('다른 법인이 예약한 시간입니다. 법인·팀 이름만 보입니다', 3000); });
   box.querySelectorAll('.ht-bk[data-n]').forEach(b=>b.onclick=ev=>{ ev.stopPropagation(); htOpen(evs[+b.dataset.n], done.get(evs[+b.dataset.n].uid)||''); });
   box.querySelectorAll('.ht-track[data-room]').forEach(t=>t.onclick=ev=>{
     if(ev.target!==t) return;
@@ -6377,10 +6377,11 @@ async function boot(){
 
 // ─────────────────────────── 회의 녹음 안내와 동의 (2026-11-16 · 홍석진 대표 11/15 지시)
 // 시안: heimdall-plan.vercel.app/consent-mock.html · consent-admin.html
-// 법무 검토 전이고 노란 칸(법인명·보관 기간 등)이 비어 있어, 시험용 화면에서만 켭니다.
+// 2026-11-16 노란 칸을 법령 원문 기준 값으로 채우고 운영에서 켰습니다.
 // 운영 화면에서는 꺼져 있습니다 — 동의를 받지도, 녹음을 막지도 않습니다.
-const CONSENT_ON = /index-test\.html|full\.html/.test(location.pathname);
-let CONSENT_VER = 'v1.0-시험';
+// 2026-11-16 운영 반영 (김현우 팀장 지시) — 안내문을 개인정보 보호법·통신비밀보호법 원문 기준으로 정비하고 모든 화면에서 켭니다
+const CONSENT_ON = true;
+let CONSENT_VER = 'v1.0';
 let CONSENT_FROM = '2026-11-16';          // 안내문 시행일
 let CONSENT_NOTE = '';                    // 개정판의 바뀐 점 요약
 // 담당자가 「안내문 개정판 등록」 으로 올린 최신 판을 읽습니다. 없으면 위 값을 씁니다.
@@ -6396,10 +6397,10 @@ const CS_ITEMS = [
    desc:'회의실 예약으로 잡은 회의와 업무 회의를 녹음해 회의록을 만듭니다. 인사 면담·징계·법무 회의는 녹음하지 않습니다. 참석자 한 명이라도 동의하지 않으면 그 회의는 녹음하지 않습니다(손님도 같은 규칙).',
    more:[['처리하는 정보','회의 음성, 전사문, 요약·할 일, 발언자 구분 표시, 참석자 이름·소속, 회의 일시·장소'],
      ['목적','회의록 작성·공유, 결정 사항과 할 일 관리, 지난 회의 검색, 회의실 이용 관리'],
-     ['근거','본인 동의 (개인정보 보호법 제15조제1항제1호)'],
+     ['근거','본인 동의 (개인정보 보호법 제15조제1항제1호). 참석자 전원이 동의한 회의만 녹음합니다 (통신비밀보호법 제3조·제14조 — 공개되지 않은 타인 간 대화의 녹음 금지).'],
      ['볼 수 있는 사람','그 회의 참석자, 회의 담당자, 소속 부서장. 시스템 관리자는 장애 처리 때만 보고 접근 기록이 남습니다.'],
-     ['보관 기간',`녹음 원본은 회의 확정 후 ${csY('90일')}, 회의록은 ${csY('N년')} 보관 후 자동 삭제`],
-     ['처리 위탁','전사: 사무실 처리 서버(외부 전송 없음) · 저장: Supabase (서울) · 요약 AI: ②에서 안내'],
+     ['보관 기간','녹음 원본은 회의 확정 후 90일, 회의록(전사문·요약)은 작성일로부터 3년 보관 후 삭제'],
+     ['처리 위탁','전사: 사무실 처리 서버(외부 전송 없음) · 저장: Supabase (서울) · 회의록 알림: Slack (Salesforce, 미국 · 회사 업무 메신저) · 요약 AI: ②에서 안내'],
      ['녹음 표시',`녹음 중에는 회의실 화면에 표시되고, 회의 중 언제든 일시 중지를 요청할 수 있습니다. 예약 시간이 10분 지나면 회의실 화면에서 계속 녹음할지 확인하고, 응답이 없고 회의실이 조용하면 녹음을 멈춥니다.`],
      ['거부·철회하면','내가 참석한 회의는 녹음하지 않고, 참석자·비동의·녹음 안 함 기록만 남깁니다. 참석자·팀 리드에게 가는 미녹음 알림에도 이름은 적지 않습니다. 철회는 담당자에게 요청하시면 되고, 요청 이후 회의부터 적용합니다.'],
      ['권리','본인이 나온 회의록의 열람·정정 요청. 처리 정지·삭제 요청은 법령이 정한 범위에서 처리합니다.']],
@@ -6407,30 +6408,32 @@ const CS_ITEMS = [
    my:{y:'동의 · 내가 참석한 회의 녹음', n:'동의 안 함 · 내가 참석한 회의는 녹음 안 함'}},
   {k:'c2', no:'②', short:'해외 AI', title:'회의록 요약용으로 해외 AI에 회의 글 보내기', sens:false,
    desc:'회의록 요약에 Anthropic(미국)의 AI를 씁니다. 전사문만 보내고 음성은 보내지 않으며, AI 학습에는 쓰지 않습니다.',
-   more:[['보내는 항목',`전사문(발언 내용, 발언자 구분, 참석자 이름). 음성 원본은 보내지 않음 ${csY('처리 서버 확인')}`],
-     ['받는 곳·국가',`Anthropic PBC, 미국 ${csY('개인정보 담당 연락처')}`],
+   more:[['보내는 항목','전사문(발언 내용, 발언자 구분, 참석자 이름). 음성 원본은 보내지 않습니다.'],
+     ['받는 곳·국가','Anthropic PBC (미국 · 548 Market St, PMB 90375, San Francisco, CA 94104 · 개인정보 문의 privacy@anthropic.com)'],
      ['시기·방법','회의록을 만들 때마다 암호화된 통신으로'],
-     ['받는 곳의 이용·보관',`요약 생성에만 사용, 학습에 쓰지 않음, ${csY('계약상 보관 기간')} 뒤 삭제`],
-     ['거부하면',`내가 참석한 회의는 ${csY('국내 처리 / 요약 없이 전사문만')}으로 회의록을 만듭니다.`]],
-   y:'내 회의도 AI 요약이 붙습니다.', n:`내가 참석한 회의는 해외로 보내지 않고 ${csY('국내 처리')}합니다.`,
-   my:{y:'동의 · 내 회의도 AI 요약', n:'동의 안 함 · 내 회의는 국내 처리'}},
+     ['받는 곳의 이용·보관','회의록 요약 생성에만 사용하고 AI 학습에 쓰지 않습니다(Anthropic 상용 약관). 받은 날부터 30일 안에 자동 삭제합니다(이용정책 위반 점검·법령상 보관 등 예외 시 더 보관될 수 있음).'],
+     ['근거','국외 이전에 대한 별도 동의 (개인정보 보호법 제28조의8제1항제1호)'],
+     ['거부하면','내가 참석한 회의는 해외 AI로 보내지 않고, AI 요약 없이 전사문만으로 회의록을 만듭니다. 이그드라실 자동 추출과 물어보기에도 그 회의는 쓰지 않습니다.']],
+   y:'내 회의도 AI 요약이 붙습니다.', n:'내가 참석한 회의는 해외 AI로 보내지 않고, AI 요약 없이 전사문만으로 회의록을 만듭니다.',
+   my:{y:'동의 · 내 회의도 AI 요약', n:'동의 안 함 · 내 회의는 AI 요약 없이 전사문만'}},
   {k:'c3', no:'③', short:'목소리', title:'목소리로 발언자 식별', sens:true,
    desc:'목소리 특징을 등록해 두면 회의록에 내 이름이 자동으로 붙습니다. 특정 개인을 식별하는 정보라 다른 항목과 따로 동의를 받습니다.',
    more:[['저장하는 것','목소리 특징값(숫자 묶음)만 저장하고, 등록할 때 읽은 녹음은 바로 지웁니다.'],
-     ['등록 방법','로그인 후 「내 정보」에서 본인이 직접 정해진 문장을 읽어 등록합니다.'],
+     ['등록 방법','처음 헤임달에 들어올 때(또는 「내 정보」에서) 본인이 직접 정해진 문장을 읽어 등록합니다. 회의실 태블릿에서도 등록할 수 있습니다.'],
      ['쓰는 곳','내가 참석자로 들어간 회의의 발언자 이름 붙이기에만 씁니다.'],
-     ['보관 기간',`철회하거나 퇴사할 때까지. 퇴사하면 ${csY('7일')} 안에 자동 삭제`],
+     ['근거','민감정보(생체인식정보)에 대한 별도 동의 (개인정보 보호법 제23조제1항제1호, 시행령 제18조제3호)'],
+     ['보관 기간','철회하거나 퇴사할 때까지. 퇴사하면 7일 안에, 등록하고 12개월이 지나면 자동 삭제합니다(다시 등록할 수 있습니다).'],
      ['거부·철회하면','내 발언은 「화자 1, 2」로 표시되고 참석자가 이름을 붙입니다. 철회는 담당자에게 요청하시면 되고, 요청을 받으면 특징값을 바로 지운 뒤 지워졌는지 알려 드립니다.']],
-   y:'완료 화면에서 목소리 등록으로 이어집니다(지금 안 해도 됩니다).', n:'목소리를 등록하지 않습니다. 회의록에는 「화자 1, 2」로 나옵니다.',
+   y:'다음 단계에서 목소리를 등록합니다(1분쯤 문장 읽기).', n:'목소리를 등록하지 않습니다. 회의록에는 「화자 1, 2」로 나옵니다.',
    my:{y:'동의 · 목소리 등록 가능', n:'동의 안 함 · 화자 1, 2로 표시'}},
   {k:'c4', no:'④', short:'시스템 연결', title:'회의록을 회사 다른 시스템에 연결', sens:false,
-   desc:`회의 담당자가 확정한 할 일·거래처·후속 일정을 이그드라실(거래처·연락처 기록)${csY(', 프리그')}에 연결합니다.`,
-   more:[['받는 곳',`⟦법인⟧의 이그드라실${csY(', 프리그')}`],
+   desc:'회의 담당자가 확정한 할 일·거래처·후속 일정을 같은 법인의 이그드라실(거래처·연락처 기록)에 연결합니다.',
+   more:[['받는 곳','⟦법인⟧의 이그드라실 (같은 회사 안의 다른 시스템 · 외부 제공 아님)'],
      ['보내는 항목','회의 제목·일시, 참석자 이름, 할 일, 회의 담당자가 확정한 거래처·관계 기록·후속 일정'],
      ['목적','거래처·업무 이력 관리'],['보관 기간','회의록과 같음'],
-     ['거부하면','연결 기록에서 내 이름이 빠집니다. 회의록 자체는 그대로입니다.']],
-   y:'확정한 항목을 연결합니다.', n:'연결 기록에서 내 이름이 빠집니다.',
-   my:{y:'동의 · 확정한 항목을 연결', n:'동의 안 함 · 연결 기록에서 내 이름 빠짐'}},
+     ['거부하면','내가 참석한 회의는 이그드라실로 자동 추출·연결하지 않습니다. 회의록 자체는 그대로입니다.']],
+   y:'확정한 항목을 연결합니다.', n:'내가 참석한 회의는 이그드라실로 연결하지 않습니다.',
+   my:{y:'동의 · 확정한 항목을 연결', n:'동의 안 함 · 내 회의는 연결하지 않음'}},
 ];
 const csWhen = t => t ? KSTF({month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(t)) : '-';
 const csLab = v => v==='y' ? '<b style="color:var(--ok,#1a7f4b)">동의</b>' : '<b style="color:var(--tx2)">동의 안 함</b>';
@@ -6653,7 +6656,7 @@ function consentDraw(){
         <div class="sub" style="margin:6px 0 0;font-size:12px">녹음하지 않은 회의는 참석자와 팀 리드에게 알리되, 사유는 「참석자 비동의」로만 적습니다.</div></div>`:''}</div>`;
   el.innerHTML=`<h1>동의 관리</h1>
     <div class="sub">직원별 녹음·회의록 동의 현황입니다. 개인정보 담당자와 헤임달 관리자만 볼 수 있고, 팀장에게는 개인별 동의 여부를 보여 주지 않습니다
-      · 현재 안내문 ${esc(CONSENT_VER)} · <b>시험 중</b> (법무 검토 전이라 운영 화면에서는 동의를 받지 않습니다)</div>
+      · 현재 안내문 ${esc(CONSENT_VER)} · 시행 ${CONSENT_FROM} (개인정보 보호법·통신비밀보호법 원문 기준 정비)</div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin:0 0 14px">${stat}</div>
     ${impBox}
     <div class="row" style="margin-bottom:12px;flex-wrap:wrap">
@@ -6680,7 +6683,7 @@ function consentDraw(){
       · 관리자가 직원 대신 동의하지 않습니다. 철회는 본인이 담당자에게 요청한 경우에만, 요청 경로·시각과 함께 처리합니다<br>
       · 개인별 동의 여부를 팀장·평가에 넘기지 않습니다 · 기록은 지우지 않습니다<br>
       · 동의 요청은 미응답·이전 버전 동의인 분께만 슬랙으로 보냅니다. 같은 분께는 7일에 한 번만 보내고, 「동의 안 함」 을 고른 분께는 다시 보내지 않습니다<br>
-      · 지금은 시험 중이라 요청을 올려도 실제 발송은 하지 않습니다(「발송 대기」). 운영에서 동의 받기를 켜면 그때부터 나갑니다. 「나에게 시험 발송」 은 바로 갑니다<br>
+      · 슬랙 자동 발송을 켜기 전에는 요청이 「발송 대기」로 남고, 켜면 그때부터 나갑니다. 「나에게 시험 발송」 은 바로 갑니다<br>
       · 예약에 들어간 미응답 직원에게는 회의 전날 한 번 더 요청합니다 (운영에서 동의 받기를 켠 뒤부터)<br>
       · 안내문 개정판을 등록하면 다음 로그인 때 모두에게 다시 받습니다. 그 전까지는 이전 버전 동의로 처리합니다. 안내문 글 자체는 개발 담당이 화면에 반영합니다<br>
       · 이메일 발송은 메일 계정이 연결된 뒤 넣습니다</div>`;
@@ -6698,7 +6701,7 @@ function consentDraw(){
     toast(reason==='test'?'내 슬랙으로 시험 안내를 보냅니다. 30초쯤 걸립니다':`${ids.length}명의 동의 요청을 올렸습니다`, 6000);
     renderConsent(); };
   $('#cs-ask').onclick=()=>{ const ids=[...CSA.sel]; if(!ids.length) return;
-    if(confirm(`${ids.length}명에게 녹음 동의 요청을 올립니다.\n\n지금은 시험 중이라 실제 슬랙 발송은 하지 않고 「발송 대기」 로 남습니다.`)) sendReq(ids,'manual'); };
+    if(confirm(`${ids.length}명에게 녹음 동의 요청을 올립니다.\n\n슬랙 자동 발송을 켜기 전이면 실제 발송은 하지 않고 「발송 대기」 로 남습니다.`)) sendReq(ids,'manual'); };
   $('#cs-me').onclick=()=>sendReq([me.id],'test');
   $('#cs-ver').onclick=()=>{
     bookBox(`<h1 style="font-size:16px;margin:0 0 4px">안내문 개정판 등록</h1>
