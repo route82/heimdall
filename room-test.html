@@ -718,6 +718,50 @@ async function cgOnPick(id){
   });
 }
 
+// ─────────────────────────── 녹음 유실 방지 2단계 (2026-11-16) — 녹음하는 동안 1분마다 서버로 조각을 올립니다
+// 1단계는 기기 안(IndexedDB)에만 적어 둡니다. 태블릿이 고장 나거나 화면이 지워지면 그것도 사라지므로,
+// 녹음 중에도 서버에 조각을 올려 둡니다. 평소에는 회의가 끝날 때 전체 녹음을 올리고 조각은 서버가 지웁니다.
+// 전체 녹음이 끝내 올라오지 않으면 처리 서버가 조각을 이어 붙여 회의록을 만듭니다 (bin/live.py).
+// 조각 올리기가 실패해도 녹음에는 영향을 주지 않습니다 — 다음 1분에 다시 올립니다.
+const LIVE={id:null, seq:0, sent:0, bytes:0, busy:false, timer:null};
+const liveDir=id=>'live/'+String(id).replace(/[^0-9A-Za-z_-]/g,'_');
+async function liveStart(ev){
+  clearInterval(LIVE.timer);
+  Object.assign(LIVE,{id:me.id+':'+(KEEP.id||REC.t0), seq:0, sent:0, bytes:0, busy:false});
+  try{
+    const ins=await SB.from('hd_rec_live').insert({id:LIVE.id, created_by:me.id, room:REC.room||cfg.room||'',
+      cal_uid:(ev&&ev.uid)||'', title:REC.title||'', agenda:REC.agenda||'', mime:(REC.mr&&REC.mr.mimeType)||'audio/webm',
+      started_at:new Date(REC.t0).toISOString(), test:!!(cfg.test && canTest())});
+    if(ins.error){ LIVE.id=null; return; }
+  }catch(e){ LIVE.id=null; return; }
+  LIVE.timer=setInterval(liveFlush, 60000);
+}
+async function liveFlush(){
+  if(!LIVE.id || LIVE.busy || !REC.mr) return;
+  const upto=REC.chunks.length; if(upto<=LIVE.sent) return;
+  LIVE.busy=true;
+  try{
+    const id=LIVE.id, blob=new Blob(REC.chunks.slice(LIVE.sent, upto), {type:'application/octet-stream'});
+    const up=await SB.storage.from('hd-audio').upload(liveDir(id)+'/'+String(LIVE.seq).padStart(5,'0')+'.part', blob,
+      {upsert:false, contentType:'application/octet-stream'});
+    // 올라갔는데 답만 못 받은 경우(이미 있음)는 올라간 것으로 봅니다
+    const ok=!up.error || /exist|duplicate|409/i.test((up.error.message||'')+' '+(up.error.statusCode||''));
+    if(ok && LIVE.id===id){
+      LIVE.sent=upto; LIVE.seq++; LIVE.bytes+=blob.size;
+      await SB.from('hd_rec_live').update({parts:LIVE.seq, bytes:LIVE.bytes, last_part_at:new Date().toISOString(),
+        who:[...(REC.who||[])], owner_id:(REC.owner && REC.who && REC.who.has(REC.owner))?REC.owner:null,
+        room:REC.room||cfg.room||'', title:REC.title||'', updated_at:new Date().toISOString()}).eq('id',id);
+    }
+  }catch(e){}
+  LIVE.busy=false;
+}
+// state: done(전체 녹음을 올렸음) · discarded(녹음하지 않기로 함). 서버가 조각을 지웁니다.
+function liveEnd(state, id){
+  if(!id){ clearInterval(LIVE.timer); id=LIVE.id; LIVE.id=null; }
+  if(!id) return;
+  try{ SB.from('hd_rec_live').update({state, updated_at:new Date().toISOString()}).eq('id',id).then(()=>{},()=>{}); }catch(e){}
+}
+
 // ─────────────────────────── 녹음
 const REC={};
 // ─────────────────────────── 녹음을 태블릿 안에 바로 저장 (2026-11-14, 유실 방지 1단계)
@@ -819,6 +863,7 @@ async function keepRecover(){
       const ins=await SB.from('hd_job').insert(job);
       if(ins.error) continue;
       await keepDrop(ss.id);
+      liveEnd('done', me.id+':'+ss.id);
       sent++;
     }
   }catch(e){}
@@ -870,6 +915,7 @@ async function startRec(ev){
   keepAwake();
   meter(stream);
   recPage();
+  liveStart(ev);               // 2단계: 1분마다 서버로 조각 올리기 (실패해도 녹음은 그대로)
 }
 
 // ── 참석자 고르기 — 회사 → 팀 → 팀원 (2026-10-20)
@@ -1223,7 +1269,7 @@ function stopRec(auto){
   const ob=document.getElementById('oversheet'); if(ob) ob.remove();
   // 실수로 눌렀을 때를 걸러냅니다
   if(auto!==true && sec<60 && !confirm('아직 '+Math.round(sec)+'초밖에 안 됐습니다.\n회의를 끝내고 올릴까요?')) return;
-  clearInterval(REC.meter); clearInterval(tick);
+  clearInterval(REC.meter); clearInterval(tick); clearInterval(LIVE.timer);
   REC.dur=Math.floor(sec);
   REC.mr.stop();
   (REC.stream.getTracks()||[]).forEach(t=>t.stop());
@@ -1234,7 +1280,7 @@ function stopRec(auto){
 function finish(){
   if(REC.discard){
     const kid=KEEP.id, A=REC.norecA||[], ev=REC.ev, title=REC.title, room=REC.room;
-    REC.discard=false; REC.mr=null; REC.chunks=[]; REC.blob=null;
+    REC.discard=false; REC.mr=null; REC.chunks=[]; REC.blob=null; liveEnd('discarded');
     (async()=>{ try{ await keepDrop(kid); }catch(e){}
       const ok=await cgNorec(ev, A, title, room);
       msg('녹음하지 않았습니다', '지금까지 녹음한 내용은 저장하지 않고 지웠습니다.'+(ok?' 참석자와 동의 여부만 기록했습니다.':''), false, true); })();
@@ -1366,6 +1412,7 @@ async function upload(){
     const ins=await SB.from('hd_job').insert(job);
     if(ins.error){ msg('기록을 남기지 못했습니다', kept || ins.error.message, !!kept); return; }
     await keepDrop(kid);
+    liveEnd('done');
 
     msg(testMode ? '시험 녹음을 올렸습니다' : '회의가 끝났습니다',
       testMode
