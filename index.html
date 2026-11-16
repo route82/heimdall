@@ -1303,7 +1303,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:12px">웹 v22.16</span>
+       <span class="sub" style="margin:0;font-size:12px">웹 v22.17</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">로그아웃</button>
@@ -2387,11 +2387,16 @@ async function drawHomeTL(){
     });
     if(HT.scope!=='mine') busy.forEach(e=>{
       if(htRoom({room:e.room,title:''})!==i) return;
-      const a=pct(mins(e.starts_at)), b=pct(mins(e.ends_at));
+      // 2026-11-16 다른 법인 예약은 시간 칸(한 시간)을 꽉 채워 그립니다 — 30분 예약이 반 칸만 차 보여 헷갈린다는 의견 (김현우 팀장).
+      // 실제 시각은 칸 안 글자와 마우스를 올렸을 때 나옵니다.
+      const m0=mins(e.starts_at), m1=mins(e.ends_at);
+      const a=pct(Math.floor(m0/60)*60), b=pct(Math.ceil(m1/60)*60);
       if(b<=a) return;
-      h+=`<div class="ht-bk other${new Date(e.ends_at)<now?' past':''}${(b-a)<6.5?' slim':''}"
-        style="left:${a.toFixed(3)}%;width:${(b-a).toFixed(3)}%" title="다른 법인 예약 ${hmOf(e.starts_at)}~${hmOf(e.ends_at)} · 내용은 보이지 않습니다">
-        <b>${(b-a)<6.5?'다른<br>법인':'다른 법인'}</b><br class="nb"><span>${(s1=>{ const e1=hmOf(e.ends_at); return (s1.endsWith(':00')&&e1.endsWith(':00')) ? (+s1.slice(0,2))+'~'+(+e1.slice(0,2))+'시' : s1+'~'+e1; })(hmOf(e.starts_at))}</span></div>`;
+      const s1=hmOf(e.starts_at), e1=hmOf(e.ends_at);
+      const tm=(s1.endsWith(':00')&&e1.endsWith(':00')) ? (+s1.slice(0,2))+'~'+(+e1.slice(0,2))+'시' : s1+'~'+e1;
+      h+=`<div class="ht-bk other${new Date(e.ends_at)<now?' past':''}"
+        style="left:${a.toFixed(3)}%;width:${(b-a).toFixed(3)}%" title="다른 법인 예약 ${s1}~${e1} · 내용은 보이지 않습니다">
+        <b>다른 법인</b><br class="nb"><span>${tm}</span></div>`;
     });
     if(nowOn) h+=`<div class="ht-now" style="left:${pct(nowM).toFixed(3)}%"></div>`;
     h+='</div></div>';
