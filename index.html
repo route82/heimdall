@@ -1291,7 +1291,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:12px">웹 v22.12</span>
+       <span class="sub" style="margin:0;font-size:12px">웹 v22.13</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">로그아웃</button>
@@ -2814,6 +2814,7 @@ function drawMeeting(){
       ?`<button class="btn ${okd?'':'g'}" id="mok">${okd?'확정 해제':(m.confirm_rule?'회의 확정':'확정')}</button>`:''}
     ${(YGG_ON && okd && m.ygg_state==='held' && (m.ygg_items||[]).length && cfCan(m))
       ?`<button class="btn" id="ygre" title="확정할 때 선택해 둔 항목입니다">이그드라실로 보내기 (보관 ${m.ygg_items.length}건)</button>`:''}
+    <span id="gsumslot"></span>
     <button class="btn p" id="edit">편집</button></div>`;
 
   // 「더보기」 — 자주 쓰지 않는 단추는 접어 둡니다 (2026-09-09 대표님 지적)
@@ -3102,6 +3103,16 @@ function drawMeeting(){
   // 확정 — 사람이 회의록을 확인했다는 표시입니다.
   // 회의록이 만들어질 때 이미 참석자·팀장에게 슬랙이 나갔으므로,
   // 고친 내용이 있을 때만 다시 보낼지 물어봅니다.
+  // 2026-11-16 손님에게 회의 요약 보내기 — 확정한 회의에서, 요약 메일을 받겠다고 한 손님이 있을 때만 (시험용 화면에서만)
+  if(CONSENT_ON && (m.status==='confirmed'||m.status==='reported') && m.cal_uid && cfCan(m)) (async()=>{
+    try{ const r=await SB.rpc('hd_guest_sumcount',{p_cal_uid:m.cal_uid}); const n=r.data||0;
+      const slot=$('#gsumslot'); if(!n || !slot || cur.m.id!==m.id) return;
+      const prev=await SB.from('hd_guest_sum').select('created_at,sent_at,result').eq('meeting_id',m.id).order('created_at',{ascending:false}).limit(1);
+      const last=(prev.data||[])[0];
+      slot.innerHTML=`<button class="btn" id="gsum">손님에게 요약 보내기 (${n}명)</button>`
+        +(last?`<span class="sub" style="margin:0 0 0 6px;font-size:12px">${last.sent_at?'보냄 · '+esc(last.result||''):'발송 대기'}</span>`:'');
+      $('#gsum').onclick=()=>guestSumOpen(m, n);
+    }catch(e){} })();
   const ygre=$('#ygre');
   if(ygre) ygre.onclick=async()=>{ ygre.disabled=true; ygre.textContent='보내는 중…'; await yggSend(m, m.ygg_items); openMeeting(m.id); };
   const okb=$('#mok');
@@ -3300,6 +3311,32 @@ async function yggSend(m, pick){
     +(rej.length?`<br>등록되지 않은 것 ${rej.length}건 · ${esc(rej.map(x=>x.reason||'').filter(Boolean).slice(0,2).join(' / '))}`:''), rej.length?12000:8000);
 }
 
+// 손님에게 보낼 요약을 담당자가 확인·수정해 올립니다. 다른 참석자의 발언과 내부 내용이 밖으로 나가므로, 그대로 보내지 않습니다.
+function guestSumOpen(m, n){
+  const plain=(m.summary_md||'').replace(/^#{1,6}\s*/gm,'').replace(/\*\*(.+?)\*\*/g,'$1').replace(/^\s*[-*]\s+/gm,'· ').trim();
+  bookBox(`<h1 style="font-size:16px;margin:0 0 4px">손님에게 요약 보내기</h1>
+    <div class="sub" style="margin:0 0 10px;font-size:12px">요약 메일을 받겠다고 하신 손님 ${n}명에게 보냅니다.
+      <b>내부 검토용 내용과 손님이 보시면 안 되는 내용은 지우고</b> 보내 주세요. 보낸 뒤에는 되돌릴 수 없습니다.</div>
+    <div class="shsec">제목</div>
+    <input id="gs-sub" class="full" maxlength="120" style="margin:6px 0 10px" value="${esc('['+(m.company||'')+'] '+(titleParts(m).name||m.title||'회의')+' 회의 요약')}">
+    <div class="shsec">보낼 내용</div>
+    <textarea id="gs-body" class="full" rows="14" maxlength="6000" style="margin:6px 0 10px;font-size:13px;line-height:1.6">${esc(plain)}</textarea>
+    <label class="meta" style="display:flex;align-items:center;gap:7px;margin:0 0 12px;cursor:pointer">
+      <input type="checkbox" id="gs-ok"> 손님께 보내도 되는 내용만 남겼습니다</label>
+    <div class="row" style="justify-content:flex-end"><button class="btn" id="gs-x">닫기</button><button class="btn p" id="gs-go" disabled>보내기</button></div>`);
+  const b=$('#bkbox'); if(b&&b.firstElementChild) b.firstElementChild.style.width='min(96vw,620px)';
+  $('#gs-x').onclick=bookClose;
+  $('#gs-ok').onchange=()=>{ $('#gs-go').disabled=!$('#gs-ok').checked; };
+  $('#gs-go').onclick=async()=>{
+    const subject=$('#gs-sub').value.trim(), body=$('#gs-body').value.trim();
+    if(!subject || body.length<10) return toast('제목과 내용을 확인해 주세요');
+    if(!confirm(`손님 ${n}명에게 회의 요약을 메일로 보냅니다. 계속할까요?`)) return;
+    $('#gs-go').disabled=true;
+    const ins=await SB.from('hd_guest_sum').insert({meeting_id:m.id, cal_uid:m.cal_uid, subject, body, created_by:me.id, created_name:me.name});
+    if(ins.error){ $('#gs-go').disabled=false; return toast('올리지 못했습니다 · '+esc(ins.error.message), 8000); }
+    bookClose(); toast('요약 발송을 올렸습니다. 메일 발송이 켜져 있으면 곧 나가고, 꺼져 있으면 「발송 대기」 로 남습니다', 8000); openMeeting(m.id);
+  };
+}
 // 회의 확정 단추를 누구에게 보여줄지 (2026-11-15)
 //   예전 회의(confirm_rule 없음)는 지금까지처럼 모두에게.
 //   새 회의는 담당자에게, 담당자가 없으면 누구나(확정한 사람이 담당자가 됩니다). 관리자·대표·팀장은 대신 확정할 수 있습니다.
