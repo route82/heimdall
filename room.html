@@ -335,6 +335,29 @@ button{font-family:inherit}
 .nm .co{font-size:clamp(13px,1.55vh,15px)}
 .ftr .hint{font-size:clamp(16px,1.9vh,19px)}
 .hint2{font-size:clamp(17px,2vh,20px)}
+/* 2026-11-16 UX·UI 정리 (김현우 팀장 · ui-ux-pro-max 점검) — 디자인 문법은 그대로 두고
+   ① 손가락으로 누르는 것은 모두 높이 48px 이상(안드로이드 48dp)  ② 15px 미만 글씨를 없앰
+   ③ 동의 확인 화면의 상태를 색 글자 대신 알약 모양 표시로  ④ 이모지 아이콘을 선 아이콘으로 */
+.pillbtn{min-height:48px;padding:10px 18px;font-size:clamp(16px,1.9vh,18px)}
+.pkc,.pkd{min-height:48px}
+.pkc{padding:10px 20px}
+.nm .co{font-size:clamp(14px,1.6vh,16px)}
+.card .cnt:not(:has(.selp)){font-size:clamp(16px,1.9vh,18px)}
+.ico{width:1.15em;height:1.15em;flex:none;vertical-align:-.18em;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.subbtn{display:inline-flex;align-items:center;gap:10px}
+.cgwrap{justify-content:flex-start;gap:14px;max-width:860px;width:100%;margin:0 auto}
+.cgtitle{font-size:clamp(26px,3.6vh,34px);font-weight:800;color:var(--tx);letter-spacing:-.4px;text-align:center}
+.cgmeta{font-size:clamp(17px,2vh,20px);color:var(--mut);text-align:center}
+.cgrow{display:flex;align-items:center;gap:14px;padding:14px 18px;border:1px solid var(--line);border-radius:var(--r1);margin-bottom:10px;background:var(--s1);min-height:72px}
+.cgname{font-size:clamp(19px,2.3vh,23px);font-weight:800}
+.cgsub{font-size:clamp(15px,1.75vh,17px);color:var(--mut);margin-top:2px}
+.cgst{display:inline-flex;align-items:center;min-height:36px;padding:4px 14px;border-radius:999px;font-size:clamp(15px,1.8vh,18px);font-weight:800;white-space:nowrap;border:1px solid var(--line2);color:var(--mut)}
+.cgst.ok{color:#0A0A0A;background:var(--green);border-color:var(--green)}
+.cgst.no{color:#fff;background:#c8102e;border-color:#c8102e}
+.cgrule{font-size:clamp(16px,1.9vh,18px);line-height:1.6;color:var(--mut);text-align:center}
+.cgfoot{width:100%;padding:18px 20px;border:1px solid var(--line2);border-radius:var(--r2);display:flex;align-items:center;gap:16px}
+.cgfoot .h{font-size:clamp(20px,2.5vh,24px);font-weight:800}
+.cgfoot .s{font-size:clamp(16px,1.9vh,18px);color:var(--mut);margin-top:2px}
 </style>
 </head>
 <body>
@@ -577,8 +600,8 @@ function idlePage(){
     // 2026-11-15 이 회의실의 회의가 진행 중이거나 20분 안에 시작하면 등록 단추를 감춥니다 (회의 시작을 막지 않게)
     + '<div class="subrow">'
     + (mine().some(e=>new Date(e.ends_at).getTime()>now && new Date(e.starts_at).getTime()-now<20*60000) ? ''
-        : '<button class="subbtn" id="voice">🎙 목소리 등록 <small>회의록에 내 이름이 붙습니다</small></button>')
-    + '<button class="subbtn" id="issue">🛠 문제 신고</button>'
+        : '<button class="subbtn" id="voice">'+ICO.mic+'목소리 등록 <small>회의록에 내 이름이 붙습니다</small></button>')
+    + '<button class="subbtn" id="issue">'+ICO.tool+'문제 신고</button>'
     + '</div>'
     + '</div>'
     + (rest.length ? '<div class="list"><div class="h">다른 회의 선택 — 누르면 위 카드가 바뀝니다 · '
@@ -648,6 +671,10 @@ function drawBar(ev){
 // 2026-11-16 운영 반영 — 기본으로 켭니다. 이 태블릿에서 끄려면 주소 끝에 ?consent=0 을 붙여 한 번 엽니다
 const CGATE = (()=>{ try{ return localStorage.getItem('hd_cgate')!=='0'; }catch(e){ return true; } })();
 const CG={};
+// 선 아이콘 (이모지 대신 · 글자 색을 그대로 따릅니다)
+const ICO={
+  mic:'<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>',
+  tool:'<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg>'};
 const cgHm=()=>new Date().toTimeString().slice(0,5);
 async function cgStates(ids){
   if(!ids.length) return new Map();
@@ -698,32 +725,32 @@ async function consentGate(ev){
 }
 function cgDraw(){
   const ev=CG.ev, A=CG.A;
-  const B={ok:'<b style="color:#1a7f4b">동의</b>', no:'<b style="color:#c8102e">동의 안 함</b>', wait:'<b style="opacity:.6">아직 선택 전</b>'};
+  const B={ok:'<span class="cgst ok">동의</span>', no:'<span class="cgst no">동의 안 함</span>', wait:'<span class="cgst">아직 선택 전</span>'};
   const wait=A.filter(a=>a.st==='wait').length, no=A.filter(a=>a.st==='no').length;
   const hm=t=>new Date(t).toTimeString().slice(0,5);
   app.innerHTML='<div class="top"><div class="tl"><div class="room">'+esc(cfg.room||'회의실')+'</div>'
     + '<div class="today"><span>회의 시작 전 동의 확인</span></div></div><div class="tc"></div><div class="clock"></div></div>'
-    + '<div class="mid" style="justify-content:flex-start;gap:14px;max-width:820px;width:100%;margin:0 auto">'
-    + '<div class="mtitle">'+esc(ev.title||'회의')+'</div>'
-    + '<div class="sub">'+hm(ev.starts_at)+'–'+hm(ev.ends_at)+(ev.owner_name?' · 담당 '+esc(ev.owner_name):'')+'</div>'
+    + '<div class="mid cgwrap">'
+    + '<div class="cgtitle">'+esc(ev.title||'회의')+'</div>'
+    + '<div class="cgmeta">'+hm(ev.starts_at)+'–'+hm(ev.ends_at)+(ev.owner_name?' · 담당 '+esc(ev.owner_name):'')+'</div>'
     + '<div style="width:100%;text-align:left">'
-    + A.map((a,i)=>'<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r1);margin-bottom:8px;background:var(--s1)">'
-        + '<div style="flex:1"><div style="font-size:1.15em;font-weight:800">'+esc(a.name)+'</div>'
-        + '<div class="sub" style="margin:2px 0 0;font-size:.85em">'+(a.guest?(a.booked?'손님':'손님 · 오늘 추가'):'직원')+(a.via?' · '+esc(a.via)+(a.at?' '+a.at:''):'')+'</div></div>'
+    + A.map((a,i)=>'<div class="cgrow">'
+        + '<div style="flex:1"><div class="cgname">'+esc(a.name)+'</div>'
+        + '<div class="cgsub">'+(a.guest?(a.booked?'손님':'손님 · 오늘 추가'):'직원')+(a.via?' · '+esc(a.via)+(a.at?' '+a.at:''):'')+'</div></div>'
         + B[a.st]+(a.st!=='ok'?'<button class="pillbtn" data-cga="'+i+'">여기서 동의 받기</button>':'')+'</div>').join('')
     + (A.length?'':'<div class="sub">이 예약에는 참석자가 적혀 있지 않습니다. 아래에서 참석자를 추가해 주세요.</div>')
     + '<button class="pillbtn" id="cgadd">+ 등록 안 된 참석자 추가</button></div>'
-    + '<div class="sub" style="font-size:.85em;line-height:1.6">직원·손님 모두 같은 규칙입니다. 한 명이라도 동의하지 않으면 녹음하지 않습니다. '
+    + '<div class="cgrule">직원·손님 모두 같은 규칙입니다. 한 명이라도 동의하지 않으면 녹음하지 않습니다. '
     + '회의 중에 누가 녹음을 원하지 않는다고 하면 [회의 종료]를 누르고 담당자에게 알려 주세요.</div>'
-    + '<div style="width:100%;padding:16px 18px;border:1px solid var(--line2);border-radius:var(--r2);display:flex;align-items:center;gap:14px">'
-    + (no ? '<div style="flex:1;text-align:left"><div style="font-size:1.2em;font-weight:800">이 회의는 녹음하지 않습니다</div>'
-            + '<div class="sub" style="margin:2px 0 0">참석자 '+no+'명이 동의하지 않았습니다. 다시 동의하면 녹음할 수 있습니다.</div></div>'
+    + '<div class="cgfoot">'
+    + (no ? '<div style="flex:1;text-align:left"><div class="h">이 회의는 녹음하지 않습니다</div>'
+            + '<div class="s">참석자 '+no+'명이 동의하지 않았습니다. 다시 동의하면 녹음할 수 있습니다.</div></div>'
             + '<button class="big go" id="cgnorec" style="font-size:20px;padding:16px 24px">녹음 없이 회의하기</button>'
-        : wait ? '<div style="flex:1;text-align:left"><div style="font-size:1.2em;font-weight:800">'+wait+'명의 선택을 기다립니다</div>'
-            + '<div class="sub" style="margin:2px 0 0">모두 동의해야 녹음을 시작할 수 있습니다</div></div>'
+        : wait ? '<div style="flex:1;text-align:left"><div class="h">'+wait+'명의 선택을 기다립니다</div>'
+            + '<div class="s">모두 동의해야 녹음을 시작할 수 있습니다</div></div>'
             + '<button class="big go" disabled style="font-size:20px;padding:16px 24px;opacity:.4">녹음 시작</button>'
-        : '<div style="flex:1;text-align:left"><div style="font-size:1.2em;font-weight:800">'+(A.length?'모두 동의했습니다':'예약에 참석자가 적혀 있지 않습니다')+'</div>'
-            + (A.length?'':'<div class="sub" style="margin:2px 0 0">녹음 중에 이름을 누르면 그때 동의를 확인합니다</div>')+'</div>'
+        : '<div style="flex:1;text-align:left"><div class="h">'+(A.length?'모두 동의했습니다':'예약에 참석자가 적혀 있지 않습니다')+'</div>'
+            + (A.length?'':'<div class="s">녹음 중에 이름을 누르면 그때 동의를 확인합니다</div>')+'</div>'
             + '<button class="big go" id="cgstart" style="font-size:20px;padding:16px 24px">녹음 시작</button>')
     + '</div><button class="ghost" id="cgback">돌아가기</button></div><div></div>';
   $('#cgback').onclick=()=>idlePage();
