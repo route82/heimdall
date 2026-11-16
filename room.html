@@ -160,6 +160,13 @@ button{font-family:inherit}
 .pillbtn{background:transparent;border:1px solid var(--line2);color:var(--mut);
  border-radius:999px;font-size:clamp(11px,1.35vh,13px);padding:5px 13px;cursor:pointer}
 .pillbtn:active{background:var(--s2)}
+/* 2026-11-16 대기 화면의 목소리 등록·문제 신고 — 작아서 안 보인다는 의견으로 크게 (김현우 팀장) */
+.subrow{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-top:6px}
+.subbtn{background:var(--s1);border:1.5px solid var(--line2);color:var(--tx);border-radius:999px;
+ font-size:clamp(16px,2.3vh,21px);font-weight:700;padding:clamp(12px,1.8vh,16px) clamp(22px,2.4vw,30px);cursor:pointer;
+ display:inline-flex;align-items:center;gap:10px}
+.subbtn small{font-weight:500;color:var(--mut);font-size:.8em}
+.subbtn:active{background:var(--s2)}
 
 /* ── 목소리 등록 (2026-11-14) */
 .vbox{width:min(100%,860px);text-align:left;background:var(--s2);border:1px solid var(--line2);
@@ -235,6 +242,7 @@ button{font-family:inherit}
  padding:10px 12px;margin-bottom:14px;min-height:52px;max-height:40vh}
 .card .cnt:not(:has(.selp)){font-size:clamp(14px,1.7vh,16px);font-weight:600;color:var(--dim)}
 .grid{display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start}
+.vpick{align-self:center;margin:0 auto}.vpick .pk{margin:0 auto}.vpick .grid{justify-content:center}
 .nm{background:var(--s2);border:2px solid var(--line);color:var(--tx);border-radius:var(--r1);
  font-size:clamp(15px,2vh,20px);font-weight:700;padding:12px 18px;cursor:pointer;
  min-width:104px;transition:background .15s ease,border-color .15s ease,color .15s ease}
@@ -471,7 +479,7 @@ async function loadEvents(){
   const from=new Date(now-2*3600*1000).toISOString();
   const to  =new Date(now+16*3600*1000).toISOString();
   const {data}=await SB.from('hd_cal_event')
-    .select('uid,title,room,starts_at,ends_at,all_day,note')
+    .select('uid,title,room,starts_at,ends_at,all_day,note,owner_id,owner_name,member_ids,member_names')
     .gte('starts_at',from).lte('starts_at',to).order('starts_at');
   EVENTS=(data||[]).filter(e=>!e.all_day);
 }
@@ -536,16 +544,21 @@ function idlePage(){
     + (ev ? '<span class="sub2">'+esc(ev.title||'회의')+'</span>' : '')
     + '</span></button>'
     + '<div class="sub" style="font-size:14px">'
-    + (ev ? '위 회의로 녹음됩니다 · 다른 회의면 아래에서 골라주세요'
+    + (ev ? '위 회의로 녹음됩니다 · 다른 회의면 아래에서 선택해 주세요'
           : '누르면 바로 녹음이 시작됩니다')
     + ' · 참석자는 녹음 중에 이름을 누르시면 됩니다</div>'
     // 예약이 떠 있어도 예약에 없는 회의를 녹음할 수 있게 합니다.
     + (ev    ? '<button class="ghost" id="adhoc">예약에 없는 회의 녹음하기</button>' : '')
     + (ADHOC && current()
              ? '<button class="ghost" id="unadhoc">예약된 회의로 돌아가기</button>' : '')
-    + '<button class="pillbtn" id="voice">목소리 등록 — 회의록에 내 이름이 붙습니다</button>'
+    // 2026-11-15 이 회의실의 회의가 진행 중이거나 20분 안에 시작하면 등록 단추를 감춥니다 (회의 시작을 막지 않게)
+    + '<div class="subrow">'
+    + (mine().some(e=>new Date(e.ends_at).getTime()>now && new Date(e.starts_at).getTime()-now<20*60000) ? ''
+        : '<button class="subbtn" id="voice">🎙 목소리 등록 <small>회의록에 내 이름이 붙습니다</small></button>')
+    + '<button class="subbtn" id="issue">🛠 문제 신고</button>'
     + '</div>'
-    + (rest.length ? '<div class="list"><div class="h">다른 회의 고르기 — 누르면 위 카드가 바뀝니다 · '
+    + '</div>'
+    + (rest.length ? '<div class="list"><div class="h">다른 회의 선택 — 누르면 위 카드가 바뀝니다 · '
         + '다른 회의실 예약도 여기 있습니다</div><div class="picks">'
         + rest.slice(0,6).map((e,i)=>'<button class="pick" data-ev="'+i+'">'
           + '<span class="tm">'+hm(e.starts_at)+' ~ '+hm(e.ends_at)+'</span>'
@@ -564,11 +577,12 @@ function idlePage(){
   }, 1000);
 
   drawBar(ev);
-  $('#start').onclick=()=>startRec(ev);
+  $('#start').onclick=()=>(CGATE && ev) ? consentGate(ev) : startRec(ev);
   // 예약 카드를 끄고 제목 없는 회의로 녹음합니다.
   const ah=$('#adhoc');   if(ah) ah.onclick=()=>{ ADHOC=true;  PICKED=null; idlePage(); };
   const uh=$('#unadhoc'); if(uh) uh.onclick=()=>{ ADHOC=false; PICKED=null; idlePage(); };
   const vb=$('#voice');   if(vb) vb.onclick=voicePick;
+  const ib=$('#issue');   if(ib) ib.onclick=issueSheet;
   // 다른 회의를 누르면 바로 녹음하지 않고 위 카드만 바꿉니다.
   // 지나가다 잘못 눌러 진짜 회의가 시작되는 일을 막습니다.
   app.querySelectorAll('[data-ev]').forEach(b=>b.onclick=()=>{
@@ -601,6 +615,166 @@ function drawBar(ev){
     }
   };
   draw();
+}
+
+// ─────────────────────────── 회의 시작 전 동의 확인 (2026-11-16 · 홍석진 대표 11/15 「전원 동의제」)
+// 직원·손님 구분 없이 한 명이라도 동의하지 않으면 그 회의는 녹음하지 않습니다.
+// 법무 검토 전이라 꺼 둔 채로 올립니다. 주소 끝에 ?consent=1 을 붙여 한 번 열면 이 태블릿에서 켜지고, ?consent=0 이면 꺼집니다.
+(()=>{ const m=location.search.match(/[?&]consent=([01])/); if(!m) return;
+  try{ m[1]==='1' ? localStorage.setItem('hd_cgate','1') : localStorage.removeItem('hd_cgate'); }catch(e){} })();
+const CGATE = (()=>{ try{ return localStorage.getItem('hd_cgate')==='1'; }catch(e){ return false; } })();
+const CG={};
+const cgHm=()=>new Date().toTimeString().slice(0,5);
+async function cgStates(ids){
+  if(!ids.length) return new Map();
+  try{ const r=await SB.rpc('hd_consent_state',{p_ids:ids}); return new Map((r.data||[]).map(x=>[x.member_id, x.c1==='y'?'ok':x.c1==='n'?'no':'wait'])); }
+  catch(e){ return new Map(); }
+}
+// 한 사람에게 묻는 창 — 본인이 직접 누릅니다. done('ok'|'no') 를 부릅니다.
+function cgAsk(name, done){
+  const box=document.createElement('div'); box.className='sheet';
+  box.innerHTML='<div class="sheetcard"><div class="h">'+esc(name)+' 님, 녹음에 동의하시나요?</div>'
+    + '<div class="sub" style="margin:0 0 16px;line-height:1.6">회의를 녹음해 회의록을 만듭니다. 동의하지 않으셔도 회의는 그대로 진행하고, 녹음만 하지 않습니다. 불이익은 없습니다.</div>'
+    + '<button class="rmopt on" id="cgy">동의합니다</button><button class="rmopt" id="cgn">동의하지 않습니다</button>'
+    + '<button class="ghost" id="cgx" style="margin-top:10px">닫기</button></div>';
+  document.body.appendChild(box);
+  box.querySelector('#cgx').onclick=()=>box.remove();
+  box.querySelector('#cgy').onclick=()=>{ box.remove(); done('ok'); };
+  box.querySelector('#cgn').onclick=()=>{ box.remove(); done('no'); };
+}
+// 직원의 선택은 본인 동의 기록으로 남깁니다 (로그인 때 받는 동의와 같은 기록)
+async function cgSave(id, st){
+  try{ const r=await SB.rpc('hd_consent_tablet',{p_member:id, p_c1:st==='ok'?'y':'n', p_room:cfg.room||''});
+    if(r.error) throw r.error; return r.data==='y'?'ok':'no'; }
+  catch(e){ alert('기록하지 못했습니다 · '+(e.message||e)); return null; }
+}
+async function cgNorec(ev, A, title, room){
+  const ins=await SB.from('hd_norec').insert({cal_uid:(ev&&ev.uid)||'', title:title||(ev&&ev.title)||'', room:room||cfg.room||'',
+    starts_at:(ev&&ev.starts_at)||new Date().toISOString(), ends_at:(ev&&ev.ends_at)||null, owner_name:(ev&&ev.owner_name)||'',
+    attendees:A.map(a=>({name:a.name, kind:a.guest?'손님':'직원', id:a.id||null, state:a.st==='ok'?'y':a.st==='no'?'n':'wait', via:a.via||'', at:a.at||''})),
+    reason:'참석자 미동의', created_by:me.id});
+  return !ins.error;
+}
+// 예약한 회의 — 녹음 시작 전에 참석자 동의를 확인합니다
+async function consentGate(ev){
+  clearInterval(tick);
+  const ids=ev.member_ids||[], names=ev.member_names||[];
+  CG.ev=ev; CG.pre=null;
+  // 2026-11-16 6번 시험 — 하나로 합친 계정·퇴사자가 예약에 남아 같은 이름이 두 번 나왔습니다.
+  //   지금 명단(재직자)에 있는 사람만, 한 번씩만 묻습니다. 명단을 못 읽었으면 예약에 적힌 그대로 둡니다.
+  const act=new Set(MEMBERS.map(m=>m.id)), seen=new Set();
+  CG.A=ids.map((id,i)=>({id, name:names[i]||'참석자', st:'wait', via:''}))
+    .filter(a=>!seen.has(a.id) && seen.add(a.id) && (!act.size || act.has(a.id)));
+  app.innerHTML='<div></div><div class="mid"><div class="sub">참석자 동의를 확인하는 중…</div></div><div></div>';
+  const st=await cgStates(ids);
+  CG.A.forEach(a=>{ a.st=st.get(a.id)||'wait'; if(a.st!=='wait') a.via='미리 선택'; });
+  try{ const gr=await SB.rpc('hd_guest_state',{p_cal_uid:ev.uid||''});
+    (gr.data||[]).forEach(g=>CG.A.push({gid:g.id, name:g.name, guest:true, booked:true, st:g.g1==='y'?'ok':g.g1==='n'?'no':'wait', via:g.g1==='wait'?'':'메일'})); }catch(e){}
+  cgDraw();
+}
+function cgDraw(){
+  const ev=CG.ev, A=CG.A;
+  const B={ok:'<b style="color:#1a7f4b">동의</b>', no:'<b style="color:#c8102e">동의 안 함</b>', wait:'<b style="opacity:.6">아직 선택 전</b>'};
+  const wait=A.filter(a=>a.st==='wait').length, no=A.filter(a=>a.st==='no').length;
+  const hm=t=>new Date(t).toTimeString().slice(0,5);
+  app.innerHTML='<div class="top"><div class="tl"><div class="room">'+esc(cfg.room||'회의실')+'</div>'
+    + '<div class="today"><span>회의 시작 전 동의 확인</span></div></div><div class="tc"></div><div class="clock"></div></div>'
+    + '<div class="mid" style="justify-content:flex-start;gap:14px;max-width:820px;width:100%;margin:0 auto">'
+    + '<div class="mtitle">'+esc(ev.title||'회의')+'</div>'
+    + '<div class="sub">'+hm(ev.starts_at)+'–'+hm(ev.ends_at)+(ev.owner_name?' · 담당 '+esc(ev.owner_name):'')+'</div>'
+    + '<div style="width:100%;text-align:left">'
+    + A.map((a,i)=>'<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r1);margin-bottom:8px;background:var(--s1)">'
+        + '<div style="flex:1"><div style="font-size:1.15em;font-weight:800">'+esc(a.name)+'</div>'
+        + '<div class="sub" style="margin:2px 0 0;font-size:.85em">'+(a.guest?(a.booked?'손님':'손님 · 오늘 추가'):'직원')+(a.via?' · '+esc(a.via)+(a.at?' '+a.at:''):'')+'</div></div>'
+        + B[a.st]+(a.st!=='ok'?'<button class="pillbtn" data-cga="'+i+'">여기서 동의 받기</button>':'')+'</div>').join('')
+    + (A.length?'':'<div class="sub">이 예약에는 참석자가 적혀 있지 않습니다. 아래에서 참석자를 추가해 주세요.</div>')
+    + '<button class="pillbtn" id="cgadd">+ 등록 안 된 참석자 추가</button></div>'
+    + '<div class="sub" style="font-size:.85em;line-height:1.6">직원·손님 모두 같은 규칙입니다. 한 명이라도 동의하지 않으면 녹음하지 않습니다. '
+    + '회의 중에 누가 녹음을 원하지 않는다고 하면 [회의 종료]를 누르고 담당자에게 알려 주세요.</div>'
+    + '<div style="width:100%;padding:16px 18px;border:1px solid var(--line2);border-radius:var(--r2);display:flex;align-items:center;gap:14px">'
+    + (no ? '<div style="flex:1;text-align:left"><div style="font-size:1.2em;font-weight:800">이 회의는 녹음하지 않습니다</div>'
+            + '<div class="sub" style="margin:2px 0 0">참석자 '+no+'명이 동의하지 않았습니다. 다시 동의하면 녹음할 수 있습니다.</div></div>'
+            + '<button class="big go" id="cgnorec" style="font-size:20px;padding:16px 24px">녹음 없이 회의하기</button>'
+        : wait ? '<div style="flex:1;text-align:left"><div style="font-size:1.2em;font-weight:800">'+wait+'명의 선택을 기다립니다</div>'
+            + '<div class="sub" style="margin:2px 0 0">모두 동의해야 녹음을 시작할 수 있습니다</div></div>'
+            + '<button class="big go" disabled style="font-size:20px;padding:16px 24px;opacity:.4">녹음 시작</button>'
+        : '<div style="flex:1;text-align:left"><div style="font-size:1.2em;font-weight:800">'+(A.length?'모두 동의했습니다':'예약에 참석자가 적혀 있지 않습니다')+'</div>'
+            + (A.length?'':'<div class="sub" style="margin:2px 0 0">녹음 중에 이름을 누르면 그때 동의를 확인합니다</div>')+'</div>'
+            + '<button class="big go" id="cgstart" style="font-size:20px;padding:16px 24px">녹음 시작</button>')
+    + '</div><button class="ghost" id="cgback">돌아가기</button></div><div></div>';
+  $('#cgback').onclick=()=>idlePage();
+  $('#cgadd').onclick=()=>{ const n=(prompt('참석자 이름')||'').trim(); if(!n) return; A.push({name:n, guest:true, st:'wait', via:''}); cgDraw(); };
+  app.querySelectorAll('[data-cga]').forEach(b=>b.onclick=()=>{ const a=A[+b.dataset.cga];
+    cgAsk(a.name, async r=>{ if(a.guest){ a.st=r;
+        if(a.gid){ try{ await SB.rpc('hd_guest_tablet',{p_id:a.gid, p_g1:r==='ok'?'y':'n'}); }catch(e){} } }
+      else { const s=await cgSave(a.id, r); if(!s) return; a.st=s; }
+      a.via='태블릿'; a.at=cgHm(); cgDraw(); }); });
+  const go=$('#cgstart'); if(go) go.onclick=async()=>{ CG.pre=A.slice(); await startRec(ev); };
+  const nr=$('#cgnorec'); if(nr) nr.onclick=async()=>{ nr.disabled=true;
+    const ok=await cgNorec(ev, A);
+    msg(ok?'녹음하지 않고 진행합니다':'기록을 남기지 못했습니다',
+        ok?'음성과 내용은 저장하지 않고, 참석자와 동의 여부만 기록했습니다. 참석자와 팀 리드에게는 「녹음하지 않은 회의」(사유: 참석자 비동의)로만 알립니다.':'잠시 뒤 다시 눌러 주세요', false, true); };
+}
+// 예약 없이 시작한 녹음 — 이름을 누를 때 그 사람의 동의를 확인합니다.
+// 동의하지 않으면 녹음을 멈추고, 그때까지의 녹음은 올리지 않고 지웁니다.
+async function cgOnPick(id){
+  if(!CGATE || !REC.mr || REC.mr.state!=='recording') return;
+  if((CG.pre||[]).some(a=>a.id===id && a.st==='ok')) return;
+  const m=MEMBERS.find(x=>x.id===id); if(!m) return;
+  const st=(await cgStates([id])).get(id)||'wait';
+  if(st==='ok' || !REC.who.has(id)) return;
+  cgAsk(m.name, async r=>{
+    const s=await cgSave(id, r); if(!s) return;
+    if(s==='ok') return;
+    if(!confirm(m.name+' 님이 녹음에 동의하지 않았습니다.\n\n녹음을 멈추고, 지금까지 녹음한 내용은 저장하지 않고 지웁니다.')) return;
+    const byId=new Map(MEMBERS.map(x=>[x.id,x]));
+    REC.norecA=[...REC.who].map(x=>({id:x, name:(byId.get(x)||{}).name||'참석자', st:x===id?'no':'ok', via:'태블릿', at:cgHm()}));
+    REC.discard=true; stopRec(true);
+  });
+}
+
+// ─────────────────────────── 녹음 유실 방지 2단계 (2026-11-16) — 녹음하는 동안 1분마다 서버로 조각을 올립니다
+// 1단계는 기기 안(IndexedDB)에만 적어 둡니다. 태블릿이 고장 나거나 화면이 지워지면 그것도 사라지므로,
+// 녹음 중에도 서버에 조각을 올려 둡니다. 평소에는 회의가 끝날 때 전체 녹음을 올리고 조각은 서버가 지웁니다.
+// 전체 녹음이 끝내 올라오지 않으면 처리 서버가 조각을 이어 붙여 회의록을 만듭니다 (bin/live.py).
+// 조각 올리기가 실패해도 녹음에는 영향을 주지 않습니다 — 다음 1분에 다시 올립니다.
+const LIVE={id:null, seq:0, sent:0, bytes:0, busy:false, timer:null};
+const liveDir=id=>'live/'+String(id).replace(/[^0-9A-Za-z_-]/g,'_');
+async function liveStart(ev){
+  clearInterval(LIVE.timer);
+  Object.assign(LIVE,{id:me.id+':'+(KEEP.id||REC.t0), seq:0, sent:0, bytes:0, busy:false});
+  try{
+    const ins=await SB.from('hd_rec_live').insert({id:LIVE.id, created_by:me.id, room:REC.room||cfg.room||'',
+      cal_uid:(ev&&ev.uid)||'', title:REC.title||'', agenda:REC.agenda||'', mime:(REC.mr&&REC.mr.mimeType)||'audio/webm',
+      started_at:new Date(REC.t0).toISOString(), test:!!(cfg.test && canTest())});
+    if(ins.error){ LIVE.id=null; return; }
+  }catch(e){ LIVE.id=null; return; }
+  LIVE.timer=setInterval(liveFlush, 60000);
+}
+async function liveFlush(){
+  if(!LIVE.id || LIVE.busy || !REC.mr) return;
+  const upto=REC.chunks.length; if(upto<=LIVE.sent) return;
+  LIVE.busy=true;
+  try{
+    const id=LIVE.id, blob=new Blob(REC.chunks.slice(LIVE.sent, upto), {type:'application/octet-stream'});
+    const up=await SB.storage.from('hd-audio').upload(liveDir(id)+'/'+String(LIVE.seq).padStart(5,'0')+'.part', blob,
+      {upsert:false, contentType:'application/octet-stream'});
+    // 올라갔는데 답만 못 받은 경우(이미 있음)는 올라간 것으로 봅니다
+    const ok=!up.error || /exist|duplicate|409/i.test((up.error.message||'')+' '+(up.error.statusCode||''));
+    if(ok && LIVE.id===id){
+      LIVE.sent=upto; LIVE.seq++; LIVE.bytes+=blob.size;
+      await SB.from('hd_rec_live').update({parts:LIVE.seq, bytes:LIVE.bytes, last_part_at:new Date().toISOString(),
+        who:[...(REC.who||[])], owner_id:(REC.owner && REC.who && REC.who.has(REC.owner))?REC.owner:null,
+        room:REC.room||cfg.room||'', title:REC.title||'', updated_at:new Date().toISOString()}).eq('id',id);
+    }
+  }catch(e){}
+  LIVE.busy=false;
+}
+// state: done(전체 녹음을 올렸음) · discarded(녹음하지 않기로 함). 서버가 조각을 지웁니다.
+function liveEnd(state, id){
+  if(!id){ clearInterval(LIVE.timer); id=LIVE.id; LIVE.id=null; }
+  if(!id) return;
+  try{ SB.from('hd_rec_live').update({state, updated_at:new Date().toISOString()}).eq('id',id).then(()=>{},()=>{}); }catch(e){}
 }
 
 // ─────────────────────────── 녹음
@@ -704,6 +878,7 @@ async function keepRecover(){
       const ins=await SB.from('hd_job').insert(job);
       if(ins.error) continue;
       await keepDrop(ss.id);
+      liveEnd('done', me.id+':'+ss.id);
       sent++;
     }
   }catch(e){}
@@ -738,7 +913,16 @@ async function startRec(ev){
 
   REC.stream=stream; REC.chunks=[]; REC.t0=Date.now(); REC.ev=ev||null;
   REC.title=(ev&&ev.title)||''; REC.who=new Set(); REC.via=new Map();
+  // 2026-11-16 점검: 지난 녹음의 상태를 비웁니다 (예약 초과 확인 시각·자동 정지·폐기 표시·담당자)
+  REC.askAt=0; REC.askShown=0; REC.autoStop=false; REC.lastSound=0; REC.discard=false; REC.norecA=null; REC.owner=null;
   PICKED=null; ADHOC=false;
+  // 2026-11-16 6번 시험 — 동의 확인 화면에서 동의한 직원은 이미 와 있는 사람이므로 참석자로 바로 넣습니다
+  //   (전에는 녹음 화면에서 「아직 아무도 누르지 않았습니다」 로 다시 고르게 했습니다)
+  if(ev && CG.pre && CG.ev===ev){
+    const byId=new Map(MEMBERS.map(m=>[m.id,m]));
+    CG.pre.forEach(a=>{ const m=!a.guest && a.st==='ok' && byId.get(a.id);
+      if(m) pickIn(m.id, m.company||'', m.dept||NO_DEPT); });
+  }
   REC.agenda=((ev&&ev.note)||'').trim();
   REC.room=cfg.room||'';
   REC.mr = mime ? new MediaRecorder(stream,{mimeType:mime, audioBitsPerSecond:64000})
@@ -755,6 +939,7 @@ async function startRec(ev){
   keepAwake();
   meter(stream);
   recPage();
+  liveStart(ev);               // 2단계: 1분마다 서버로 조각 올리기 (실패해도 녹음은 그대로)
 }
 
 // ── 참석자 고르기 — 회사 → 팀 → 팀원 (2026-10-20)
@@ -890,12 +1075,19 @@ function paintWho(){
     const ids=[...via.keys()].filter(id=>REC.who.has(id))
       .concat([...REC.who].filter(id=>!via.has(id)));          // 고른 순서대로
     const picked=ids.map(id=>byId.get(id)).filter(Boolean);
+    // 2026-11-16 회의 담당자 — 예약에서 정해지지 않은 회의는 여기서 정합니다 (기본은 처음 누른 사람)
+    const needOwn = !(REC.ev && REC.ev.owner_id);
+    if(needOwn && (!REC.owner || !REC.who.has(REC.owner))) REC.owner = picked.length ? picked[0].id : null;
     c.innerHTML = picked.length
       ? '<span class="cntn">참석 '+picked.length+'명</span>'
         + picked.map(m=>{ const v=via.get(m.id)||{co:m.company,dp:m.dept};
             const where=[v.co, v.dp && v.dp!==NO_DEPT ? v.dp : ''].filter(Boolean).join(' ');
+            const own = needOwn ? (m.id===REC.owner
+                ? '<span data-own="'+m.id+'" style="margin-left:8px;padding:2px 8px;border-radius:999px;background:#c8102e;color:#fff;font-size:.78em;font-weight:800">담당</span>'
+                : '<span data-own="'+m.id+'" style="margin-left:8px;padding:2px 8px;border-radius:999px;border:1px solid #888;color:#444;font-size:.78em">담당 지정</span>') : '';
             return '<button class="selp" data-un="'+m.id+'">'+esc(m.name)
-              +(where?'<span class="w">'+esc(where)+'</span>':'')+'<span class="x">×</span></button>'; }).join('')
+              +(where?'<span class="w">'+esc(where)+'</span>':'')+own+'<span class="x">×</span></button>'; }).join('')
+        + (needOwn ? '<div class="sub" style="width:100%;margin:6px 0 0;font-size:.8em">담당자는 회의록을 확인하고 확정하는 분입니다 · 「담당 지정」을 누르면 바뀝니다</div>' : '')
       : '아직 아무도 누르지 않았습니다';
   }
   paintUp();          // 참석자 확인 화면일 때만 동작합니다
@@ -904,6 +1096,8 @@ function bindPicker(){
   const box=$('#pk'); if(!box) return;
   const c=$('#cnt');
   if(c) c.onclick=e=>{
+    const o=e.target.closest('[data-own]');
+    if(o){ REC.owner=o.dataset.own; paintWho(); return; }
     const b=e.target.closest('[data-un]'); if(!b) return;
     unpick(b.dataset.un);
     const keep=(box.querySelector('.pkms')||{}).scrollTop||0;
@@ -924,6 +1118,7 @@ function bindPicker(){
       const id=b.dataset.id;
       const m=PK.co===ALL_CO && MEMBERS.find(x=>x.id===id);   // 「전체」 에서 고르면 본 소속으로
       REC.who.has(id) ? unpick(id) : m ? pickIn(id,m.company||'회사 미지정',m.dept||NO_DEPT) : pickIn(id,PK.co,PK.dp);
+      if(REC.who.has(id)) cgOnPick(id);
     }
     else return;
     const keep=(box.querySelector('.pkms')||{}).scrollTop||0;
@@ -975,10 +1170,48 @@ function recPage(){
   tick=setInterval(()=>{
     const a=$('#ela'); if(a) a.textContent=el((Date.now()-REC.t0)/1000);
     const c=$('#ck'); if(c) c.textContent=clk().hm;
+    overCheck();
   }, 500);
   bindPicker();
   $('#stop').onclick=stopRec;
   const rb=$('#rmch'); if(rb) rb.onclick=roomPick;
+}
+
+// 2026-11-16 문제 신고 — 장비는 AX팀, 시설은 경영지원팀으로 슬랙 전달 (웹의 「문제 신고」 와 같은 표에 넣습니다)
+function issueSheet(){
+  const PRE={equip:['녹음이 시작되지 않습니다','태블릿 화면이 멈췄습니다','마이크 소리가 들어오지 않습니다','화면·TV 연결이 안 됩니다'],
+             facility:['냉난방이 안 됩니다','조명이 나갔습니다','청소가 필요합니다','비품이 부족합니다']};
+  const st={kind:'equip', urgent:false, pre:''};
+  const box=document.createElement('div'); box.className='sheet';
+  const draw=()=>{ box.innerHTML='<div class="sheetcard"><div class="h">문제 신고 · '+esc(cfg.room||'회의실')+'</div>'
+    + '<div style="display:flex;gap:8px;margin-bottom:12px">'
+    +   '<button class="rmopt'+(st.kind==='equip'?' on':'')+'" data-k="equip" style="margin:0">장비</button>'
+    +   '<button class="rmopt'+(st.kind==='facility'?' on':'')+'" data-k="facility" style="margin:0">시설</button></div>'
+    + PRE[st.kind].map((t,i)=>'<button class="rmopt'+(st.pre===t?' on':'')+'" data-p="'+i+'" style="font-weight:500">'+esc(t)+'</button>').join('')
+    + '<textarea id="istx" rows="2" maxlength="300" placeholder="더 알려 주실 내용이 있으면 적어 주세요 (선택)" '
+    +   'style="width:100%;margin:6px 0 10px;padding:12px;font-size:17px;background:var(--s2);color:var(--tx);border:1px solid var(--line);border-radius:var(--r1)">'+esc(st.tx||'')+'</textarea>'
+    + '<button class="rmopt'+(st.urgent?' on':'')+'" id="isurg" style="font-weight:500">긴급 — 지금 회의를 못 하고 있습니다'+(st.urgent?' ✓':'')+'</button>'
+    + '<div style="display:flex;gap:8px;margin-top:8px"><button class="ghost" id="isx" style="flex:1">닫기</button>'
+    + '<button class="rmopt on" id="isgo" style="flex:2;margin:0">신고하기</button></div></div>';
+    box.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{ st.tx=box.querySelector('#istx').value; st.kind=b.dataset.k; st.pre=''; draw(); });
+    box.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{ st.tx=box.querySelector('#istx').value; const t=PRE[st.kind][+b.dataset.p]; st.pre=st.pre===t?'':t; draw(); });
+    box.querySelector('#isurg').onclick=()=>{ st.tx=box.querySelector('#istx').value; st.urgent=!st.urgent; draw(); };
+    box.querySelector('#isx').onclick=()=>box.remove();
+    box.querySelector('#isgo').onclick=async()=>{
+      const body=[st.pre, box.querySelector('#istx').value.trim()].filter(Boolean).join(' · ');
+      if(!body){ alert('어떤 문제인지 하나 눌러 주시거나 적어 주세요.'); return; }
+      const go=box.querySelector('#isgo'); go.disabled=true; go.textContent='보내는 중…';
+      const ins=await SB.from('hd_issue').insert({room:cfg.room||'', kind:st.kind, urgent:st.urgent, body,
+        created_by:me.id, created_name:(cfg.room||'회의실')+' 태블릿', company:''});
+      if(ins.error){ go.disabled=false; go.textContent='신고하기'; alert('신고를 남기지 못했습니다 · '+ins.error.message); return; }
+      box.innerHTML='<div class="sheetcard"><div class="h">신고를 접수했습니다</div>'
+        + '<div class="sub" style="margin:0 0 16px">담당자에게 슬랙으로 전달했습니다. '+(st.urgent?'긴급 신고는 30분 안에':'다음 근무일까지')+' 답변드리겠습니다.<br>'
+        + '태블릿 녹음이 안 되면 휴대폰이나 노트북의 헤임달 「녹음」 으로 녹음하셔도 회의록은 똑같이 나옵니다.</div>'
+        + '<button class="rmopt on" id="isok">확인</button></div>';
+      box.querySelector('#isok').onclick=()=>box.remove();
+    };
+  };
+  draw(); document.body.appendChild(box);
 }
 
 // 녹음 중에 회의실을 바꿉니다 (예약한 곳과 실제 장소가 다를 때)
@@ -1015,18 +1248,52 @@ function meter(stream){
       an.getByteFrequencyData(buf);
       let sum=0; for(let i=0;i<buf.length;i++) sum+=buf[i];
       const lv=$('#lv');
+      if((sum/buf.length)>2) REC.lastSound=Date.now();
       if(lv) lv.innerHTML = (sum/buf.length)>2 ? '<i></i>소리 들어오는 중' : '';
     }, 700);
     REC.ac=ac;
   }catch(e){}
 }
 
-function stopRec(){
+// ── 2026-11-16 예약 시간이 지난 녹음 — 끊지 않고 먼저 묻습니다 (김현우 팀장 결정)
+// 회의가 끝났는데 녹음이 계속 돌면, 나중에 들어온 다른 사람들의 대화가 녹음될 수 있습니다.
+// 그렇다고 예약 시간이 지났다고 바로 끊으면 길어진 회의가 잘립니다. 그래서:
+//   예약 종료 10분 뒤 「회의가 계속되고 있나요?」 를 띄웁니다.
+//   [계속 녹음] → 그대로 녹음하고 20분 뒤에 한 번 더 묻습니다.
+//   5분 동안 아무도 누르지 않았을 때 — 소리가 계속 들어오면 회의 중으로 보고 그대로 둡니다(20분 뒤 다시 묻기).
+//                                      3분 넘게 조용하면 녹음을 멈추고 그때까지의 녹음을 올립니다.
+// 예약 없이 시작한 녹음은 끝나는 시각을 모르므로 묻지 않습니다.
+const OVER={first:10*60000, again:20*60000, wait:5*60000, quiet:3*60000};
+function overCheck(){
+  if(!REC.mr || REC.mr.state!=='recording' || !REC.ev || !REC.ev.ends_at) return;
+  const now=Date.now();
+  if(!REC.askAt) REC.askAt=new Date(REC.ev.ends_at).getTime()+OVER.first;
+  const box=document.getElementById('oversheet');
+  if(!box){
+    if(now<REC.askAt) return;
+    REC.askShown=now;
+    const b=document.createElement('div'); b.className='sheet'; b.id='oversheet';
+    b.innerHTML='<div class="sheetcard"><div class="h">예약 시간이 지났습니다 · 회의가 계속되고 있나요?</div>'
+      + '<div class="sub" style="margin:0 0 14px">계속하시면 그대로 녹음합니다. 아무도 누르지 않고 회의실이 조용하면 녹음을 멈추고 회의록을 만듭니다.</div>'
+      + '<button class="rmopt on" id="ovgo">계속 녹음</button>'
+      + '<button class="rmopt" id="ovend">회의 종료</button></div>';
+    document.body.appendChild(b);
+    b.querySelector('#ovgo').onclick=()=>{ b.remove(); REC.askAt=Date.now()+OVER.again; };
+    b.querySelector('#ovend').onclick=()=>{ b.remove(); stopRec(true); };
+    return;
+  }
+  if(now-REC.askShown<OVER.wait) return;
+  if(now-(REC.lastSound||REC.t0)<OVER.quiet){ box.remove(); REC.askAt=now+OVER.again; return; }   // 말소리가 이어지는 중
+  box.remove(); REC.autoStop=true; stopRec(true);
+}
+
+function stopRec(auto){
   if(!REC.mr || REC.mr.state!=='recording') return;
   const sec=(Date.now()-REC.t0)/1000;
+  const ob=document.getElementById('oversheet'); if(ob) ob.remove();
   // 실수로 눌렀을 때를 걸러냅니다
-  if(sec<60 && !confirm('아직 '+Math.round(sec)+'초밖에 안 됐습니다.\n회의를 끝내고 올릴까요?')) return;
-  clearInterval(REC.meter); clearInterval(tick);
+  if(auto!==true && sec<60 && !confirm('아직 '+Math.round(sec)+'초밖에 안 됐습니다.\n회의를 끝내고 올릴까요?')) return;
+  clearInterval(REC.meter); clearInterval(tick); clearInterval(LIVE.timer);
   REC.dur=Math.floor(sec);
   REC.mr.stop();
   (REC.stream.getTracks()||[]).forEach(t=>t.stop());
@@ -1035,15 +1302,24 @@ function stopRec(){
 }
 
 function finish(){
+  if(REC.discard){
+    const kid=KEEP.id, A=REC.norecA||[], ev=REC.ev, title=REC.title, room=REC.room;
+    REC.discard=false; REC.mr=null; REC.chunks=[]; REC.blob=null; liveEnd('discarded');
+    (async()=>{ try{ await keepDrop(kid); }catch(e){}
+      const ok=await cgNorec(ev, A, title, room);
+      msg('녹음하지 않았습니다', '지금까지 녹음한 내용은 저장하지 않고 지웠습니다.'+(ok?' 참석자와 동의 여부만 기록했습니다.':''), false, true); })();
+    return;
+  }
   const type=REC.mr.mimeType||'audio/webm';
   const ext=type.indexOf('mp4')>=0?'mp4':type.indexOf('ogg')>=0?'ogg':'webm';
   REC.blob=new Blob(REC.chunks,{type}); REC.ext=ext; REC.type=type;
   REC.mr=null; REC.chunks=[];
+  if(LIVE.id){ try{ SB.from('hd_rec_live').update({last_part_at:new Date().toISOString(), updated_at:new Date().toISOString()}).eq('id',LIVE.id).then(()=>{},()=>{}); }catch(e){} }
   REC.up=true;      // 참석자 묻기·올리기가 끝날 때까지 2분마다 새로 읽기·새로고침을 쉽니다
   if(REC.blob.size<4000){ msg('녹음이 비어 있습니다','마이크가 연결되어 있는지 확인해주세요'); return; }
   // 아무도 이름을 누르지 않았으면 한 번 더 여쭙니다.
   // 참석자가 곧 열람 권한이라 비워두면 팀장·관리자만 보게 됩니다.
-  if(!REC.who.size) return askWho();
+  if(!REC.who.size && !REC.autoStop) return askWho();
   upload();
 }
 
@@ -1066,6 +1342,10 @@ function askWho(){
   bindPicker();
   $('#up').onclick=upload;
   paintUp();
+  // 2026-11-16 점검: 10분 동안 아무도 누르지 않으면 이대로 올립니다 (모두 나간 뒤 녹음이 태블릿에만 남지 않게)
+  clearTimeout(askWho.t); const arm=()=>{ clearTimeout(askWho.t); askWho.t=setTimeout(()=>{ if($('#up')) upload(); }, 10*60000); };
+  app.onclick=arm; arm();
+  const h=$('#uphint'); if(h) h.insertAdjacentHTML('afterend','<div class="sub" style="font-size:12px;opacity:.75">10분 동안 아무도 누르지 않으면 이대로 올립니다</div>');
 }
 
 // 누른 인원에 따라 올리기 단추의 말을 바꿉니다
@@ -1116,6 +1396,7 @@ function meetingCoDept(){
 }
 
 async function upload(){
+  clearTimeout(askWho.t); if(app.onclick) app.onclick=null;
   REC.up=true;      // 올리는 동안·결과 화면에서는 스스로 새로고침하지 않습니다
   app.innerHTML='<div class="mid"><div class="done"><span class="ok">⏳</span>올리는 중입니다…</div></div>';
 
@@ -1140,6 +1421,7 @@ async function upload(){
       device:'회의실 태블릿', created_by:me.id, created_name:cfg.room||'회의실',
       company:company, dept:dept,
       cal_uid:(REC.ev&&REC.ev.uid)||'', room:REC.room||cfg.room||'',
+      owner_id:(!(REC.ev&&REC.ev.owner_id) && REC.owner && REC.who.has(REC.owner)) ? REC.owner : null,
       agenda_md:(REC.agenda||''),
       started_at:new Date(REC.t0).toISOString(),
       ended_at:new Date(REC.t0+(REC.dur||0)*1000).toISOString(),
@@ -1160,6 +1442,7 @@ async function upload(){
     const ins=await SB.from('hd_job').insert(job);
     if(ins.error){ msg('기록을 남기지 못했습니다', kept || ins.error.message, !!kept); return; }
     await keepDrop(kid);
+    liveEnd('done');
 
     msg(testMode ? '시험 녹음을 올렸습니다' : '회의가 끝났습니다',
       testMode
@@ -1176,12 +1459,12 @@ async function upload(){
 }
 
 // later=true — 지금은 못 올렸지만 태블릿에 보관해 둔 경우
-function msg(head, sub, later){
+function msg(head, sub, later, plain){
   clearInterval(tick);
   app.innerHTML='<div></div><div class="mid">'
     + '<div class="done"><span class="ok">'+(later?'⏳':'✓')+'</span>'+esc(head)+'</div>'
     + '<div class="sub" style="max-width:620px">'+esc(sub||'')
-    + (later ? '' : '<br><br>회의록은 몇 분 뒤 헤임달에 올라옵니다.')+'</div>'
+    + ((later||plain) ? '' : '<br><br>회의록은 몇 분 뒤 헤임달에 올라옵니다.')+'</div>'
     + '<button class="ghost" id="ok">확인</button></div><div></div>';
   let went=false;
   const back=()=>{ if(went) return; went=true; REC.up=false;
@@ -1235,10 +1518,9 @@ function voicePick(){
     const ms=MEMBERS.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','ko'));
     app.innerHTML='<div></div><div class="mid">'
       + '<div class="mtitle">목소리 등록 — 누구 목소리인가요?</div>'
-      + '<div class="sub">본인 이름을 눌러주세요. 1분쯤 안내 글을 읽으면 끝납니다.<br>'
-      + '✓ 표시는 이 태블릿에서 이미 등록한 분입니다 (다시 등록하셔도 됩니다)</div>'
-      + '<div class="who"><div class="pk"><div class="pkms"><div class="grid">'
-      + (ms.length ? ms.map(m=>'<button class="nm" data-id="'+m.id+'">'+esc(m.name)+(VOICED.has(m.id)?'<span class="reg">✓</span>':'')
+      + '<div class="sub">본인 이름을 눌러주세요. 1분쯤 안내 글을 읽으면 끝납니다.</div>'
+      + '<div class="who vpick"><div class="pk"><div class="pkms"><div class="grid">'
+      + (ms.length ? ms.map(m=>'<button class="nm" data-id="'+m.id+'">'+esc(m.name)
           + '<span class="co">'+esc(m.dept&&m.dept!==NO_DEPT?m.dept:(m.company||''))+'</span></button>').join('')
           : '<span class="sub">구성원 명단을 불러오지 못했습니다 · 와이파이를 확인해주세요</span>')
       + '</div></div></div></div>'
@@ -1295,7 +1577,8 @@ async function voiceRec(){
   keepAwake();
   app.innerHTML='<div></div><div class="mid">'
     + '<div class="mtitle">'+esc(m.name)+' 님 — 아래 글을 평소 회의에서 말하듯 소리 내어 읽어주세요</div>'
-    + '<div class="vbox vread">'+VOICE_TEXT.map(t=>'<p>'+esc(t)+'</p>').join('')+'</div>'
+    + '<div class="vbox vread">'+(()=>{ const a=VOICE_TEXT.slice(1,-1); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=a[i]; a[i]=a[j]; a[j]=t; }
+        return [VOICE_TEXT[0]].concat(a,[VOICE_TEXT[VOICE_TEXT.length-1]]); })().map(t=>'<p>'+esc(t)+'</p>').join('')+'</div>'
     + '<div class="vrow"><span class="velapsed" id="vela">0:00</span><span class="lv" id="lv"></span></div>'
     + '<div class="vrow"><button class="ghost" id="vx">취소</button>'
     + '<button class="big go" id="vdone" disabled style="font-size:clamp(20px,3vh,28px)">'
