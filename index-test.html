@@ -6367,6 +6367,8 @@ async function boot(){
     try{ history.replaceState(null,'',location.pathname+location.search+'#/home'); }catch(e){}
   const enter=()=>{ shell(); checkPending(); route(); };
   // 2026-11-16 처음 로그인하거나 안내문이 바뀌면 회의 녹음 안내와 동의를 먼저 받습니다 (시험용 화면에서만)
+  // 2026-11-16 미리보기 — 주소 끝 ?onboard=1 이면 첫 사용 단계를 처음부터 보여 주되 아무것도 기록하지 않습니다
+  if(CONSENT_ON && OB_PREVIEW){ await consentVerLoad(); CONSENT_PREV=''; return consentPage(enter); }
   if(CONSENT_ON && await consentNeeded()) return consentPage(enter);
   // 2026-11-16 홍석진 대표 — ③에 동의하셨는데 목소리가 아직 없으면 등록부터 마칩니다 (태블릿에서 다시 묻지 않게)
   if(CONSENT_ON){ try{ const r=await consentRow(); if(r && r.c3==='y' && !(await voiceRegistered())) return obVoice({saved:true, next:enter}); }catch(e){} }
@@ -6443,9 +6445,10 @@ async function consentNeeded(){
   try{ await consentVerLoad(); const r=await consentRow(); CONSENT_PREV=r?r.version:''; return !r || r.version!==CONSENT_VER; }catch(e){ return false; }
 }
 // 첫 사용 단계 표시 — ① 안내·동의 ② 목소리 등록 ③ 완료 (2026-11-16 홍석진 대표: 네이버 가입처럼 처음에 한 번에)
+const OB_PREVIEW = /[?&]onboard=1/.test(location.search);
 function obSteps(n){
   const L=['안내·동의','목소리 등록','완료'];
-  return `<div style="display:flex;gap:6px;align-items:center;margin:0 0 14px;font-size:12.5px;flex-wrap:wrap">
+  return `${OB_PREVIEW?'<div style="border:1px solid var(--line);background:var(--mark);color:var(--markt);padding:8px 12px;margin:0 0 12px;font-size:13px">미리보기입니다 · 선택해도 동의 기록이 바뀌지 않고, 목소리도 등록하지 않습니다</div>':''}<div style="display:flex;gap:6px;align-items:center;margin:0 0 14px;font-size:12.5px;flex-wrap:wrap">
     <span class="sub" style="margin:0 8px 0 0;font-size:12px;letter-spacing:.08em">HEIMDALL · 처음 한 번</span>
     ${L.map((t,i)=>`<span style="padding:3px 10px;border:1px solid var(--line);${i+1===n?'background:var(--tx);color:var(--bg);border-color:var(--tx)':i+1<n?'color:var(--tx2)':'color:var(--tx3)'}">${i+1<n?'✓ ':(i+1)+' '}${t}</span>`).join('<span style="color:var(--tx3)">›</span>')}</div>`;
 }
@@ -6481,7 +6484,9 @@ function obVoice(o){
       value:CS_ITEMS.map(it=>st[it.k]).join(','), kind:'choose', via:'로그인', actor_id:me.id, actor_name:me.name});
     consentDone(up.data, o.next);
   };
-  $('#obvgo').onclick=()=>voiceSelf();
+  $('#obvgo').onclick=()=>{ if(!OB_PREVIEW) return voiceSelf();
+    toast('미리보기라 목소리를 등록하지 않고 다음 단계로 넘어갑니다', 4000);
+    consentDone({...o.st, version:CONSENT_VER, updated_at:new Date().toISOString()}, o.next); };
   const bk=$('#obvback'); if(bk) bk.onclick=()=>{ VS.onDone=null; consentPage(o.next); };
   const out=$('#obvout'); if(out) out.onclick=async()=>{ localStorage.setItem('hd_auto','0'); await SB.auth.signOut({scope:'local'}); location.reload(); };
 }
@@ -6529,6 +6534,8 @@ function consentPage(next){
   $('#csgo').onclick=async()=>{
     const b=$('#csgo'); b.disabled=true; b.textContent='확인하는 중…';
     // ③에 동의하셨으면 목소리 등록을 마친 뒤에 동의 기록을 함께 남깁니다 (등록 단계에서 ③을 다시 고를 수 있게)
+    if(OB_PREVIEW){ if(st.c3==='y') return obVoice({saved:false, st:{...st}, next});
+      return consentDone({...st, version:CONSENT_VER, updated_at:new Date().toISOString()}, next); }
     if(st.c3==='y' && !(await voiceRegistered())) return obVoice({saved:false, st:{...st}, next});
     b.textContent='기록하는 중…';
     const row={member_id:me.id, c1:st.c1, c2:st.c2, c3:st.c3, c4:st.c4, version:CONSENT_VER, via:'로그인'};
@@ -6554,7 +6561,7 @@ function consentDone(row, next){
         ${CS_ITEMS.map(it=>`<dt style="color:var(--tx2)">${it.no} ${it.short}</dt><dd style="margin:0">${csLab(row[it.k])}</dd>`).join('')}</dl></div>
     <div class="sub" style="margin:14px 0 0">${row.c3==='y'?'목소리 등록까지 마쳤습니다. ':''}이제 회의실 태블릿에서는 따로 묻지 않고 바로 녹음합니다.</div>
     <div class="row" style="margin-top:16px"><button class="btn p" id="csnext">헤임달 시작하기</button></div></div>`;
-  $('#csnext').onclick=()=>next();
+  $('#csnext').onclick=()=>{ if(OB_PREVIEW) try{ history.replaceState(null,'',location.pathname+'#/home'); }catch(e){} next(); };
 }
 // 내 정보 › 동의 관리 — 동의하지 않은 항목은 여기서 동의할 수 있습니다. 철회 버튼은 두지 않습니다 (11/15 결정)
 async function consentManage(){
