@@ -1291,7 +1291,7 @@ function shell(){
      <div class="sfoot">
        <span class="who">${esc(me.name)}</span>
        <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:12px">웹 v22.5</span>
+       <span class="sub" style="margin:0;font-size:12px">웹 v22.6</span>
        <div class="frow">
          <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
          <button class="btn" id="out" title="로그아웃">로그아웃</button>
@@ -1969,6 +1969,7 @@ function bookOpen(keep){
       <b id="bkprev"></b> 로 적힙니다</div>
     <div class="shsec">참석자</div>
     <div id="bkatt" style="margin:6px 0 10px"></div>
+    <div id="bkcs" class="sub" style="margin:-4px 0 10px;font-size:12px;display:none"></div>
     <div class="shsec">회의 담당자 <span style="font-weight:400;text-transform:none;letter-spacing:0">(1명 · 필수)</span></div>
     <select id="bkown" class="full" style="margin:6px 0 4px"></select>
     <div class="sub" style="margin:0 0 10px;font-size:12px">담당자는 회의가 끝난 뒤 회의록을 확인하는 사람입니다.
@@ -2014,6 +2015,18 @@ function bookOpen(keep){
     if(!ps.some(p=>p.id===cur)) sel.value=me.id; };
   bkOwnFill();
   $('#bkown').onpointerdown=bkOwnFill; $('#bkown').onfocus=bkOwnFill;
+  // 2026-11-16 참석자 가운데 아직 녹음 동의 여부를 선택하지 않은 분이 있으면 알려 줍니다 (시험용 화면에서만)
+  const bkCs=async()=>{ const box=$('#bkcs'); if(!box || !CONSENT_ON) return;
+    const ps=bkPeople(); let st=[];
+    try{ const r=await SB.rpc('hd_consent_state',{p_ids:ps.map(p=>p.id)}); st=r.data||[]; }catch(e){}
+    if(!$('#bkcs')) return;
+    const by=new Map(st.map(x=>[x.member_id,x.c1]));
+    const wait=ps.filter(p=>by.get(p.id)==='wait').map(p=>p.name), no=ps.filter(p=>by.get(p.id)==='n').length;
+    const L=[];
+    if(wait.length) L.push(`${esc(wait.join(', '))} 님은 아직 녹음 동의 여부를 선택하지 않았습니다. 예약하면 슬랙으로 동의 요청을 보냅니다.`);
+    if(no) L.push(`참석자 중 ${no}명이 녹음에 동의하지 않아, 이대로면 이 회의는 녹음하지 않습니다.`);
+    box.style.display=L.length?'block':'none'; box.innerHTML=L.join('<br>'); };
+  $('#bkatt').addEventListener('focusout',()=>setTimeout(bkCs,150)); $('#bkatt').addEventListener('click',()=>setTimeout(bkCs,150)); bkCs();
   const say=t=>{ const m=$('#bkmsg'); if(!m) return; m.style.display=t?'block':'none'; m.textContent=t||''; };
   $('#bkok').onclick=async()=>{
     const room=$('#bkroom').value, d=$('#bkday').value, a=$('#bkst').value, b=$('#bken').value;
@@ -6337,16 +6350,21 @@ async function consentManage(){
 }
 
 // ── 관리 › 동의 관리 (개인정보 담당·관리자) — 보기와 철회 요청 처리만 합니다. 대신 동의하지 않습니다.
-const CSA={co:'', item:0, st:'', q:'', rows:[], logs:[]};
+const CSA={co:'', item:0, st:'', q:'', rows:[], logs:[], sel:new Set(), reqs:new Map(), evs:[], imp:false};
 const CS_ST={ok:'동의', no:'동의 안 함', wait:'미응답', old:'이전 버전 동의'};
 function csState(c, k){ if(!c||!c[k]) return 'wait'; if(c[k]==='n') return 'no'; return c.version===CONSENT_VER?'ok':'old'; }
 const csPill=s=>`<span style="font-size:12px;padding:1px 7px;border:1px solid var(--line);${s==='ok'?'font-weight:700':s==='wait'?'color:var(--tx2)':s==='old'?'background:var(--mark);color:var(--markt)':'color:var(--tx2);text-decoration:line-through'}">${CS_ST[s]}</span>`;
 async function renderConsent(){
   const el=$('#p-consent');
   el.innerHTML='<h1>동의 관리</h1><div class="sub">불러오는 중…</div>';
-  const [mem,con]=await Promise.all([
+  const [mem,con,req,cal]=await Promise.all([
     SB.from('hd_member').select('id,name,email,company,dept,status,approved').eq('approved',true).order('company').order('name'),
-    SB.from('hd_consent').select('*')]);
+    SB.from('hd_consent').select('*'),
+    SB.from('hd_consent_req').select('member_id,created_at,sent_at,result,reason').order('created_at',{ascending:false}).limit(600),
+    SB.from('hd_cal_event').select('uid,title,room,starts_at,member_ids').gte('starts_at',new Date().toISOString())
+      .lte('starts_at',new Date(Date.now()+7*86400000).toISOString()).order('starts_at')]);
+  CSA.reqs=new Map(); (req.data||[]).forEach(q=>{ if(!CSA.reqs.has(q.member_id)) CSA.reqs.set(q.member_id,q); });
+  CSA.evs=cal.data||[]; CSA.sel=new Set();
   if(mem.error||con.error) return el.innerHTML=`<h1>동의 관리</h1><div class="empty">불러오지 못했습니다 · ${esc((mem.error||con.error).message)}</div>`;
   const cm=new Map((con.data||[]).map(c=>[c.member_id,c]));
   CSA.rows=(mem.data||[]).filter(m=>(m.status||'active')==='active' && !isRoomAccount(m)).map(m=>({m, c:cm.get(m.id)||null}));
@@ -6362,34 +6380,69 @@ function consentDraw(){
     return `<div style="border:1px solid var(--line);background:var(--s1);padding:10px 12px;flex:1;min-width:170px">
       <div style="font-size:12.5px;font-weight:700;margin-bottom:4px">${it.no} ${it.short}</div>
       <div class="sub" style="margin:0;font-size:12px">동의 ${c.ok} · 안 함 ${c.no} · 미응답 ${c.wait}${c.old?` · 이전 버전 ${c.old}`:''}</div></div>`; }).join('');
+  // 동의 요청은 「미응답」 과 「이전 버전 동의」 인 사람에게만, 7일에 한 번 보냅니다. 「동의 안 함」 인 사람에게는 다시 보내지 않습니다.
+  const reqOf=r=>CSA.reqs.get(r.m.id);
+  const canAsk=r=>{ const s=CS_ITEMS.map(it=>csState(r.c,it.k)); if(!s.some(v=>v==='wait'||v==='old')) return false;
+    const q=reqOf(r); return !(q && Date.now()-new Date(q.created_at).getTime()<7*86400000 && (q.result==='보냄'||!q.sent_at)); };
+  const reqLab=r=>{ const q=reqOf(r); if(!q) return '-'; return esc(csWhen(q.created_at))+' '+(q.sent_at?esc(q.result||''):'발송 대기'); };
+  // 다음 7일 회의 — ① 녹음 동의 기준. 누가 동의하지 않았는지는 적지 않습니다.
+  const c1=new Map(all.map(r=>[r.m.id, csState(r.c,'c1')]));
+  const imp=CSA.evs.map(e=>{ const ids=(e.member_ids||[]).filter(id=>c1.has(id));
+    const no=ids.filter(id=>c1.get(id)==='no').length, wait=ids.filter(id=>c1.get(id)==='wait').length;
+    return {e,no,wait,kind:no?'no':wait?'wait':''}; }).filter(x=>x.kind);
+  const impNo=imp.filter(x=>x.kind==='no').length, impWait=imp.filter(x=>x.kind==='wait').length;
+  const impBox=`<div style="border:1px solid var(--line);background:var(--s1);padding:10px 12px;margin:0 0 14px;font-size:13px">
+      <b>다음 7일 회의</b> · 녹음 안 함 ${impNo}건 · 미정 ${impWait}건
+      <span class="sub" style="margin:0 0 0 6px;font-size:12px">참석자 미동의로 녹음하지 않을 회의와, 미응답이라 아직 정해지지 않은 회의입니다 (참석자를 넣어 예약한 회의만 셉니다)</span>
+      ${imp.length?`<button class="btn" id="cs-imp" style="margin-left:8px;font-size:12px">${CSA.imp?'접기':'회의 보기'}</button>`:''}
+      ${CSA.imp?`<div style="margin-top:8px;line-height:1.8">${imp.map(x=>`<b>${x.kind==='no'?'녹음 안 함':'미정'}</b> · ${esc(csWhen(x.e.starts_at))} ${esc(x.e.title||'')} ${x.e.room?'('+esc(x.e.room)+')':''} — ${x.kind==='no'?`참석자 ${x.no}명 동의 안 함`:`참석자 ${x.wait}명 미응답`}`).join('<br>')}
+        <div class="sub" style="margin:6px 0 0;font-size:12px">미동의로 녹음하지 않는 회의는 미녹음 알림 대상에서 뺍니다.</div></div>`:''}</div>`;
   el.innerHTML=`<h1>동의 관리</h1>
     <div class="sub">직원별 녹음·회의록 동의 현황입니다. 개인정보 담당자와 헤임달 관리자만 볼 수 있고, 팀장에게는 개인별 동의 여부를 보여 주지 않습니다
       · 현재 안내문 ${esc(CONSENT_VER)} · <b>시험 중</b> (법무 검토 전이라 운영 화면에서는 동의를 받지 않습니다)</div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin:0 0 14px">${stat}</div>
+    ${impBox}
     <div class="row" style="margin-bottom:12px;flex-wrap:wrap">
       <select id="csf-co"><option value="">모든 법인</option>${cos.map(c=>`<option${c===CSA.co?' selected':''}>${esc(c)}</option>`).join('')}</select>
       <select id="csf-it">${CS_ITEMS.map((it,i)=>`<option value="${i}"${i===CSA.item?' selected':''}>${it.no} ${it.short}</option>`).join('')}</select>
       <select id="csf-st"><option value="">모든 상태</option>${Object.entries(CS_ST).map(([a,b])=>`<option value="${a}"${a===CSA.st?' selected':''}>${b}</option>`).join('')}</select>
       <input id="csf-q" placeholder="이름·부서" value="${esc(CSA.q)}" style="flex:1;min-width:120px">
+      <button class="btn p" id="cs-ask"${CSA.sel.size?'':' disabled'}>동의 요청 보내기${CSA.sel.size?` (${CSA.sel.size}명)`:''}</button>
+      <button class="btn" id="cs-me" title="슬랙으로 어떤 안내가 가는지 내 계정으로 받아 봅니다">나에게 시험 발송</button>
       <button class="btn" id="cs-csv">기록 내려받기 (CSV)</button></div>
     <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">
-      <thead><tr style="text-align:left;color:var(--tx2)">${['이름','법인 · 부서',...CS_ITEMS.map(it=>it.no+' '+it.short),'안내문','마지막 변경'].map(h=>`<th style="padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap">${h}</th>`).join('')}</tr></thead>
+      <thead><tr style="text-align:left;color:var(--tx2)">${['','이름','법인 · 부서',...CS_ITEMS.map(it=>it.no+' '+it.short),'안내문','마지막 변경','마지막 요청'].map(h=>`<th style="padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap">${h}</th>`).join('')}</tr></thead>
       <tbody>${rows.map(r=>`<tr data-csid="${r.m.id}" style="cursor:pointer">
+        <td style="padding:7px 4px 7px 8px;border-bottom:1px solid var(--line)"><input type="checkbox" data-csq="${r.m.id}"${CSA.sel.has(r.m.id)?' checked':''}${canAsk(r)?'':' disabled title="동의를 마쳤거나 동의하지 않은 분, 7일 안에 요청을 받은 분께는 보내지 않습니다"'}></td>
         <td style="padding:7px 8px;border-bottom:1px solid var(--line)"><b>${esc(r.m.name)}</b></td>
         <td style="padding:7px 8px;border-bottom:1px solid var(--line)">${esc(r.m.company||'')}<span class="sub" style="margin:0 0 0 6px;font-size:12px">${esc(r.m.dept||'')}</span></td>
         ${CS_ITEMS.map(it=>`<td style="padding:7px 8px;border-bottom:1px solid var(--line)">${csPill(csState(r.c,it.k))}</td>`).join('')}
         <td style="padding:7px 8px;border-bottom:1px solid var(--line)">${r.c?esc(r.c.version):'-'}</td>
-        <td style="padding:7px 8px;border-bottom:1px solid var(--line)" class="sub">${r.c?esc(csWhen(r.c.updated_at))+' '+esc(r.c.via||''):'-'}</td></tr>`).join('')
-        ||'<tr><td colspan="8" style="padding:24px;color:var(--tx2)">조건에 맞는 사람이 없습니다</td></tr>'}</tbody></table></div>
+        <td style="padding:7px 8px;border-bottom:1px solid var(--line)" class="sub">${r.c?esc(csWhen(r.c.updated_at))+' '+esc(r.c.via||''):'-'}</td>
+        <td style="padding:7px 8px;border-bottom:1px solid var(--line)" class="sub">${reqLab(r)}</td></tr>`).join('')
+        ||'<tr><td colspan="10" style="padding:24px;color:var(--tx2)">조건에 맞는 사람이 없습니다</td></tr>'}</tbody></table></div>
     <div class="sub" style="margin:14px 0 0;font-size:12.5px;line-height:1.7">
       · 관리자가 직원 대신 동의하지 않습니다. 철회는 본인이 담당자에게 요청한 경우에만, 요청 경로·시각과 함께 처리합니다<br>
       · 개인별 동의 여부를 팀장·평가에 넘기지 않습니다 · 기록은 지우지 않습니다<br>
-      · 동의 요청 보내기(슬랙·이메일), 다음 7일 회의 영향, 안내문 개정판 등록는 다음 단계에서 넣습니다</div>`;
+      · 동의 요청은 미응답·이전 버전 동의인 분께만 슬랙으로 보냅니다. 같은 분께는 7일에 한 번만 보내고, 「동의 안 함」 을 고른 분께는 다시 보내지 않습니다<br>
+      · 지금은 시험 중이라 요청을 올려도 실제 발송은 하지 않습니다(「발송 대기」). 운영에서 동의 받기를 켜면 그때부터 나갑니다. 「나에게 시험 발송」 은 바로 갑니다<br>
+      · 이메일 발송, 회의 전날 재요청, 안내문 개정판 등록은 다음 단계에서 넣습니다</div>`;
   $('#csf-co').onchange=e=>{ CSA.co=e.target.value; consentDraw(); };
   $('#csf-it').onchange=e=>{ CSA.item=+e.target.value; consentDraw(); };
   $('#csf-st').onchange=e=>{ CSA.st=e.target.value; consentDraw(); };
   $('#csf-q').onchange=e=>{ CSA.q=e.target.value.trim(); consentDraw(); };
   $('#cs-csv').onclick=consentCsv;
+  const ib=$('#cs-imp'); if(ib) ib.onclick=()=>{ CSA.imp=!CSA.imp; consentDraw(); };
+  el.querySelectorAll('[data-csq]').forEach(c=>{ c.onclick=e=>e.stopPropagation();
+    c.onchange=()=>{ c.checked?CSA.sel.add(c.dataset.csq):CSA.sel.delete(c.dataset.csq); consentDraw(); }; });
+  const sendReq=async(ids,reason)=>{
+    const ins=await SB.from('hd_consent_req').insert(ids.map(id=>({member_id:id, asked_by:me.id, asked_name:me.name, reason})));
+    if(ins.error) return toast('요청을 올리지 못했습니다 · '+esc(ins.error.message), 8000);
+    toast(reason==='test'?'내 슬랙으로 시험 안내를 보냅니다. 30초쯤 걸립니다':`${ids.length}명의 동의 요청을 올렸습니다`, 6000);
+    renderConsent(); };
+  $('#cs-ask').onclick=()=>{ const ids=[...CSA.sel]; if(!ids.length) return;
+    if(confirm(`${ids.length}명에게 녹음 동의 요청을 올립니다.\n\n지금은 시험 중이라 실제 슬랙 발송은 하지 않고 「발송 대기」 로 남습니다.`)) sendReq(ids,'manual'); };
+  $('#cs-me').onclick=()=>sendReq([me.id],'test');
   el.querySelectorAll('tr[data-csid]').forEach(tr=>tr.onclick=()=>consentPerson(tr.dataset.csid));
 }
 async function consentCsv(){
