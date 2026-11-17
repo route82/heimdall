@@ -5042,6 +5042,8 @@ function attInput(host, initial, opts){
       목록에서 이름을 <b>누르면</b> 바로 추가됩니다 · 목록에 없는 분은 이름을 입력하고 <b>Enter</b> ·
       <span style="color:var(--err)">빨간 이름</span>은 헤임달에 없는 분이라 슬랙 알림이 가지 않습니다</div>`;
   const box=host.querySelector('.atin'), inp=host.querySelector('input'), pk=host.querySelector('.atpick');
+  // 2026-11-17 칸 안 빈 곳(이름 칩 사이)을 눌러도 입력칸으로 갑니다
+  box.style.cursor='text'; box.addEventListener('click', e=>{ if(e.target===box) inp.focus(); });
   // 한 칸 = {n: 보이는 이름, m: 목록에서 고른 구성원(없으면 이름으로 찾음)}
   let vals=(initial||[]).map(x=>typeof x==='string' ? {n:x.trim(), m:null} : (x && x.name ? {n:x.name, m:(x.id?x:null)} : null))
     .filter(v=>v && v.n);
