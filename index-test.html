@@ -2021,7 +2021,7 @@ function bookOpen(keep){
       <div id="bkreps" class="sub" style="margin:0 0 6px;font-size:12px"></div>
     </div>
     <div style="height:4px"></div>
-    <div class="shsec">회의 이름</div>
+    <div class="shsec">회의 이름 <span style="font-weight:400;text-transform:none;letter-spacing:0">(필수)</span></div>
     <input id="bktitle" class="full" maxlength="80" placeholder="예: AX팀 주간회의"
       value="${esc(k.title||'')}" style="margin:6px 0 4px">
     <div class="sub" style="margin:0 0 10px;font-size:12px">캘린더에는
@@ -2103,7 +2103,7 @@ function bookOpen(keep){
     const room=$('#bkroom').value, d=$('#bkday').value, a=$('#bkst').value, b=$('#bken').value;
     const title=($('#bktitle').value||'').trim(), note=($('#bknote').value||'').trim();
     if(!d) return say('날짜를 선택해 주세요.');
-    if(!title) return say('회의 이름을 적어주세요.');
+    if(!title){ const tt=$('#bktitle'); tt.style.borderColor='var(--err)'; tt.scrollIntoView({block:'center',behavior:'smooth'}); tt.focus(); tt.oninput=()=>{ tt.style.borderColor=''; prev(); }; return say('회의 이름을 적어주세요 — 맨 위 「회의 이름」 칸입니다.'); }
     if(b<=a) return say('끝나는 시각이 시작보다 늦어야 합니다.');
     const s1=new Date(d+'T'+a+':00+09:00'), e1=new Date(d+'T'+b+':00+09:00');
     if(e1<=new Date()) return say('이미 지난 시간입니다.');
