@@ -2869,11 +2869,11 @@ function drawMeeting(){
       ${!(m.summary_md||'').trim() && m.local_id
         ? '<button class="btn" id="remake">회의록 다시 만들기</button>' : ''}
       <button class="btn" id="expdoc">워드로 내보내기</button>
-      ${((m.visibility==='private'&&m.owner_id===me.id)
-         ||(m.visibility!=='private'&&isAdm))
-        ?'<button class="btn" id="mdel" style="color:var(--err)">삭제</button>':''}
     </div>
-    <button class="btn" id="barmoreb" title="보관 · 내보내기 · 삭제">⋯ 더보기</button>
+    <button class="btn" id="barmoreb" title="보관 · 내보내기">⋯ 더보기</button>
+    ${((m.visibility==='private'&&m.owner_id===me.id)
+       ||(m.visibility!=='private'&&isAdm))
+      ?'<button class="btn" id="mdel" style="color:var(--err)" title="이 회의록과 녹음 원본을 지웁니다">삭제</button>':''}
     <span class="sep"></span>
     <button class="btn" id="cancel" style="display:none">취소</button>
     ${(m.visibility!=='private' && cfCan(m))
@@ -3040,7 +3040,8 @@ function drawMeeting(){
   const md=$('#mdel');
   if(md) md.onclick=async()=>{
     const what=m.visibility==='private'?'노트':'회의록';
-    if(!confirm(`이 ${what}을(를) 완전히 삭제합니다.\n전사·요약·액션아이템이 모두 지워지고 되돌릴 수 없습니다.\n계속할까요?`)) return;
+    // 2026-11-17 홍석진 대표 — 삭제 단추를 더보기 밖으로. 웹에는 저장소를 지울 권한이 없어, 녹음 원본은 처리 서버 정리(store_sweep)가 지웁니다
+    if(!confirm(`이 ${what}을(를) 완전히 삭제합니다.\n전사·요약·액션아이템이 모두 지워지고 되돌릴 수 없습니다.\n녹음 원본은 서버 정리 때 함께 지워집니다.\n계속할까요?`)) return;
     md.disabled=true;
     const {error}=await SB.from('hd_meeting').delete().eq('id',m.id);
     md.disabled=false;
