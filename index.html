@@ -455,6 +455,36 @@ mark{background:var(--mark);color:var(--markt);padding:1px 3px;border-radius:0}
 .atc button{border:0;background:transparent;color:inherit;cursor:pointer;
  font-size:15px;line-height:1;padding:0 4px;opacity:.55;font-family:inherit}
 .atc button:hover{opacity:1}
+/* 2026-11-17 참석자 고르기 목록 — 누르면 바로 추가 */
+.atwrap{position:relative}
+.atpick{position:absolute;left:0;right:0;top:100%;z-index:30;background:var(--s1);border:1px solid var(--line);
+ border-top:0;box-shadow:0 8px 24px var(--shadow);max-height:260px;overflow-y:auto}
+.atp{display:flex;align-items:baseline;gap:10px;width:100%;text-align:left;border:0;background:transparent;
+ padding:9px 12px;cursor:pointer;font-family:inherit;color:var(--tx);font-size:14px;border-bottom:1px solid var(--line2)}
+.atp:last-child{border-bottom:0}
+.atp span{font-size:12px;color:var(--tx3)}
+.atp:hover,.atp.on{background:var(--s3)}
+.atp.none{cursor:default;color:var(--tx3);font-size:12.5px}
+.atp.none:hover{background:transparent}
+/* 2026-11-17 회의실 예약 화면 (팝업 → 화면) — 노트북 한 화면에 스크롤 없이, 좁으면 한 줄로 */
+.bkpg{max-width:1080px}
+.bkhd h1{margin-bottom:2px}
+.bkhd .sub{margin:0 0 14px;font-size:12.5px}
+.bkgrid{display:grid;grid-template-columns:1fr 1fr;gap:0 32px;align-items:start}
+.bkcol .shsec{margin:12px 0 5px}
+.bkcol .shsec:first-child{margin-top:0}
+.bkhint{margin:4px 0 0!important;font-size:12px!important}
+.bkdt{align-items:center;gap:6px}
+.bkdt input{flex:1.5;min-width:0}.bkdt select{flex:1;min-width:0}
+.bkreq{display:inline-block;margin-left:4px;padding:1px 6px;font-family:var(--f-body);font-size:11px;font-weight:700;
+ letter-spacing:0;text-transform:none;color:var(--err);background:var(--errbg);border:1px solid var(--err);vertical-align:1px}
+.bkopt{margin-left:4px;font-family:var(--f-body);font-size:11.5px;font-weight:400;letter-spacing:0;text-transform:none;color:var(--tx3)}
+.bkf.bkneed{border-color:var(--err);box-shadow:0 0 0 3px var(--errbg)}
+.bkf.bkbad{border-color:var(--err);border-width:2px;box-shadow:0 0 0 3px var(--errbg)}
+.bkact{margin-top:16px;gap:8px}
+.bkact .btn{min-width:120px}
+@media (max-width:860px){ .bkgrid{grid-template-columns:1fr} .bkgrid .bkcol+.bkcol{margin-top:12px} }
+@media (max-width:520px){ .bkdt{flex-wrap:wrap} .bkdt input{flex:1 1 100%} }
 .steps{display:flex;flex-wrap:wrap;gap:6px 10px;margin-top:8px}
 .step{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--tx3)}
 .step .sd{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--line);flex:none;
@@ -1371,6 +1401,7 @@ function shell(){
        <div class="page" id="p-members"></div><div class="page" id="p-server"></div>
        <div class="page" id="p-guide"></div><div class="page" id="p-usage"></div>
        <div class="page" id="p-meeting"></div><div class="page" id="p-consent"></div>
+       <div class="page" id="p-book"></div>
      </div>
    </div>`;
 
@@ -1575,7 +1606,8 @@ function route(){
   if(mt) return meetDraw(mt[1]);
   let v=h==='search'?'chat':h;
   // 메뉴에 없는 화면(권한 밖)이나 모르는 주소는 홈으로
-  const ok=v && $('#p-'+v) && (document.querySelector('.nav[data-v="'+v+'"]') || (!isBookOnly() && ['home','projects','actions'].includes(v)));
+  // 2026-11-17 회의실 예약은 팝업이 아니라 화면(#/book)입니다 — 메뉴에는 없지만 누구나 열 수 있습니다
+  const ok=v && $('#p-'+v) && (document.querySelector('.nav[data-v="'+v+'"]') || v==='book' || (!isBookOnly() && ['home','projects','actions'].includes(v)));
   if(!ok){ v='home'; try{ history.replaceState(null,'',location.pathname+location.search+'#/home'); }catch(e){} }
   goDraw(v);
 }
@@ -1583,12 +1615,12 @@ function openMeeting(id){ navPush('#m/'+id); return meetDraw(id); }
 function goDraw(v){
   view=v; cur=null;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
-  document.querySelectorAll('.nav').forEach(b=>b.setAttribute('aria-current', b.dataset.v===v || (v==='projects' && b.dataset.v==='list')));
+  document.querySelectorAll('.nav').forEach(b=>b.setAttribute('aria-current', b.dataset.v===v || (v==='projects' && b.dataset.v==='list') || (v==='book' && b.dataset.v==='cal')));
   const el=$('#p-'+v); if(el) el.classList.add('on');
   ({home:renderHome, cal:renderCal, list:renderList, search:renderSearch, actions:renderActions, brief:renderBrief,
     members:renderMembers, chat:renderChat, projects:renderProjects,
     upload:renderUpload, rec:renderRec, server:renderServer,
-    guide:renderGuide, usage:renderUsage, consent:renderConsent}[v]||(()=>{}))();
+    guide:renderGuide, usage:renderUsage, consent:renderConsent, book:renderBook}[v]||(()=>{}))();
   watchStuck(el);
 }
 
@@ -1987,8 +2019,21 @@ async function bookSend(meta, label, waitMs){
       msg:'처리 서버의 답이 늦습니다. 잠시 뒤 일정 화면에서 예약이 들어갔는지 확인해주세요.'};
   }
 }
+// 2026-11-17 홍석진 대표 — 예약은 팝업이 아니라 화면(#/book)으로, 노트북 한 화면에 스크롤 없이.
+// 진입점(일정 「+ 회의실 예약」 · 홈 「+ 예약」 · 홈 시간표 빈칸)은 그대로 bookOpen(미리 채울 값)을 부릅니다.
+let BK={};                      // 미리 채울 값 + 어느 화면에서 왔는지
 function bookOpen(keep){
-  const k=keep||{};
+  BK=Object.assign({}, keep||{}, {from: view && view!=='book' ? view : 'cal'});
+  go('book');
+}
+// 예약 화면을 떠나 원래 화면으로 — 헤임달 안에서 왔으면 뒤로 가기, 주소로 바로 들어왔으면 원래 화면(없으면 일정)
+function bookBack(){
+  if(history.state && history.state.hd) history.back();
+  else go(BK.from||'cal');
+}
+function renderBook(){
+  const k=BK||{}; BK={from:k.from};          // 미리 채우기는 한 번만 씁니다 (뒤로·앞으로로 다시 오면 기본값)
+  const el=$('#p-book');
   const day = k.day || (ymd(CAL.anchor)<ymd(new Date()) ? ymd(new Date()) : ymd(CAL.anchor));
   const today=ymd(new Date());
   // 지금 시각 다음 30분 단위를 기본으로 (오늘이 아니면 오전 10시)
@@ -2001,58 +2046,70 @@ function bookOpen(keep){
   const enDef=()=>{ const i=T.indexOf(st); return T[Math.min(T.length-1, (i<0?4:i)+2)]; };
   const en=k.en || enDef();
   const opt=(arr,v)=>arr.map(x=>`<option${x===v?' selected':''}>${esc(x)}</option>`).join('');
-  bookBox(`<h1 style="font-size:16px;margin:0 0 4px">회의실 예약</h1>
-    <div class="sub" style="margin:0 0 12px;font-size:12px">건물 공용 구글 캘린더(★회의실★)에 같이 적힙니다.
-      다른 회사 예약과 겹치면 예약되지 않습니다.</div>
-    <div class="shsec">회의실</div>
-    <select id="bkroom" class="full" style="margin:6px 0 10px">${opt(BOOK_ROOMS, k.room||BOOK_ROOMS[0])}</select>
-    <div class="shsec">날짜 · 시간</div>
-    <input id="bkday" type="date" class="full" value="${esc(day)}" min="${today}" style="margin:6px 0 6px">
-    <div class="row" style="margin-bottom:10px;align-items:center">
-      <select id="bkst" style="flex:1">${opt(T.slice(0,-1), st)}</select><span>~</span>
-      <select id="bken" style="flex:1">${opt(T.slice(1), en)}</select></div>
-    <div class="shsec">반복</div>
-    <select id="bkrep" class="full" style="margin:6px 0 6px">
-      <option value="">한 번</option><option value="weekly">매주</option><option value="monthly">매월</option></select>
-    <div id="bkrepx" style="display:none">
-      <div class="row" style="align-items:center;margin-bottom:4px">
-        <span class="sub" style="margin:0;font-size:12px;flex:none">언제까지</span>
-        <input id="bkuntil" type="date" style="flex:1" min="${today}"></div>
-      <div id="bkreps" class="sub" style="margin:0 0 6px;font-size:12px"></div>
+  // 처음부터 꼭 넣어야 하는 칸은 제목 옆에 붉은 「필수」 (홍석진 대표 11/17)
+  const REQ='<span class="bkreq">필수</span>', OPT=t=>`<span class="bkopt">${t}</span>`;
+  el.innerHTML=`<div class="bkpg">
+    <div class="bkhd"><h1>회의실 예약</h1>
+      <div class="sub">건물 공용 구글 캘린더(★회의실★)에 같이 적힙니다. 다른 회사 예약과 겹치면 예약되지 않습니다 ·
+        <span class="bkreq">필수</span> 칸은 꼭 채워 주세요</div></div>
+    <div class="bkgrid">
+     <div class="bkcol">
+      <div class="shsec">회의실 ${REQ}</div>
+      <select id="bkroom" class="full bkf">${opt(BOOK_ROOMS, k.room||BOOK_ROOMS[0])}</select>
+      <div class="shsec">날짜 · 시간 ${REQ}</div>
+      <div class="row bkdt">
+        <input id="bkday" type="date" class="bkf" data-req="1" value="${esc(day)}" min="${today}">
+        <select id="bkst" class="bkf">${opt(T.slice(0,-1), st)}</select><span>~</span>
+        <select id="bken" class="bkf">${opt(T.slice(1), en)}</select></div>
+      <div class="shsec">반복</div>
+      <select id="bkrep" class="full bkf">
+        <option value="">한 번</option><option value="weekly">매주</option><option value="monthly">매월</option></select>
+      <div id="bkrepx" style="display:none">
+        <div class="row" style="align-items:center;margin:6px 0 2px">
+          <span class="sub" style="margin:0;font-size:12px;flex:none">언제까지</span>
+          <input id="bkuntil" type="date" style="flex:1" min="${today}"></div>
+        <div id="bkreps" class="sub" style="margin:0;font-size:12px"></div>
+      </div>
+      <div class="shsec">회의 이름 ${REQ}</div>
+      <input id="bktitle" class="full bkf" data-req="1" maxlength="80" placeholder="예: AX팀 주간회의"
+        value="${esc(k.title||'')}">
+      <div class="sub bkhint">캘린더에는 <b id="bkprev"></b> 로 적힙니다</div>
+      <div class="shsec">회의 담당자 ${REQ} ${OPT('1명')}</div>
+      <select id="bkown" class="full bkf"></select>
+      <div class="sub bkhint">담당자는 회의가 끝난 뒤 회의록을 확인하는 사람입니다.
+        참석자·담당자는 헤임달에만 남고, 건물 캘린더에는 적히지 않습니다</div>
+     </div>
+     <div class="bkcol">
+      <div class="shsec">참석자 ${OPT('나는 자동으로 들어 있습니다')}</div>
+      <div id="bkatt"></div>
+      <div id="bkcs" class="sub bkhint" style="display:none"></div>
+      ${CONSENT_ON?`<div class="shsec">외부 손님 ${OPT('선택 · 한 분씩')}</div>
+      <div id="bkguests"></div>
+      <button class="btn" type="button" id="bkgadd" style="font-size:12.5px">+ 손님 추가</button>
+      <div class="sub bkhint">손님마다 따로 녹음 동의 메일을 보냅니다. 메일 주소를 모르면 이름만 넣으세요.
+        당일 회의실 태블릿에서 동의를 받습니다</div>`:''}
+      <div class="shsec">사전 안건 ${OPT('선택')}</div>
+      <textarea id="bknote" class="full bkf" rows="3" maxlength="4000"
+        placeholder="적어 두면 녹음할 때 사전 안건으로 들어옵니다">${esc(k.note||'')}</textarea>
+     </div>
     </div>
-    <div style="height:4px"></div>
-    <div class="shsec">회의 이름 <span style="font-weight:400;text-transform:none;letter-spacing:0">(필수)</span></div>
-    <input id="bktitle" class="full" maxlength="80" placeholder="예: AX팀 주간회의"
-      value="${esc(k.title||'')}" style="margin:6px 0 4px">
-    <div class="sub" style="margin:0 0 10px;font-size:12px">캘린더에는
-      <b id="bkprev"></b> 로 적힙니다</div>
-    <div class="shsec">참석자</div>
-    <div id="bkatt" style="margin:6px 0 10px"></div>
-    <div id="bkcs" class="sub" style="margin:-4px 0 10px;font-size:12px;display:none"></div>
-    ${CONSENT_ON?`<div class="shsec">외부 손님 <span style="font-weight:400;text-transform:none;letter-spacing:0">(선택 · 한 분씩)</span></div>
-    <div id="bkguests" style="margin:6px 0 4px"></div>
-    <button class="btn" type="button" id="bkgadd" style="font-size:12.5px;margin-bottom:4px">+ 손님 추가</button>
-    <div class="sub" style="margin:0 0 10px;font-size:12px">손님마다 따로 녹음 동의 메일을 보냅니다. 함께 오시는 분도 한 분씩 넣어 주세요.
-      메일 주소를 모르면 이름만 넣으세요. 당일 회의실 태블릿에서 동의를 받습니다</div>`:''}
-    <div class="shsec">회의 담당자 <span style="font-weight:400;text-transform:none;letter-spacing:0">(1명 · 필수)</span></div>
-    <select id="bkown" class="full" style="margin:6px 0 4px"></select>
-    <div class="sub" style="margin:0 0 10px;font-size:12px">담당자는 회의가 끝난 뒤 회의록을 확인하는 사람입니다.
-      참석자·담당자는 헤임달에만 남고, 건물 캘린더에는 적히지 않습니다</div>
-    <div class="shsec">사전 안건 <span style="font-weight:400;text-transform:none;letter-spacing:0">(선택)</span></div>
-    <textarea id="bknote" class="full" rows="3" maxlength="4000" style="margin:6px 0 12px"
-      placeholder="적어 두면 녹음할 때 사전 안건으로 들어옵니다">${esc(k.note||'')}</textarea>
-    <div id="bkmsg" class="sub" style="margin:0 0 10px;color:var(--err);display:none"></div>
-    <div class="row"><button class="btn p" id="bkok">예약하기</button>
-      <button class="btn" id="bkx">닫기</button></div>`);
+    <div id="bkmsg" class="sub" style="margin:12px 0 0;color:var(--err);display:none"></div>
+    <div class="row bkact"><button class="btn p" id="bkok">예약하기</button>
+      <button class="btn" id="bkx">취소</button></div>
+  </div>`;
   const TAG={'5F 대회의실':'[5F]','1F 대회의실':'[1F]','B1 소회의실':'[B1, 소회의실]',
              'B1 대회의실':'[B1, 대회의실]','B1 간이 회의실':'[B1, 간이 회의실]'};
+  // 필수 칸이 비어 있는 동안은 연한 붉은 테두리, 채우면 보통 모양
+  const need=()=>el.querySelectorAll('.bkf[data-req]').forEach(f=>f.classList.toggle('bkneed', !(f.value||'').trim()));
   const prev=()=>{ $('#bkprev').textContent=(TAG[$('#bkroom').value]||'')+' '
     +(($('#bktitle').value||'').trim()||'회의')+' ('+me.name+')'; };
-  prev(); $('#bkroom').onchange=prev; $('#bktitle').oninput=prev;
+  prev(); need();
+  $('#bkroom').onchange=prev;
+  $('#bktitle').oninput=()=>{ $('#bktitle').classList.remove('bkbad'); prev(); need(); };
   // 시작을 바꾸면 끝을 1시간 뒤로 맞춥니다 (끝이 시작보다 빠르지 않게)
   $('#bkst').onchange=()=>{ const i=T.indexOf($('#bkst').value);
     if($('#bken').value<=$('#bkst').value) $('#bken').value=T[Math.min(T.length-1,i+2)]; };
-  $('#bkx').onclick=bookClose;
+  $('#bkx').onclick=bookBack;
   // 반복 — 석 달 뒤까지만. 날짜마다 따로 예약되고, 겹치는 날은 빠집니다.
   const repMax=ymd(new Date(Date.now()+90*86400000));
   $('#bkuntil').max=repMax; $('#bkuntil').value=repMax;
@@ -2068,19 +2125,11 @@ function bookOpen(keep){
       : '총 '+L.length+'회 · '+L.slice(0,4).map(md).join(', ')+(L.length>4?' … '+md(L[L.length-1]):'')
         +' · 다른 예약과 겹치는 날은 빠지고, 빠진 날을 알려드립니다';
   };
-  $('#bkrep').onchange=repDraw; $('#bkday').onchange=repDraw; $('#bkuntil').onchange=repDraw; repDraw();
-  // 참석자 (나는 처음부터 들어 있습니다) → 담당자는 그중 한 명. 고르지 않으면 예약하는 사람입니다.
-  const bkAtt=attInput($('#bkatt'), [me.name]);
-  const bkPeople=()=>{ const seen=new Set([me.id]), out=[{id:me.id,name:me.name}];
-    bkAtt.value().forEach(n=>{ const m=findMember(n); if(m && !seen.has(m.id)){ seen.add(m.id); out.push({id:m.id,name:m.name}); } });
-    return out; };
-  const bkOwnFill=()=>{ const sel=$('#bkown'); if(!sel) return; const cur=sel.value||me.id, ps=bkPeople();
-    sel.innerHTML=ps.map(p=>`<option value="${p.id}"${p.id===cur?' selected':''}>${esc(p.name)}${p.id===me.id?' (나)':''}</option>`).join('');
-    if(!ps.some(p=>p.id===cur)) sel.value=me.id; };
-  bkOwnFill();
-  $('#bkown').onpointerdown=bkOwnFill; $('#bkown').onfocus=bkOwnFill;
+  $('#bkrep').onchange=repDraw; $('#bkday').onchange=()=>{ repDraw(); need(); }; $('#bkday').oninput=need;
+  $('#bkuntil').onchange=repDraw; repDraw();
   // 2026-11-16 참석자 가운데 아직 녹음 동의 여부를 선택하지 않은 분이 있으면 알려 줍니다 (시험용 화면에서만)
-  const bkCs=async()=>{ const box=$('#bkcs'); if(!box || !CONSENT_ON) return;
+  let bkAtt=null;
+  const bkCs=async()=>{ const box=$('#bkcs'); if(!box || !CONSENT_ON || !bkAtt) return;
     const ps=bkPeople(); let st=[];
     try{ const r=await SB.rpc('hd_consent_state',{p_ids:ps.map(p=>p.id)}); st=r.data||[]; }catch(e){}
     if(!$('#bkcs')) return;
@@ -2090,7 +2139,17 @@ function bookOpen(keep){
     if(wait.length) L.push(`${esc(wait.join(', '))} 님은 아직 녹음 동의 여부를 선택하지 않았습니다. 예약하면 슬랙으로 동의 요청을 보냅니다.`);
     if(no) L.push(`참석자 중 ${no}명이 녹음에 동의하지 않아, 이대로면 이 회의는 녹음하지 않습니다.`);
     box.style.display=L.length?'block':'none'; box.innerHTML=L.join('<br>'); };
-  $('#bkatt').addEventListener('focusout',()=>setTimeout(bkCs,150)); $('#bkatt').addEventListener('click',()=>setTimeout(bkCs,150)); bkCs();
+  // 참석자 (나는 처음부터 들어 있습니다) → 담당자는 그중 한 명. 고르지 않으면 예약하는 사람입니다.
+  // 목록에서 누른 사람은 그 계정 그대로 들어갑니다 (같은 이름이 여럿이어도 고른 사람으로)
+  const bkPeople=()=>{ const seen=new Set([me.id]), out=[{id:me.id,name:me.name}];
+    (bkAtt?bkAtt.members():[]).forEach(m=>{ if(m && !seen.has(m.id)){ seen.add(m.id); out.push({id:m.id,name:m.name}); } });
+    return out; };
+  const bkOwnFill=()=>{ const sel=$('#bkown'); if(!sel) return; const cur=sel.value||me.id, ps=bkPeople();
+    sel.innerHTML=ps.map(p=>`<option value="${p.id}"${p.id===cur?' selected':''}>${esc(p.name)}${p.id===me.id?' (나)':''}</option>`).join('');
+    if(!ps.some(p=>p.id===cur)) sel.value=me.id; };
+  bkAtt=attInput($('#bkatt'), [me], {onChange:()=>{ bkOwnFill(); setTimeout(bkCs,50); }});
+  bkOwnFill(); bkCs();
+  $('#bkown').onpointerdown=bkOwnFill; $('#bkown').onfocus=bkOwnFill;
   // 2026-11-16 외부 손님 — 이름과 이메일을 한 분씩 (시험용 화면에서만)
   const bkGadd=()=>{ const box=$('#bkguests'); if(!box || box.children.length>=10) return;
     const r=document.createElement('div'); r.className='row'; r.style.cssText='margin-bottom:6px;align-items:center';
@@ -2102,8 +2161,8 @@ function bookOpen(keep){
   $('#bkok').onclick=async()=>{
     const room=$('#bkroom').value, d=$('#bkday').value, a=$('#bkst').value, b=$('#bken').value;
     const title=($('#bktitle').value||'').trim(), note=($('#bknote').value||'').trim();
-    if(!d) return say('날짜를 선택해 주세요.');
-    if(!title){ const tt=$('#bktitle'); tt.style.borderColor='var(--err)'; tt.scrollIntoView({block:'center',behavior:'smooth'}); tt.focus(); tt.oninput=()=>{ tt.style.borderColor=''; prev(); }; return say('회의 이름을 적어주세요 — 맨 위 「회의 이름」 칸입니다.'); }
+    if(!d){ need(); $('#bkday').focus(); return say('날짜를 선택해 주세요.'); }
+    if(!title){ const tt=$('#bktitle'); tt.classList.add('bkbad'); tt.scrollIntoView({block:'center',behavior:'smooth'}); tt.focus(); return say('회의 이름을 적어주세요 — 왼쪽 「회의 이름」 칸입니다.'); }
     if(b<=a) return say('끝나는 시각이 시작보다 늦어야 합니다.');
     const s1=new Date(d+'T'+a+':00+09:00'), e1=new Date(d+'T'+b+':00+09:00');
     if(e1<=new Date()) return say('이미 지난 시간입니다.');
@@ -2119,14 +2178,16 @@ function bookOpen(keep){
     if(badMail){ btn.disabled=false; btn.textContent='예약하기'; return say(`${badMail.name} 님의 이메일 주소를 확인해 주세요.`); }
     if(guests.length) meta.guests=guests;
     const r=await bookSend(meta, '회의실 예약 · '+title+(rep?' (반복)':''), rep?120000:45000);
-    if(!$('#bkbox')) return;
+    const here = view==='book' && $('#bkok')===btn;
     if(r.ok){
-      bookClose(); toast(esc(r.msg), rep?9000:5000);
-      CAL.anchor=new Date(d+'T12:00:00+09:00');
-      if($('#cbook')) renderCal();
-      if($('#h-tl')){ HT.day=d; drawHomeTL(); drawHomeMy(); }
+      toast(esc(r.msg), rep?9000:5000);
+      // 돌아간 화면이 예약한 날을 보여 주게 맞춰 둡니다 (일정 · 홈 시간표)
+      CAL.anchor=new Date(d+'T12:00:00+09:00'); HT.day=d;
+      if(here) bookBack();
+      else { if($('#cbook')) renderCal(); if($('#h-tl')){ drawHomeTL(); drawHomeMy(); } }
       return;
     }
+    if(!here) return toast(esc(r.msg), 8000);
     btn.disabled=false; btn.textContent='예약하기'; say(r.msg);
   };
 }
@@ -4946,13 +5007,16 @@ function oneLine(md, n){
 let MEMBERS = null;
 async function loadMembers(){
   if(MEMBERS) return MEMBERS;
-  const {data}=await SB.from('hd_member')
+  let q=await SB.from('hd_member')
+    .select('id,name,email,company,dept,status,merged_into').eq('approved',true).order('name');
+  if(q.error) q=await SB.from('hd_member')
     .select('id,name,company,dept,status').eq('approved',true).order('name');
+  const data=q.data;
   // 2026-11-16 퇴사자·하나로 합친 계정은 참석자·예약 고르기에 나오지 않게 뺍니다
-  MEMBERS=(data||[]).filter(m=>(m.name||'').trim() && (m.status||'active')!=='left');
-  let dl=document.getElementById('hd-mnames');
-  if(!dl){ dl=document.createElement('datalist'); dl.id='hd-mnames'; document.body.appendChild(dl); }
-  dl.innerHTML=MEMBERS.map(m=>`<option value="${esc(m.name)}">`).join('');
+  // 2026-11-17 회의실 태블릿 로그인용 계정(「1F 대회의실」 등)도 사람이 아니므로 뺍니다 (홍석진 대표)
+  //   기준은 로그인 막는 isRoomAccount 와 같고, 태블릿 room.html 처럼 이름에 회의실·미팅룸·회의룸이 든 계정입니다
+  MEMBERS=(data||[]).filter(m=>(m.name||'').trim() && (m.status||'active')!=='left' && !m.merged_into
+    && !isRoomAccount(m) && !BOOK_ROOMS.some(r=>flatName(r)===flatName(m.name)));
   return MEMBERS;
 }
 const flatName = t => (t||'').replace(/\s/g,'');
@@ -4965,35 +5029,74 @@ function findMember(nm){
   }) || null;
 }
 
-function attInput(host, initial){
-  host.innerHTML=`<div class="atin"><input type="text" list="hd-mnames"
-      placeholder="이름을 입력하고 Enter (예: 김현우)"></div>
+// 2026-11-17 홍석진 대표 — 목록에서 이름을 누르면 바로 참석자로 들어갑니다 (예전엔 고른 뒤 Enter 를 한 번 더).
+// 목록에는 회사 · 팀이 같이 보여 같은 이름이 여럿이어도 골라 넣을 수 있습니다.
+// 목록에 없는 분(외부 참석자)은 지금처럼 이름을 입력하고 Enter 입니다.
+// initial 에는 이름(문자열)이나 구성원({id,name,…})을 넣습니다. opts.onChange — 참석자가 바뀔 때마다 부릅니다.
+function attInput(host, initial, opts){
+  const o=opts||{};
+  host.innerHTML=`<div class="atwrap"><div class="atin"><input type="text" autocomplete="off"
+      placeholder="이름 입력 후 목록에서 누르기"></div>
+      <div class="atpick" role="listbox" style="display:none"></div></div>
     <div class="sub" style="margin:5px 0 0;font-size:12px">
-      이름을 입력하고 <b>Enter</b>를 누르면 한 명씩 추가됩니다 ·
-      <span style="color:var(--err)">빨간 이름</span>은 헤임달에 없는 분이라
-      슬랙 알림이 가지 않습니다 (외부 참석자도 그대로 입력하시면 됩니다)</div>`;
-  const box=host.querySelector('.atin'), inp=host.querySelector('input');
-  let vals=(initial||[]).map(x=>(x||'').trim()).filter(Boolean);
+      목록에서 이름을 <b>누르면</b> 바로 추가됩니다 · 목록에 없는 분은 이름을 입력하고 <b>Enter</b> ·
+      <span style="color:var(--err)">빨간 이름</span>은 헤임달에 없는 분이라 슬랙 알림이 가지 않습니다</div>`;
+  const box=host.querySelector('.atin'), inp=host.querySelector('input'), pk=host.querySelector('.atpick');
+  // 한 칸 = {n: 보이는 이름, m: 목록에서 고른 구성원(없으면 이름으로 찾음)}
+  let vals=(initial||[]).map(x=>typeof x==='string' ? {n:x.trim(), m:null} : (x && x.name ? {n:x.name, m:(x.id?x:null)} : null))
+    .filter(v=>v && v.n);
+  const who=v=>v.m || findMember(v.n);
+  const changed=()=>{ if(o.onChange) try{ o.onChange(); }catch(e){} };
+  const dupName=m=>(MEMBERS||[]).filter(x=>flatName(x.name)===flatName(m.name)).length>1;
+  const sub=m=>[m.company, m.dept].map(x=>(x||'').trim()).filter(Boolean).join(' · ');
 
   const draw=()=>{
     [...box.querySelectorAll('.atc')].forEach(x=>x.remove());
     vals.forEach((v,i)=>{
-      const hit=findMember(v);
+      const hit=who(v);
       const c=document.createElement('span');
       c.className='atc'+(hit?'':' out');
-      c.title=hit ? `${hit.name} · ${(hit.company||'')} ${(hit.dept||'')}`.trim()
+      c.title=hit ? `${hit.name} · ${sub(hit)}`.replace(/ · $/,'')
                   : '헤임달에 없는 이름입니다 · 슬랙 알림이 가지 않습니다';
-      c.innerHTML=`<span>${esc(v)}</span><button type="button" title="삭제">×</button>`;
-      c.querySelector('button').onclick=()=>{ vals.splice(i,1); draw(); };
+      const tag = hit && v.m && dupName(hit) && sub(hit) ? ` <small style="opacity:.7">${esc(sub(hit))}</small>` : '';
+      c.innerHTML=`<span>${esc(v.n)}${tag}</span><button type="button" title="삭제">×</button>`;
+      c.querySelector('button').onclick=()=>{ vals.splice(i,1); draw(); changed(); };
       box.insertBefore(c, inp);
     });
   };
+  const has=m=>vals.some(v=>{ const h=who(v); return h && h.id===m.id; });
   const add=t=>{
     t=(t||'').replace(/,+$/,'').trim();
     if(!t) return;
-    if(!vals.some(v=>flatName(v)===flatName(t))) vals.push(t);
-    inp.value=''; draw();
+    if(!vals.some(v=>flatName(v.n)===flatName(t))){ vals.push({n:t, m:null}); inp.value=''; draw(); changed(); }
+    else { inp.value=''; draw(); }
   };
+  const addM=m=>{ if(!has(m)){ vals.push({n:m.name, m}); draw(); changed(); } };
+
+  // ── 고르기 목록
+  let L=[], hi=-1, picked=0;
+  const hide=()=>{ pk.style.display='none'; pk.innerHTML=''; L=[]; hi=-1; };
+  const show=()=>{
+    const q=flatName(inp.value).toLowerCase();
+    if(!q || !MEMBERS){ hide(); return; }
+    L=MEMBERS.filter(m=>!has(m) && (flatName(m.name).toLowerCase().includes(q)
+        || flatName(sub(m)).toLowerCase().includes(q))).slice(0,8);
+    if(hi>=L.length) hi=L.length-1;
+    if(!L.length){ pk.style.display='block';
+      pk.innerHTML='<div class="atp none">목록에 없는 분입니다 · Enter 를 누르면 외부 참석자로 들어갑니다</div>'; return; }
+    pk.style.display='block';
+    pk.innerHTML=L.map((m,i)=>`<button type="button" class="atp${i===hi?' on':''}" role="option" data-i="${i}">
+      <b>${esc(m.name)}</b><span>${esc(sub(m)||'소속 미입력')}</span></button>`).join('');
+    pk.querySelectorAll('.atp[data-i]').forEach(b=>{
+      // 누르는 순간 입력칸이 포커스를 잃지 않게 (잃으면 쓰던 글자가 외부 참석자로 들어가 버립니다)
+      b.onmousedown=e=>e.preventDefault();
+      b.onclick=()=>pick(L[+b.dataset.i]);
+    });
+  };
+  const pick=m=>{ if(!m) return; picked=Date.now(); inp.value=''; addM(m); hide(); inp.focus(); };
+  inp.addEventListener('input', ()=>{ if(Date.now()-picked<400){ inp.value=''; return; } hi=-1; show(); });
+  inp.addEventListener('focus', ()=>{ if(inp.value) show(); });
+
   // 한글은 글자를 「조합」 하는 중에 Enter 가 들어옵니다.
   // 그때 바로 넣어버리면 조합이 끝나고 마지막 글자가 뒤늦게 떨어집니다
   // (김현우 → 「김현우」 와 「우」 가 따로 들어가던 문제).
@@ -5002,28 +5105,42 @@ function attInput(host, initial){
   inp.addEventListener('compositionstart', ()=>{ composing=true; });
   inp.addEventListener('compositionend', ()=>{
     composing=false;
-    if(wantAdd){ wantAdd=false; add(inp.value); }
+    if(Date.now()-picked<400){ inp.value=''; wantAdd=false; return; }   // 목록에서 막 고른 뒤 남은 조합 글자는 버립니다
+    if(wantAdd){ wantAdd=false; add(inp.value); hide(); }
   });
   inp.onkeydown=e=>{
     const ime = composing || e.isComposing || e.keyCode===229;
+    if((e.key==='ArrowDown'||e.key==='ArrowUp') && L.length){
+      e.preventDefault(); hi = e.key==='ArrowDown' ? Math.min(L.length-1,hi+1) : Math.max(-1,hi-1);
+      pk.querySelectorAll('.atp[data-i]').forEach((b,i)=>b.classList.toggle('on', i===hi)); return;
+    }
+    if(e.key==='Escape'){ hide(); return; }
     if(e.key==='Enter'){
+      if(hi>=0 && L[hi] && !ime){ e.preventDefault(); pick(L[hi]); return; }   // 화살표로 고른 사람
       if(ime){ wantAdd=true; return; }      // 조합이 끝나면 넣습니다
-      e.preventDefault(); add(inp.value);
+      e.preventDefault(); add(inp.value); hide();
     } else if(e.key===','){
       if(ime) return;
-      e.preventDefault(); add(inp.value);
+      e.preventDefault(); add(inp.value); hide();
     } else if(e.key==='Backspace' && !ime && !inp.value && vals.length){
-      vals.pop(); draw();
+      vals.pop(); draw(); changed();
     }
   };
-  inp.onblur=()=>{ if(!composing) add(inp.value); };
+  inp.onblur=()=>{ setTimeout(()=>{
+    if(document.activeElement===inp) return;
+    if(!composing && Date.now()-picked>=400) add(inp.value);
+    hide(); }, 200); };
   inp.onpaste=e=>{
     const t=(e.clipboardData||window.clipboardData).getData('text')||'';
-    if(/[,\n]/.test(t)){ e.preventDefault(); t.split(/[,\n]/).forEach(add); }
+    if(/[,\n]/.test(t)){ e.preventDefault(); t.split(/[,\n]/).forEach(add); hide(); }
   };
   draw();
-  loadMembers().then(draw);           // 명부가 늦게 와도 색이 맞춰집니다
-  return { value(){ add(inp.value); return vals.slice(); } };
+  loadMembers().then(()=>{ draw(); if(document.activeElement===inp && inp.value) show(); changed(); });   // 명부가 늦게 와도 색이 맞춰집니다
+  return {
+    value(){ add(inp.value); return vals.map(v=>v.n); },
+    // 헤임달 구성원만 계정으로 (목록에서 고른 사람은 고른 그 계정, 입력한 이름은 이름으로 찾은 계정)
+    members(){ add(inp.value); return vals.map(who).filter(Boolean); },
+  };
 }
 
 // 회의 머리말을 쪽 나눠 돌려줍니다 (2026-08-27 대표님 지시).
