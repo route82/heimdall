@@ -900,7 +900,7 @@ let RECOVERY = /type=recovery/.test(location.hash || '');
 //   우리 워크스페이스가 아닌 슬랙은 가입 트리거가 막아 「Database error saving new user」 로 돌아옵니다
 const AUTH_Q = decodeURIComponent((location.hash || '') + (location.search || '')).replace(/\+/g,' ');
 const SLACK_ERR = sessionStorage.getItem('hd_slack') && /error/.test(AUTH_Q)
-  ? (/saving new user/i.test(AUTH_Q) ? '!더올마이티 슬랙 계정으로만 로그인할 수 있습니다. 회사 슬랙 계정으로 다시 시도해 주세요.'
+  ? (/saving new user/i.test(AUTH_Q) ? '!더올마이티·슈퍼홀릭 슬랙 계정으로만 로그인할 수 있습니다. 회사 슬랙 계정으로 다시 시도해 주세요.'
      : /access_denied/.test(AUTH_Q) ? '슬랙 로그인을 취소했습니다.' : '!슬랙으로 로그인하지 못했습니다. 잠시 후 다시 시도해 주세요.') : '';
 const LINK_ERR = !SLACK_ERR && /error_code=|error=access_denied/.test(location.hash || '');
 if(SLACK_ERR) sessionStorage.removeItem('hd_slack');
@@ -6448,7 +6448,7 @@ async function boot(){
       return slackSignIn();
     }
     const fail = {linked:'!슬랙 계정을 연결하지 못했습니다. 관리자에게 문의해 주세요.',
-      other_team:'!더올마이티 슬랙 계정으로만 로그인할 수 있습니다. 회사 슬랙 계정으로 다시 시도해 주세요.',
+      other_team:'!더올마이티·슈퍼홀릭 슬랙 계정으로만 로그인할 수 있습니다. 회사 슬랙 계정으로 다시 시도해 주세요.',
       ambiguous:'!이 슬랙 이메일로 찾은 헤임달 계정이 두 개 이상입니다. 관리자에게 문의해 주세요.'}[r];
     if(fail){ await SB.auth.signOut({scope:'local'}); SLACK_BUSY = false; return loginPage('in', fail); }
     SLACK_BUSY = false;
