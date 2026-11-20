@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Claude 연결 · 더올마이티</title>
+<!-- 2026-11-20 이그드라실·궁니르 Claude 커넥터 로그인·동의 화면 (Supabase OAuth 2.1 서버의 Authorization Path)
+     Claude → Supabase /auth/v1/oauth/authorize → 이 화면(?authorization_id=…) → 로그인(슬랙·이메일) → 연결 허용 → Claude 로 돌아감
+     헤임달과 같은 주소라 헤임달에 로그인되어 있으면 그 로그인을 그대로 씁니다 -->
+<style>
+:root{--bg:#f4f5f3;--card:#fff;--ink:#1d2622;--muted:#5f6b64;--line:#e2e6e3;--acc:#183d32;--err:#b3412f}
+@media (prefers-color-scheme:dark){:root{--bg:#151917;--card:#1e2420;--ink:#e8ece9;--muted:#a3ada7;--line:#2f3732;--acc:#7cc4a2;--err:#f08b77}}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--ink);font:15px/1.6 "Pretendard","Noto Sans KR","Malgun Gothic",sans-serif;padding:24px 16px}
+.card{width:100%;max-width:420px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:28px 24px}
+h1{font-size:20px;margin:0 0 6px}
+p{margin:0 0 14px;color:var(--muted)}
+b{color:var(--ink)}
+ul{margin:0 0 16px;padding-left:20px;color:var(--ink)}
+li{margin:4px 0}
+button,.btn{display:block;width:100%;min-height:46px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-weight:600;cursor:pointer;margin-top:10px}
+button.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+@media (prefers-color-scheme:dark){button.primary{color:#10261d}}
+button:disabled{opacity:.6;cursor:default}
+label{display:block;font-size:13px;color:var(--muted);margin-top:12px}
+input{display:block;width:100%;min-height:44px;margin-top:4px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit;font-size:16px}
+.err{color:var(--err);font-size:14px;margin-top:12px}
+.sep{text-align:center;color:var(--muted);font-size:13px;margin:16px 0 4px}
+.who{background:var(--bg);border-radius:10px;padding:10px 12px;margin:0 0 14px;font-size:14px}
+.dots i{animation:b 1.2s infinite;font-style:normal}.dots i:nth-child(2){animation-delay:.2s}.dots i:nth-child(3){animation-delay:.4s}
+@keyframes b{0%,80%,100%{opacity:.2}40%{opacity:1}}
+</style>
+</head>
+<body>
+<main class="card" id="app"><p>확인하는 중입니다<span class="dots"><i>.</i><i>.</i><i>.</i></span></p></main>
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.119.2';
+const SB = createClient('https://dwoiobqucmikbtikfjwk.supabase.co', 'sb_publishable_K6BW26u2jRkTBDwuMqaaFA_3HkfnOc9');
+const $app = document.getElementById('app');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const q = new URLSearchParams(location.search);
+const AID = q.get('authorization_id') || sessionStorage.getItem('mc_aid') || '';
+if (AID) sessionStorage.setItem('mc_aid', AID);
+const here = () => location.origin + location.pathname + '?authorization_id=' + encodeURIComponent(AID);
+const show = html => { $app.innerHTML = html; };
+const wait = t => show(`<p>${esc(t)}<span class="dots"><i>.</i><i>.</i><i>.</i></span></p>`);
+const slackIn = () => SB.auth.signInWithOAuth({provider: 'slack_oidc', options: {redirectTo: here()}});
+
+function loginPage(msg = '') {
+  show(`<h1>Claude 연결</h1><p>Claude에서 <b>이그드라실·궁니르</b>를 쓰려면 헤임달 계정으로 로그인해 주세요.</p>
+  <button class="primary" id="slack">슬랙으로 로그인</button>
+  <div class="sep">또는 이메일로 로그인</div>
+  <form id="f"><label>이메일<input id="em" type="email" autocomplete="username" required></label>
+  <label>비밀번호<input id="pw" type="password" autocomplete="current-password" required></label>
+  <button type="submit">로그인</button></form>
+  ${msg ? `<p class="err" role="alert">${esc(msg)}</p>` : ''}`);
+  document.getElementById('slack').onclick = async e => { e.target.disabled = true; sessionStorage.setItem('mc_slack', '1'); const { error } = await slackIn(); if (error) { sessionStorage.removeItem('mc_slack'); loginPage('슬랙으로 로그인하지 못했습니다. 잠시 후 다시 시도해 주세요.'); } };
+  document.getElementById('f').onsubmit = async e => {
+    e.preventDefault(); const b = e.target.querySelector('button'); b.disabled = true;
+    const { error } = await SB.auth.signInWithPassword({email: document.getElementById('em').value.trim(), password: document.getElementById('pw').value});
+    if (error) { b.disabled = false; return loginPage(/Invalid login/i.test(error.message) ? '이메일 또는 비밀번호가 맞지 않습니다.' : '로그인하지 못했습니다. 잠시 후 다시 시도해 주세요.'); }
+    main();
+  };
+}
+
+async function main() {
+  if (!AID) return show('<h1>Claude 연결</h1><p class="err">연결 요청 정보가 없습니다. Claude의 커넥터 설정에서 「연결」을 다시 눌러 주세요.</p>');
+  const err = q.get('error_description') || new URLSearchParams(location.hash.slice(1)).get('error_description');
+  const { data: { session } } = await SB.auth.getSession();
+  if (!session) { sessionStorage.removeItem('mc_slack'); return loginPage(err ? '로그인하지 못했습니다. 회사 슬랙 계정으로 다시 시도해 주세요.' : ''); }
+  // 슬랙 이메일이 헤임달 로그인 이메일과 다른 직원 — 헤임달과 같은 방식으로 원래 계정에 슬랙을 붙이고 한 번 더 로그인
+  const step = sessionStorage.getItem('mc_slack');
+  if (step) {
+    sessionStorage.removeItem('mc_slack'); wait('슬랙 계정을 확인하는 중입니다');
+    const { data: r } = await SB.rpc('hd_slack_link');
+    if (r === 'linked' && step === '1') { await SB.auth.signOut({scope: 'local'}); sessionStorage.setItem('mc_slack', '2'); wait('기존 계정에 슬랙을 연결했습니다. 다시 로그인하는 중입니다'); return slackIn(); }
+    const bad = {linked: '슬랙 계정을 연결하지 못했습니다. AX팀에 문의해 주세요.', other_team: '더올마이티·슈퍼홀릭 슬랙 계정으로만 로그인할 수 있습니다.', ambiguous: '이 슬랙 이메일로 찾은 계정이 두 개 이상입니다. AX팀에 문의해 주세요.'}[r];
+    if (bad) { await SB.auth.signOut({scope: 'local'}); return loginPage(bad); }
+  }
+  wait('계정을 확인하는 중입니다');
+  const [{ data: ok }, { data: st }, { data: mem }] = await Promise.all([SB.rpc('pt_can_use'), SB.rpc('pt_studio_can'), SB.from('hd_member').select('name,email').eq('id', session.user.id).maybeSingle()]);
+  if (!ok) return show(`<h1>연결할 수 없는 계정입니다</h1><p>${esc(session.user.email)} 계정은 이그드라실을 쓸 수 없습니다(헤임달 승인 전이거나 사용이 중지된 계정). AX팀에 문의해 주세요.</p><button id="out">다른 계정으로 로그인</button>`), document.getElementById('out').onclick = async () => { await SB.auth.signOut({scope: 'local'}); loginPage(); };
+  const { data: det, error } = await SB.auth.oauth.getAuthorizationDetails(AID);
+  if (error || !det) return show(`<h1>연결 요청이 만료되었습니다</h1><p>Claude의 커넥터 설정에서 「연결」을 다시 눌러 주세요.</p>`);
+  if (!det.authorization_id && det.redirect_url) { sessionStorage.removeItem('mc_aid'); wait('Claude로 돌아가는 중입니다'); return location.replace(det.redirect_url); }
+  const app = det.client?.name || det.client?.client_name || 'Claude';
+  show(`<h1>${esc(app)} 연결</h1>
+  <div class="who"><b>${esc(mem?.name || '')}</b> · ${esc(session.user.email || '')}</div>
+  <p>${esc(app)}이(가) 내 계정 권한으로 다음 일을 할 수 있게 됩니다.</p>
+  <ul><li>이그드라실 검색 (연락처는 내가 볼 수 있는 것만)</li><li>명함·엔티티 등록 — 미리보기를 확인한 뒤에만 저장</li>${st ? '<li>궁니르 프로젝트 보기·만들기·결정 — 비용이 드는 작업은 확인한 뒤에만</li>' : ''}</ul>
+  <p>연결은 언제든 Claude 설정의 커넥터에서 끊을 수 있습니다.</p>
+  <button class="primary" id="ok">연결 허용</button><button id="no">허용하지 않음</button><button id="out" style="border:0;font-weight:400;color:var(--muted)">다른 계정으로 로그인</button>`);
+  const go = async fn => { $app.querySelectorAll('button').forEach(b => b.disabled = true);
+    const { data, error } = await fn(AID);
+    if (error || !data?.redirect_url) return show(`<h1>처리하지 못했습니다</h1><p class="err">연결 요청이 만료되었을 수 있습니다. Claude에서 다시 연결해 주세요.</p>`);
+    sessionStorage.removeItem('mc_aid'); wait('Claude로 돌아가는 중입니다'); location.replace(data.redirect_url); };
+  document.getElementById('ok').onclick = () => go(id => SB.auth.oauth.approveAuthorization(id));
+  document.getElementById('no').onclick = () => go(id => SB.auth.oauth.denyAuthorization(id));
+  document.getElementById('out').onclick = async () => { await SB.auth.signOut({scope: 'local'}); loginPage(); };
+}
+main().catch(() => show('<h1>문제가 생겼습니다</h1><p class="err">잠시 후 Claude에서 다시 연결해 주세요.</p>'));
+</script>
+</body>
+</html>
