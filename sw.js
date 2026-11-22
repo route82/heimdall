@@ -1,10 +1,12 @@
 // HEIMDALL 서비스 워커
 // 앱 껍데기만 캐시합니다. 회의 내용은 절대 캐시하지 않습니다 —
 // 오래된 회의록이 남거나, 기기에 회사 자료가 저장되면 안 되기 때문입니다.
-const V = 'heimdall-v15';   // 2026-11-16 — 새 아이콘·인트로 (캐시 이름을 올려야 새 껍데기를 받습니다)
+const V = 'heimdall-v16';   // 2026-11-22 — 판테온 디자인 기준 v1 (토큰 css·헤임달 엠블럼 아이콘). 캐시 이름을 올려야 새 껍데기를 받습니다
 const SHELL = ['./', './index.html', './manifest.webmanifest',
-               './icons/hd-v4-192.png', './icons/hd-v4-512.png', './icons/favicon.ico',
-               './assets/logo-horizontal.svg', './assets/logo-vertical.svg'];
+               './assets/pantheon-tokens.css',
+               './assets/brand/heimdall.png', './assets/brand/heimdall-favicon.png', './assets/brand/pantheon.png',
+               './assets/brand/heimdall-192.png', './assets/brand/heimdall-512.png',
+               './assets/logo-vertical.svg'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(V).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));

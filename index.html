@@ -1,24 +1,22 @@
 <!doctype html>
 <html lang="ko"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>HEIMDALL</title>
+<title>헤임달</title>
 <link rel="manifest" href="./manifest.webmanifest">
 <!-- 글꼴 — 파일을 저장소에 넣지 않고 CDN 으로만 부릅니다 (라이선스 안전) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard-dynamic-subset.min.css">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&display=swap">
-<meta name="theme-color" content="#080808" media="(prefers-color-scheme: dark)">
-<meta name="theme-color" content="#FBFBFA" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;600&display=swap">
+<!-- 판테온 디자인 기준 v1 — pantheon-map.vercel.app/design/tokens.css 를 그대로 복사한 파일 -->
+<link rel="stylesheet" href="./assets/pantheon-tokens.css">
+<meta name="theme-color" content="#ffffff">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="HEIMDALL">
-<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png?v=4">
-<link rel="icon" href="./icons/favicon.ico?v=3" sizes="any">
-<link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32.png?v=3">
-<link rel="icon" type="image/png" sizes="16x16" href="./icons/favicon-16.png?v=3">
-<link rel="shortcut icon" href="./icons/favicon.ico?v=3">
+<meta name="apple-mobile-web-app-title" content="헤임달">
+<link rel="apple-touch-icon" href="./assets/brand/heimdall-apple.png?v=5">
+<link rel="icon" type="image/png" sizes="64x64" href="./assets/brand/heimdall-favicon.png?v=5">
 <script>
 (function(){
   // 고른 값은 dark / light / auto 셋 중 하나입니다.
@@ -27,6 +25,7 @@
   //   무엇을 고르고 무엇을 적어야 하는지 못 찾는다는 지적을 받아 바꿨습니다).
   //   한 번이라도 직접 고른 분은 그 값을 그대로 씁니다.
   function resolve(t){
+    return 'light';   // 2026-11-22 판테온 디자인 기준 v1 — 다크 모드 없음
     if(t==='auto'){
       try{ return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
       catch(e){ return 'light'; }
@@ -846,6 +845,247 @@ input:focus,textarea:focus,select:focus{border-color:var(--verm);box-shadow:none
 .ht-legend i{display:inline-block;width:12px;height:12px;vertical-align:-2px;margin-right:5px;border:1px solid var(--cardln);background:var(--card)}
 .ht-legend i.m{border-color:var(--ac);background:var(--acbg)}
 </style>
+<style id="pantheon-skin">
+/* ═══ 2026-11-22 판테온 디자인 기준 v1 (후긴 기준) 시안 ═══
+   옛 변수는 지우지 않고 토큰을 가리키게만 바꿉니다 — 기존 화면이 한꺼번에 따라옵니다. */
+:root,html[data-theme=light],html[data-theme=dark]{
+  --bg:var(--ground); --s1:var(--raised); --s2:var(--surface); --s3:var(--active);
+  --line:var(--border); --line2:var(--rule);
+  --tx:var(--text); --tx2:var(--muted); --tx3:var(--faint);
+  --ac:var(--accent); --acon:#fff; --acbg:var(--accent-pale); --acln:var(--control);
+  --ok:var(--positive); --okbg:var(--positive-pale);
+  --warn:var(--warning); --warnbg:var(--warning-pale);
+  --err:var(--negative); --errbg:var(--negative-pale);
+  --purple:#5A3699; --teal:var(--accent);
+  --mark:#f6e7bf; --markt:var(--warning-ink);
+  --card:var(--raised); --cardln:var(--border); --cardon:var(--surface); --cardln2:var(--control);
+  --verm:var(--accent);
+  --inbg:var(--raised); --inln:var(--control); --num:var(--active);
+  --shadow:rgba(0,0,0,.08); --scrim:rgba(31,32,29,.32);
+  --dur:120ms; --ease:ease;
+  --f-body:var(--font); --f-disp:var(--font); --f-mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  --track:.02em;
+  color-scheme:light;
+}
+body{font-family:var(--font);font-size:var(--fs-body);line-height:20px;background:var(--ground);color:var(--text)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+::selection{background:var(--accent-pale);color:var(--accent-ink)}
+.num,.hm-when,.ts{font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* 읽는 글은 줄 간격을 넉넉히 */
+.md,.seg p,.msg,.bone,.csum,.recnote,.mandoc{line-height:1.7}
+
+/* 대문자 라벨 어법(영문 자간) → 기준의 작은 회색 라벨 */
+.eyebrow,.sgt,.shsec,.bsec,.cgh{text-transform:none;letter-spacing:0}
+
+/* ── ④ 사이드바 셸 (pt- 와 같은 값) */
+.side{width:var(--sidebar-width);background:var(--ground);border-right:1px solid var(--border);padding:20px 12px}
+.main{margin-left:var(--sidebar-width)}
+.side .pt-brand{flex:none}
+.sgroup{padding:0;display:grid;gap:2px}
+.sgt{margin:14px 10px 4px;padding:0;font-size:var(--fs-small);font-weight:400;color:var(--faint);line-height:16px}
+.nav{min-height:32px;padding:0 10px;gap:10px;border-radius:var(--radius-nav);font-size:var(--fs-body);font-weight:400;
+  color:var(--muted);line-height:20px;transition:background-color var(--t-hover) ease,color var(--t-hover) ease}
+.nav svg{width:16px;height:16px;color:currentColor;stroke-width:1.5}
+.nav:hover{background:var(--surface);color:var(--text)}
+.nav[aria-current=true]{background:var(--active);color:var(--text);font-weight:400}
+.nav[aria-current=true] svg{color:currentColor}
+.stree{margin:2px 0 4px 16px}
+.st{border-radius:8px;color:var(--muted);font-size:13px;padding:4px 8px}
+.st:hover{background:var(--surface)}
+.st.sel{background:var(--active);color:var(--text);font-weight:500}
+.sfoot{margin-top:auto;border-top:0;padding:12px 0 0;display:grid;gap:2px}
+.pt-pantheon{margin-top:6px}
+.pt-me{margin-top:4px;border-radius:var(--radius-nav);cursor:pointer;align-items:center;
+  transition:background-color var(--t-hover) ease}
+.pt-me:hover,.pt-me[aria-expanded=true]{background:var(--surface)}
+.pt-me .meinfo{min-width:0;flex:1}
+.pt-me b,.pt-me .meinfo>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pt-me .chev{width:14px;height:14px;flex:none;color:var(--faint);fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.pt-memenu{position:fixed;z-index:60;min-width:180px;display:grid;gap:2px;padding:6px;background:var(--raised);
+  border:1px solid var(--border);border-radius:var(--radius-row);box-shadow:0 8px 24px rgba(0,0,0,.08)}
+.pt-memenu[hidden]{display:none}
+.pt-memenu .mi{appearance:none;border:0;background:none;font:inherit;font-size:var(--fs-body);color:var(--text);text-align:left;
+  min-height:32px;padding:0 10px;border-radius:var(--radius-nav);cursor:pointer}
+.pt-memenu .mi:hover{background:var(--surface)}
+.pt-memenu .ver{padding:6px 10px 2px;border-top:1px solid var(--rule);margin-top:4px;font-size:var(--fs-small);color:var(--faint)}
+#thm{display:none!important}
+.nav[hidden]{display:none!important}
+#thmpick{display:none!important}
+.wrap{max-width:var(--content-max);padding:64px 32px 120px}
+
+/* 페이지 머리 — 세리프 제목 한 줄 + 회색 설명 한 줄 */
+.page > h1:not([style]),.bkhd > h1,.mttl{font-family:var(--serif);font-size:var(--fs-title);line-height:1.25;font-weight:600;
+  letter-spacing:-.02em;text-wrap:balance;margin:0 0 12px}
+.mttl .mtag{font-family:var(--font);font-size:.6em;font-weight:500;letter-spacing:0;vertical-align:middle}
+.sub{font-size:15px;color:var(--muted);line-height:22px;margin-bottom:24px}
+h1[style]{font-family:var(--font)}
+.ht-hd h1,.hm-hd h1{font-size:var(--fs-section)!important;font-weight:600}
+
+/* ── 면·카드 */
+.box{background:var(--surface);border:0;border-radius:var(--radius-card);padding:var(--pad)}
+.card,.bcard,.hit{background:var(--raised);border:1px solid var(--border);border-radius:var(--radius-row);padding:12px 16px}
+.card:hover,.hit:hover{background:var(--raised);border-color:#d6d6d3}
+.card.locked,.box.locked{border-style:dashed}
+.ct{font-size:15px;font-weight:600}
+.empty{background:var(--surface);border:0;border-radius:var(--radius-card);color:var(--muted)}
+#p-list .card{border-radius:0;border:0;border-top:1px solid var(--rule)}
+#p-list .card:hover{background:var(--surface);border-top-color:var(--rule)}
+.rooms{background:var(--surface);border:0;border-radius:var(--radius-card)}
+.room{border-radius:var(--radius-nav)}
+.room.on{background:var(--active)}
+.msg{border-radius:var(--radius-row)}
+.msg.q{background:var(--accent-pale);color:var(--accent-ink);border-bottom-right-radius:4px}
+.msg.a{border-bottom-left-radius:4px}
+.ht-tl{background:var(--raised);border:1px solid var(--border);border-radius:var(--radius-row)}
+.ht-bk{border-radius:8px}
+.ht-bk.mine{border-color:var(--accent);background:var(--accent-pale)}
+.ht-nowlb{border-radius:999px}
+.cgrid{border-radius:var(--radius-row)}
+.cgh{background:var(--surface);color:var(--muted)}
+.cev{border-radius:6px;background:var(--accent-pale);color:var(--accent-ink)}
+table{font-size:13px}
+th,td{border:0;border-bottom:1px solid var(--rule);padding:10px 12px}
+th{background:transparent;color:var(--muted);font-size:12px}
+.hl{border-left-color:var(--accent)}
+
+/* ── 버튼 — 알약 30px (주 버튼 검정, 강조는 청록 36px) */
+.btn,.install{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:30px;padding:4px 12px;
+  border-radius:var(--radius-control);border:1px solid var(--control);background:var(--raised);color:var(--text);
+  font-size:13px;font-weight:500;line-height:20px;white-space:nowrap;
+  transition:background-color var(--t-hover) ease,transform var(--t-press) ease}
+.btn:hover,.install:hover{background:var(--surface);border-color:var(--control)}
+.btn:active{transform:translateY(1px)}
+.btn.p{background:var(--primary);border-color:transparent;color:var(--primary-ink);font-weight:500}
+.btn.p:hover{background:var(--primary-hover);border-color:transparent;opacity:1}
+.btn.g{background:var(--accent);border-color:transparent;color:#fff}
+.btn.g:hover{background:var(--accent-hover);opacity:1}
+.btn.full{display:flex;width:100%}
+.hask input{height:44px;border-radius:var(--radius-row);font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.08)}
+.hask .btn{height:44px;min-height:44px;padding:0 18px;font-size:14px;background:var(--accent);color:#fff}
+.hask .btn:hover{background:var(--accent-hover)}
+#rc-go{border-radius:var(--radius-control);min-height:36px;background:var(--accent);border-color:transparent;color:#fff}
+.thm,.burger{border-radius:var(--radius-control)}
+
+/* ── 칩·태그·고르개 */
+.chip{border-radius:var(--radius-control);border:1px solid var(--control);background:var(--raised);color:var(--muted);
+  font-size:13px;min-height:28px;padding:3px 12px}
+.chip:hover{border-color:var(--control);background:var(--surface);color:var(--text)}
+.chip.on{background:var(--active);border-color:var(--active);color:var(--text);font-weight:500}
+.tag,.role,.spk,.mhead .atd,.mandoc .manwho{border-radius:999px;letter-spacing:0;font-weight:500}
+.role{background:var(--pill-neutral-bg);color:var(--pill-neutral-ink)}
+.t-draft{background:var(--pill-neutral-bg);color:var(--pill-neutral-ink)}
+.t-review{background:var(--warning-pale);color:var(--warning-ink)}
+.t-reported{background:var(--accent-pale);color:var(--accent-ink)}
+.ht-seg{border-radius:var(--radius-control);overflow:hidden;border-color:var(--control)}
+.ht-seg button.on{background:var(--active);color:var(--text)}
+.tabs{border-bottom:1px solid var(--rule);gap:2px}
+.tab{color:var(--muted)}
+.tab[aria-selected=true]{color:var(--text);border-bottom:2px solid var(--text)}
+
+/* ── 입력 — 36px, 10px 모서리, 초점은 청록 2px */
+input,select,textarea{border:1px solid var(--control);border-radius:10px;background:var(--raised);font-size:14px;padding:7px 12px}
+input:focus,textarea:focus,select:focus{border-color:var(--control);box-shadow:none;outline:2px solid var(--accent);outline-offset:1px}
+input[type=checkbox],input[type=radio]{accent-color:var(--accent)}
+.atin{border-radius:10px;border-color:var(--control)}
+.atin:focus-within{border-color:var(--control);box-shadow:none;outline:2px solid var(--accent);outline-offset:1px}
+.fld input,.fld select{border-radius:0}
+.fld textarea{border-radius:10px}
+
+/* ── 떠 있는 것 — 그림자 하나 */
+.toast,.upd{border-radius:var(--radius-row);box-shadow:0 8px 24px rgba(0,0,0,.08)}
+.bar,.barmore{border:1px solid var(--border);border-radius:var(--radius-card);box-shadow:0 8px 24px rgba(0,0,0,.08)}
+.bar .btn,.barmore .btn{border-radius:var(--radius-control)}
+#selfbox,.mask>div{border-radius:var(--radius-card)!important;border:1px solid var(--border)!important;box-shadow:0 8px 24px rgba(0,0,0,.08)!important}
+.login{border:0;background:var(--surface);border-radius:var(--radius-card)}
+
+/* ── 그 밖의 부품 */
+.hcf{border:0;border-radius:var(--radius-card);overflow:hidden;padding:4px 0 6px}
+.hcf-row:hover{background:rgba(255,255,255,.55)}
+.hcard,.pjc,.tree{background:var(--raised);border:1px solid var(--border);border-radius:var(--radius-row)}
+.hcard:hover{transform:none;background:var(--raised);border-color:#d6d6d3}
+.hcard .hic{border-radius:10px;background:var(--accent-pale);color:var(--accent-ink)}
+.pjc:hover{border-color:#d6d6d3}
+.pjbar{border-radius:2px}
+.pjbtn{border-radius:var(--radius-control);border-color:var(--control)}
+.pjop,.delx,.tw{border-radius:8px}
+.tb{border-radius:var(--radius-nav)}
+.tb.sel{background:var(--active)}
+.tb .tc{border-radius:999px}
+.atc{border-radius:999px;background:var(--pill-neutral-bg)}
+.sw{border-radius:50%}
+.pick{border-radius:var(--radius-card);border:1px solid var(--border)!important;box-shadow:0 8px 24px rgba(0,0,0,.08)!important;overflow:hidden}
+mark{border-radius:3px}
+.boot .tr{border-radius:2px}
+[contenteditable=true]{border-radius:8px}
+.fldh .opt.good{color:var(--accent)}
+#rc-today + .fld,.recnote + .fld{border-top:1px solid var(--border)}
+.recgo{border-top:1px solid var(--border)}
+.mandoc h2.manh{border-bottom:1px solid var(--rule)}
+.hcard p,.msg .src,.hit .h,.cday .dn{font-family:var(--font)}
+
+.bkreq{border-radius:999px;border-color:var(--negative-line)!important;background:var(--negative-pale);color:var(--negative-ink)}
+.bar .btn.p,.barmore .btn.p{background:var(--primary)!important;color:var(--primary-ink)!important;border-color:transparent!important}
+
+/* ── 녹음 화면 — 번호 칸을 회색 패널 안 흰 카드로 */
+#p-rec > .box{background:var(--surface);border:0;border-radius:var(--radius-card);padding:var(--pad);display:grid;gap:12px}
+#rc-today:empty{display:none}
+#p-rec .fld,#rc-today + .fld,.recnote + .fld{background:var(--raised);border:1px solid var(--border);border-radius:var(--radius-row);
+  padding:16px 18px 18px 58px;margin:0}
+#p-rec .fld::before{display:none}
+#p-rec .fld:focus-within{border-color:#d6d6d3}
+.fldn{left:18px;top:18px;width:auto;font-size:12px;letter-spacing:.04em;color:var(--faint)}
+.fld:focus-within .fldn{color:var(--accent)}
+.fldh{margin:0 0 10px}
+.fldh b{font-size:15px;font-weight:600;letter-spacing:0}
+.fldh .opt{letter-spacing:0;font-weight:500}
+#p-rec .fld input,#p-rec .fld select{border:1px solid var(--control);border-radius:10px;padding:7px 12px;background:var(--raised)}
+#p-rec .fld input:focus,#p-rec .fld select:focus,#p-rec .fld textarea:focus{border-color:var(--control);outline:2px solid var(--accent);outline-offset:1px}
+.recnote{background:var(--accent-pale);color:var(--accent-ink);border:0;border-radius:var(--radius-row);padding:12px 16px;margin:0;font-size:14px;line-height:1.7}
+.recnote b{color:var(--accent-ink)}
+.recgo{background:var(--surface);border:0;padding:12px 0 2px;margin:0;box-shadow:0 -12px 16px -8px var(--surface)}
+#p-rec .fld .atin input,.atin input,.atin input:focus{border:0!important;outline:0!important;box-shadow:none!important;background:transparent!important;padding:4px 6px}
+/* ── 로그인 */
+#reset{background:transparent!important}
+.login{max-width:400px;margin:12vh auto;padding:32px 28px;background:var(--surface);border:0;border-radius:var(--radius-card)}
+.login .box{background:var(--raised);border:1px solid var(--border);border-radius:var(--radius-row)}
+.wm{margin-bottom:22px}
+.wm .wmlogo{display:block;width:48px;height:48px;object-fit:contain;margin:0 auto 12px}
+.wm .nm{font-family:var(--serif);font-size:var(--fs-title);font-weight:600;letter-spacing:-.02em;line-height:1.25;animation:none}
+.wm .tl{font-size:14px;color:var(--muted);margin-top:8px}
+.opts input{accent-color:var(--accent)}
+
+/* ── 1100px 아래: 사이드바 → 위 막대(로고 + 가로로 밀리는 메뉴) */
+@media(max-width:1100px){
+  .side{position:sticky;top:0;bottom:auto;z-index:30;transform:none!important;box-shadow:none!important;
+    width:auto;height:auto;flex-direction:row;align-items:center;gap:8px;padding:8px 12px;
+    border-right:0;border-bottom:1px solid var(--border);overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+  .side::-webkit-scrollbar{display:none}
+  .side .pt-brand{padding:0 6px 0 0}
+  .side .pt-brand small{display:none}
+  .sgroup{display:flex;gap:2px;flex:none}
+  .sgt,.stree,.pt-me .meinfo,.pt-me .chev{display:none}
+  .nav{width:auto;min-height:40px;padding:0 10px;font-size:var(--fs-body);white-space:nowrap}
+  .sfoot{display:flex;flex-direction:row;align-items:center;gap:2px;margin:0;padding:0;flex:none}
+  .pt-pantheon{margin:0}
+  .side .pt-me{display:flex;padding:4px;margin:0 0 0 4px;flex:none}
+  .main{margin-left:0}
+  .mtop,.scrim{display:none!important}
+  .wrap{padding:32px 20px 96px}
+}
+@media(max-width:760px){
+  .wrap{padding:24px 16px 88px}
+  #p-rec > .box{padding:12px}
+  #p-rec .fld,#rc-today + .fld,.recnote + .fld{padding:40px 14px 16px}
+  .fldn{top:14px;left:14px}
+  /* 회의 화면 탭 줄 — 탭은 옆으로 밀고 「전체 복사」는 오른쪽 끝에 붙여 둡니다 (넘치던 문제) */
+  #p-meeting .tabs{overflow-x:auto;scrollbar-width:none;flex-wrap:nowrap}
+  #p-meeting .tabs::-webkit-scrollbar{display:none}
+  #p-meeting .tabs #cpy{position:sticky;right:0;margin-left:auto;background:var(--raised);box-shadow:-10px 0 10px var(--ground)}
+  .login{margin:6vh auto;width:calc(100% - 32px);max-width:400px;padding:28px 20px}
+  .bar{border-radius:0;border:0;border-top:1px solid var(--border)}
+}
+</style>
 </head><body>
 <!-- 2026-11-16 앱 인트로 — 설치한 헤임달 앱을 열 때 헤임달이 뿔피리를 부는 장면을 2초 보여 줍니다 (김현우 팀장).
      브라우저 탭에서 열 때는 띄우지 않습니다. 한 번 열면 그 창에서는 다시 띄우지 않고, 누르면 바로 넘어갑니다. ?intro=1 로 언제든 볼 수 있습니다. -->
@@ -886,7 +1126,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--verm);box-shadow:none
 })();
 </script>
 
-<div id="app"><div class="boot"><div class="nm">HEIMDALL</div><div class="tr"><i></i></div><div class="lb">Loading</div></div></div>
+<div id="app"><div class="boot"><div class="nm">헤임달</div><div class="tr"><i></i></div><div class="lb">Loading</div></div></div>
 
 <script type="module">
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -1133,7 +1373,7 @@ let SLACK_BUSY = false;
 function loginPage(mode='in', msg=''){
   const isUp = mode==='up';
   $('#app').innerHTML = `<div class="login">
-    <div class="wm"><div class="kr">The Almighty Creative Group</div><div class="nm">HEIMDALL<sup>™</sup></div><div class="tl">회의를 기록으로 바꿉니다</div></div>
+    <div class="wm"><img class="wmlogo" src="./assets/brand/heimdall.png" alt=""><div class="nm">헤임달</div><div class="tl">회의를 기록으로 바꿉니다 · 더올마이티</div></div>
     <div class="tabs" style="margin:4px 0 20px">
       <button class="tab" data-m="in" ${!isUp?'aria-selected="true"':''}>로그인</button>
       <button class="tab" data-m="up" ${isUp?'aria-selected="true"':''}>가입</button>
@@ -1211,7 +1451,7 @@ function loginPage(mode='in', msg=''){
 // 메일 링크로 들어오신 분께 새 비밀번호를 받는 화면
 function recoveryPage(msg){
   $('#app').innerHTML = `<div class="login">
-    <div class="wm"><div class="kr">The Almighty Creative Group</div><div class="nm">HEIMDALL<sup>™</sup></div><div class="tl">회의를 기록으로 바꿉니다</div></div>
+    <div class="wm"><img class="wmlogo" src="./assets/brand/heimdall.png" alt=""><div class="nm">헤임달</div><div class="tl">회의를 기록으로 바꿉니다 · 더올마이티</div></div>
     <h2 style="font-size:19px;margin:0 0 6px">새 비밀번호를 정해주세요</h2>
     <p class="sub" style="margin:0 0 16px">메일 링크로 들어오셨습니다.
       비밀번호를 새로 정하시면 바로 쓰실 수 있습니다.</p>
@@ -1245,7 +1485,7 @@ const ADMIN_MAILS = ['seokinho@gmail.com','Kdamian2025@gmail.com',
   'zeus@thealmighty.co.kr','khw@jhhds.co.kr','route82biz@gmail.com'];
 function pendingPage(row){
   $('#app').innerHTML = `<div class="login">
-    <div class="wm"><div class="kr">The Almighty Creative Group</div><div class="nm">HEIMDALL<sup>™</sup></div><div class="tl">회의를 기록으로 바꿉니다</div></div>
+    <div class="wm"><img class="wmlogo" src="./assets/brand/heimdall.png" alt=""><div class="nm">헤임달</div><div class="tl">회의를 기록으로 바꿉니다 · 더올마이티</div></div>
     <h2>가입 승인 대기</h2>
     <p><b>${esc(row.name)}</b> 님, 가입 신청이 접수되었습니다.<br>
        관리자가 승인해야 회의를 보실 수 있습니다.</p>
@@ -1265,7 +1505,7 @@ function pendingPage(row){
 // 가입 정보가 비어 있으면 채우게 합니다 (예전 계정 대응)
 function profilePage(row, msg=''){
   $('#app').innerHTML = `<div class="login">
-    <div class="wm"><div class="kr">The Almighty Creative Group</div><div class="nm">HEIMDALL<sup>™</sup></div><div class="tl">회의를 기록으로 바꿉니다</div></div>
+    <div class="wm"><img class="wmlogo" src="./assets/brand/heimdall.png" alt=""><div class="nm">헤임달</div><div class="tl">회의를 기록으로 바꿉니다 · 더올마이티</div></div>
     <h2>프로필 확인</h2>
     <p>직함은 넣지 마세요. 이름만 입력하시면 됩니다.</p>
     <input class="full" id="nm" placeholder="이름 (예: 김현우)" value="${esc(row.name||'')}" style="margin-bottom:10px">
@@ -1334,6 +1574,7 @@ const ICO = {
   members:'<circle cx="9" cy="8" r="3.3"/><path d="M3 20c0-3.3 2.7-5.4 6-5.4s6 2.1 6 5.4"/><path d="M17 8.2a3 3 0 0 1 0 5.6"/><path d="M18 20c0-2.3-.9-3.9-2.3-4.9"/>',
   usage:'<path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/>',
   server:'<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/>',
+  consent:'<path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/>',
   guide:'<circle cx="12" cy="12" r="9"/><path d="M9.6 9.2A2.5 2.5 0 0 1 14.4 10c0 1.7-2.4 2-2.4 3.6"/><path d="M12 17h.01"/>'
 };
 const svgIco = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
@@ -1346,7 +1587,6 @@ function shell(){
   // 사이드바는 묶음으로 보여줍니다 — 자주 쓰는 것 → 정리 → 관리 순
   // 「쓰기 → 보기 → 물어보기」 순서. 하는 일 기준으로 묶습니다.
   const groups = [
-    ['',      [['home','홈']]],
     ['쓰기',   [['rec','녹음'],['upload','업로드']]],
     ['보기',   [['cal','일정'],['list','회의록']]],
     ['찾기',   [['chat','물어보기']]],
@@ -1359,28 +1599,35 @@ function shell(){
   if(CONSENT_ON && (me.role==='admin' || me.hr)) admin.push(['consent','동의 관리']);
   if(isAdminish(me.role)) admin.push(['server','처리서버']);
   if(admin.length) groups.push(['관리', admin]);
-  groups.push(['도움말', [['guide','사용 매뉴얼']]]);
-  if(isBookOnly()){ groups.length=0; groups.push(['',[['home','홈']]], ['보기',[['cal','일정']]], ['도움말',[['guide','사용 매뉴얼']]]); }
-
-  const brand = `<div class="brand"><img src="./assets/logo-horizontal.svg" alt="HEIMDALL" class="lgh"></div>`;
+  if(isBookOnly()){ groups.length=0; groups.push(['보기',[['cal','일정']]]); }
+  // 2026-11-22 판테온 디자인 기준 v1 — 「홈」 메뉴 대신 왼쪽 위 로고가 홈입니다. 사용 매뉴얼은 아래쪽으로.
+  // 홈 단추(data-v="home")는 화면에 보이지 않게 남겨 둡니다 — route() 가 메뉴에 있는 화면인지 볼 때 씁니다.
+  const brand = `<a class="pt-brand" href="#/home" id="brandhome"><img src="./assets/brand/heimdall.png" alt=""><span><b>헤임달</b><small>회의 기록</small></span></a>`;
+  const PANTHEON = 'https://pantheon-map.vercel.app';
 
   $('#app').innerHTML = `
    <div class="scrim" id="scrim"></div>
    <aside class="side" id="side">
      ${brand}
+     <button class="nav" data-v="home" hidden aria-hidden="true" tabindex="-1">홈</button>
      ${groups.map(([t,items])=>`<div class="sgroup">
        ${t?`<div class="sgt">${t}</div>`:''}
        ${items.map(([k,l])=>`<button class="nav" data-v="${k}">${svgIco(k)}<span>${l}</span></button>`).join('')}
      </div>`).join('')}
      <div class="sfoot">
-       <span class="who">${esc(me.name)}</span>
-       <span class="role">${ROLE[me.role]||me.role}</span>
-       <span class="sub" style="margin:0;font-size:12px">웹 v22.18</span>
-       <div class="frow">
-         <button class="btn" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
-         <button class="btn" id="out" title="로그아웃">로그아웃</button>
-         <button class="install" id="inst" style="display:none">앱으로 설치</button>
+       <button class="nav" data-v="guide">${svgIco('guide')}<span>사용 매뉴얼</span></button>
+       <a class="pt-nav-item pt-pantheon" href="${PANTHEON}"><img src="./assets/brand/pantheon.png" alt="">판테온 지도</a>
+       <div class="pt-me" id="mebtn" role="button" tabindex="0" aria-haspopup="menu" aria-expanded="false" title="내 정보 · 로그아웃">
+         <span class="avatar">${esc((me.name||'?').slice(0,1))}</span>
+         <div class="meinfo"><b class="who">${esc(me.name)}</b><span>${ROLE[me.role]||me.role}</span></div>
+         <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 14l5-5 5 5"/></svg>
+       </div>
+       <div class="pt-memenu" id="memenu" role="menu" hidden>
+         <button class="mi" role="menuitem" id="selfinfo" title="내 계정 정보 · 연결 계정 · 비밀번호">내 정보</button>
+         <button class="mi" role="menuitem" id="inst" style="display:none">앱으로 설치</button>
+         <button class="mi" role="menuitem" id="out" title="로그아웃">로그아웃</button>
          <button class="thm" id="thm" aria-label="밝게/어둡게" title="밝게 / 어둡게"></button>
+         <div class="ver">웹 v22.18</div>
        </div>
      </div>
    </aside>
@@ -1389,7 +1636,6 @@ function shell(){
        <button class="burger" id="burger" aria-label="메뉴 열기">
          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"
            stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
-       ${brand}
        <div class="me"><span class="who">${esc(me.name)}</span>
          <button class="btn" id="out-m" title="로그아웃">로그아웃</button></div>
      </div>
@@ -1410,6 +1656,24 @@ function shell(){
   if(pnav){ pnav.insertAdjacentHTML('afterend','<div class="stree" id="stree"></div>'); loadSideTree(); }
 
   const closeNav=()=>document.body.classList.remove('snav');
+  const bh=$('#brandhome'); if(bh) bh.onclick=e=>{ e.preventDefault(); go('home'); closeNav(); };
+  // 내 계정 줄 — 누르면 작은 메뉴(내 정보·앱으로 설치·로그아웃). 위 막대(1100px 아래)에서는 아래로, 사이드바에서는 위로 엽니다
+  { const mb=$('#mebtn'), mm=$('#memenu');
+    if(mb && mm){
+      const close=()=>{ mm.hidden=true; mb.setAttribute('aria-expanded','false'); };
+      const open=()=>{ if(innerWidth<=1100){ try{ mb.scrollIntoView({block:'nearest',inline:'nearest'}); }catch(e){} } const r=mb.getBoundingClientRect(); mm.hidden=false;
+        if(innerWidth<=1100){ Object.assign(mm.style,{top:(r.bottom+6)+'px',bottom:'auto',right:Math.max(8,innerWidth-Math.min(r.right,innerWidth))+'px',left:'auto',width:''}); }
+        else { Object.assign(mm.style,{bottom:(innerHeight-r.top+6)+'px',top:'auto',left:r.left+'px',right:'auto',width:r.width+'px'}); }
+        mb.setAttribute('aria-expanded','true'); };
+      mb.onclick=e=>{ e.stopPropagation(); mm.hidden?open():close(); };
+      mb.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); mb.click(); } else if(e.key==='Escape') close(); };
+      mm.addEventListener('click',close);
+      window.HD_MECLOSE=close;
+      if(!window.HD_MEBOUND){ window.HD_MEBOUND=1;
+        document.addEventListener('click',e=>{ const m=$('#memenu'), b=$('#mebtn'); if(m && !m.hidden && !m.contains(e.target) && !(b&&b.contains(e.target))) window.HD_MECLOSE&&window.HD_MECLOSE(); });
+        window.addEventListener('resize',()=>window.HD_MECLOSE&&window.HD_MECLOSE());
+        document.addEventListener('keydown',e=>{ if(e.key==='Escape') window.HD_MECLOSE&&window.HD_MECLOSE(); }); }
+    } }
   document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>{ go(b.dataset.v); closeNav(); });
   const bg=$('#burger'); if(bg) bg.onclick=()=>document.body.classList.toggle('snav');
   const sc=$('#scrim'); if(sc) sc.onclick=closeNav;
@@ -1461,8 +1725,8 @@ function shell(){
       ${CONSENT_ON?`<div class="shsec">동의 관리</div>
       <div class="sub" style="margin:2px 0 8px;font-size:12px">회의 녹음·해외 AI·목소리·시스템 연결에 동의한 내용을 확인합니다</div>
       <button class="btn full" id="myconsent" style="margin-bottom:14px">동의 관리 열기</button>`:''}
-      <div class="shsec">화면 밝기</div>
-      <div class="sub" style="margin:2px 0 8px;font-size:12px">이 계정의 기본값입니다.
+      <div class="shsec" hidden>화면 밝기</div>
+      <div class="sub" hidden style="margin:2px 0 8px;font-size:12px">이 계정의 기본값입니다.
         다른 컴퓨터에서 로그인해도 그대로 따라옵니다</div>
       <div class="chips" id="thmpick" style="margin:0 0 14px">
         ${THEMES.map(([k,l])=>`<button class="chip${THEME_RAW===k?' on':''}"
@@ -1617,6 +1881,10 @@ function goDraw(v){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.nav').forEach(b=>b.setAttribute('aria-current', b.dataset.v===v || (v==='projects' && b.dataset.v==='list') || (v==='book' && b.dataset.v==='cal')));
   const el=$('#p-'+v); if(el) el.classList.add('on');
+  { const nb=document.querySelector('.nav[data-v="'+v+'"] span');
+    const PT={book:'회의실 예약',projects:'폴더 관리',actions:'액션아이템',search:'검색'};
+    const nm=v==='home'?'':(PT[v]||(nb?nb.textContent:''));
+    document.title = nm ? nm+' · 헤임달' : '헤임달'; }
   ({home:renderHome, cal:renderCal, list:renderList, search:renderSearch, actions:renderActions, brief:renderBrief,
     members:renderMembers, chat:renderChat, projects:renderProjects,
     upload:renderUpload, rec:renderRec, server:renderServer,
@@ -2734,6 +3002,7 @@ async function meetDraw(id){
   editing=false;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   const el=$('#p-meeting'); el.classList.add('on'); el.innerHTML='<div class="sub">불러오는 중…</div>';
+  document.title = '회의록 · 헤임달';
   const [m,segs,hls,acts,edits,att] = await Promise.all([
     SB.from('hd_meeting').select('*').eq('id',id).single(),
     SB.from('hd_segment').select('*').eq('meeting_id',id).order('idx'),
@@ -2861,6 +3130,7 @@ function drawMeeting(){
     ${m.source?`<span class="tag" style="background:var(--warnbg);color:var(--warn)">${esc(m.source)} 사용 회의</span>`:''}
     ${m.status==='archived'?'<span class="tag t-draft">보관</span>':''}
     ${m.visibility==='private'?'<span class="tag" style="background:var(--errbg);color:var(--warn)">나만 보기</span>':''}</div>
+  ${(document.title=(tp.name||'회의록')+' · 헤임달')?'':''}
   <h1 class="mttl"><span class="mtag">${esc(tp.tag)}</span> <span id="mtitle">${esc(tp.name)}</span></h1>
   ${sub?`<div class="msub">${esc(sub)}</div>`:''}
   <div class="sub mhead">${timeText(m, cur.ev)?`<span>${esc(timeText(m, cur.ev))}</span>`:''}
