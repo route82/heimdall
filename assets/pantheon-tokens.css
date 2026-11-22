@@ -1,0 +1,122 @@
+/* 판테온 디자인 기준 v1 (2026-11-22) — 후긴(huginn/web/app/globals.css)에서 뽑음.
+   모든 판테온 시스템(후긴·노른·프리그/뇨르드·브라기·게피온·판테온 지도)이 이 파일을 그대로 복사해 쓴다.
+   바꿀 때는 여기를 먼저 고치고, 각 시스템의 복사본(pantheon-tokens.css)을 덮어쓴다.
+   글꼴 불러오기(레이아웃 <head>에):
+     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;600&display=swap"> */
+
+:root {
+  /* 면 */
+  --ground: #ffffff;        /* 바탕 */
+  --surface: #f9f9f9;       /* 패널(큰 묶음) */
+  --raised: #ffffff;        /* 패널 안 카드·줄 */
+  --active: #ededec;        /* 선택된 메뉴·탭 */
+  /* 선 */
+  --border: #eaeaea;        /* 카드 테두리, 사이드바 오른쪽 선 */
+  --rule: #ececea;          /* 목록 줄 사이 */
+  --control: #d9d9d6;       /* 버튼·입력 테두리 */
+  /* 글자 */
+  --text: #1f201d;
+  --muted: #5f5f5c;         /* 보조 글자 (흰 바탕 6.4:1) */
+  --faint: #6b6b68;         /* 힌트·단축키 */
+  /* 색 하나: 청록 (행동·선택·지금) */
+  --accent: #1b6e66;
+  --accent-hover: #165b54;
+  --accent-pale: #e3f0ee;
+  --accent-ink: #134e48;
+  --primary: #1f201d;       /* 주 버튼(검정) */
+  --primary-hover: #3a3b37;
+  --primary-ink: #ffffff;
+  /* 상태 */
+  --negative: #b42318; --negative-pale: #fdf4f3; --negative-line: #f0cdc8; --negative-ink: #7a1b13;
+  --warning: #b07a2c;  --warning-pale: #fbf4e6;  --warning-line: #e0b973;  --warning-ink: #6b4a22;
+  --positive: #1b6e66; --positive-pale: #e3f0ee;
+  --pill-neutral-bg: #efefed; --pill-neutral-ink: #3d3d3a;
+  /* 모양 */
+  --radius-card: 22px;      /* 패널 */
+  --radius-row: 14px;       /* 카드·줄·입력 */
+  --radius-nav: 10px;       /* 메뉴 항목 */
+  --radius-control: 999px;  /* 버튼·칩 */
+  /* 간격·크기 */
+  --sidebar-width: 224px;
+  --gap: 16px;
+  --pad: 20px;
+  --content-max: 1100px;
+  /* 글자 크기 (줄 높이 20px 기준) */
+  --fs-title: 32px;         /* 페이지 제목 (세리프) */
+  --fs-section: 14px;       /* 패널 제목 */
+  --fs-body: 14px;
+  --fs-small: 12px;
+  --font: "Pretendard Variable", Pretendard, system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif;
+  --serif: "Noto Serif KR", serif;
+  /* 움직임 */
+  --t-hover: 120ms; --t-press: 90ms;
+  /* 판테온 지도 */
+  --pantheon-url: "https://pantheon-map.vercel.app";
+}
+@media (max-width: 760px) { :root { --fs-title: 22px; } }
+
+/* ── 공통 셸 (접두어 pt- : 각 시스템의 기존 클래스와 겹치지 않게) ──
+   <div class="pt-app">
+     <aside class="pt-sidebar">
+       <a class="pt-brand" href="/"><img src="/brand/logo.png" alt=""><span><b>노른</b><small>더올마이티</small></span></a>
+       <nav class="pt-nav"> <a class="pt-nav-item" aria-current="page">…</a> … </nav>
+       <div class="pt-bottom"> … <a class="pt-nav-item pt-pantheon" href="https://pantheon-map.vercel.app">판테온 지도</a> <div class="pt-me">…</div></div>
+     </aside>
+     <main class="pt-canvas"><div class="pt-column">…</div></main>
+   </div> */
+.pt-app { display: grid; grid-template-columns: var(--sidebar-width) minmax(0, 1fr); min-height: 100svh; background: var(--ground); }
+.pt-sidebar { position: sticky; top: 0; height: 100svh; overflow-y: auto; display: flex; flex-direction: column; padding: 20px 12px; border-right: 1px solid var(--border); background: var(--ground); }
+.pt-brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 16px; color: var(--text); text-decoration: none; border-radius: 12px; }
+.pt-brand img { width: 28px; height: 28px; flex: none; object-fit: contain; }
+.pt-brand b { display: block; font-size: 15px; font-weight: 600; line-height: 18px; }
+.pt-brand small { display: block; font-size: var(--fs-small); color: var(--muted); line-height: 16px; }
+.pt-brand:hover b { text-decoration: underline; text-underline-offset: 3px; }
+.pt-nav { display: grid; gap: 2px; }
+.pt-nav-item { display: flex; align-items: center; gap: 10px; min-height: 32px; padding: 0 10px; border-radius: var(--radius-nav); color: var(--muted); font-size: var(--fs-body); text-decoration: none; transition: background-color var(--t-hover) ease, color var(--t-hover) ease; }
+.pt-nav-item svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.pt-nav-item .count { margin-left: auto; font-size: var(--fs-small); color: var(--text); }
+.pt-nav-item:hover { background: var(--surface); color: var(--text); }
+.pt-nav-item[aria-current="page"] { background: var(--active); color: var(--text); }
+.pt-nav-label { margin: 14px 10px 4px; font-size: var(--fs-small); color: var(--faint); }
+.pt-bottom { margin-top: auto; display: grid; gap: 2px; padding-top: 12px; }
+.pt-pantheon { border: 1px solid var(--border); }
+.pt-pantheon img { width: 16px; height: 16px; object-fit: contain; }
+.pt-me { display: flex; align-items: center; gap: 10px; padding: 10px; }
+.pt-me .avatar { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 600; background: var(--accent-pale); color: var(--accent-ink); flex: none; }
+.pt-me b { display: block; font-weight: 500; }
+.pt-me span { display: block; font-size: var(--fs-small); color: var(--muted); line-height: 16px; }
+.pt-canvas { min-width: 0; padding: 64px 32px 120px; }
+.pt-column { max-width: var(--content-max); margin: 0 auto; }
+.pt-title { font-family: var(--serif); font-size: var(--fs-title); line-height: 1.25; font-weight: 600; letter-spacing: -0.02em; text-wrap: balance; }
+.pt-sub { margin-top: 12px; font-size: 15px; color: var(--muted); }
+
+/* 1100px 아래: 사이드바 → 위 막대(로고 + 가로로 밀리는 메뉴) */
+@media (max-width: 1100px) {
+  .pt-app { grid-template-columns: minmax(0, 1fr); }
+  .pt-sidebar { position: sticky; z-index: 5; height: auto; flex-direction: row; align-items: center; gap: 8px; padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--border); overflow-x: auto; overflow-y: hidden; }
+  .pt-brand { padding: 0 6px 0 0; }
+  .pt-brand small { display: none; }
+  .pt-nav, .pt-bottom { display: flex; gap: 2px; margin: 0; padding: 0; }
+  .pt-nav-item { min-height: 40px; white-space: nowrap; }
+  .pt-nav-label, .pt-me { display: none; }
+  .pt-canvas { padding: 32px 20px 96px; }
+}
+@media (max-width: 760px) { .pt-canvas { padding: 24px 16px 88px; } }
+
+/* ── 기본 부품 ── */
+.pt-panel { background: var(--surface); border-radius: var(--radius-card); padding: var(--pad); min-width: 0; }
+.pt-card { background: var(--raised); border: 1px solid var(--border); border-radius: var(--radius-row); padding: 10px 14px; transition: border-color var(--t-hover) ease; }
+.pt-card:hover { border-color: #d6d6d3; }
+.pt-chip { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 999px; background: var(--pill-neutral-bg); color: var(--pill-neutral-ink); font-size: var(--fs-small); font-weight: 500; }
+.pt-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: var(--radius-control); border: 1px solid var(--control); background: var(--raised); color: var(--text); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; transition: background-color var(--t-hover) ease, transform var(--t-press) ease; }
+.pt-btn:hover { background: var(--surface); }
+.pt-btn:active { transform: translateY(1px); }
+.pt-btn.primary { background: var(--primary); color: var(--primary-ink); border-color: transparent; }
+.pt-btn.primary:hover { background: var(--primary-hover); }
+.pt-btn.accent { height: 36px; padding: 0 16px; background: var(--accent); color: #fff; border-color: transparent; font-size: 14px; }
+.pt-btn.accent:hover { background: var(--accent-hover); }
+.pt-btn.quiet { border-color: transparent; background: transparent; color: var(--muted); }
+.pt-btn.quiet:hover { background: var(--active); color: var(--text); }
+.pt-input { height: 36px; padding: 0 12px; border: 1px solid var(--control); border-radius: 10px; background: var(--raised); color: var(--text); font: inherit; }
+.pt-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
