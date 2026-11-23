@@ -1977,11 +1977,23 @@ async function boot(){
     const {data}=await SB.from('hd_member').select('*').eq('id',session.user.id).maybeSingle();
     if(data && data.approved && (data.status||'active')==='active') me=data;
   }
+  // 2026-11-23 — 같은 주소의 헤임달 웹에서 개인 계정으로 로그인하면 태블릿 로그인도 개인 계정으로 바뀝니다.
+  //   (5F 정원하 대표님 사무실 태블릿: 동의 단추가 「회의실 태블릿에서만 쓸 수 있습니다」로 막힘)
+  //   회의실 계정이 아니면 처음부터 회의실 계정 로그인 화면을 띄웁니다. 김현우 시험 계정은 예외.
+  let wrongAcct = '';
+  if(me && !canTest()){
+    let r = {data:null};
+    try { r = await SB.rpc('hd_is_room'); } catch(e) {}
+    if(r && r.data === false){
+      wrongAcct = '지금 「'+(me.name||me.email||'')+'」 개인 계정으로 로그인돼 있습니다. 회의실 계정으로 다시 로그인해주세요.';
+      me = null;
+    }
+  }
   // 시험 모드가 켜져 있는데 쓸 수 없는 계정이면 조용히 꺼둡니다
   if(cfg.test && !canTest()){ cfg.test=false; CFG.set(cfg); }
   await loadEvents().catch(()=>{});
   if(!me || !cfg.room){
-    setupPage(!me && session ? '이 계정은 아직 승인되지 않았습니다. 관리자에게 요청해주세요.' : '');
+    setupPage(wrongAcct || (!me && session ? '이 계정은 아직 승인되지 않았습니다. 관리자에게 요청해주세요.' : ''));
     return;
   }
   await loadMembers().catch(()=>{});
@@ -2000,6 +2012,11 @@ async function boot(){
     if(REC.mr || REC.up || KEEP.busy) return;
     await keepRecover().catch(()=>{});
     if(REC.mr || REC.up) return;
+    // 녹음 중이 아닐 때 다른 계정으로 바뀌었으면(같은 주소의 웹에서 개인 로그인) 다시 시작해 회의실 계정 로그인을 받습니다
+    try{
+      const s=(await SB.auth.getSession()).data.session;
+      if(!s || (me && s.user.id!==me.id)){ location.reload(); return; }
+    }catch(e){}
     if(sig0){
       const s=await pageSig().catch(()=>'');
       if(s && s!==sig0){ location.reload(); return; }
