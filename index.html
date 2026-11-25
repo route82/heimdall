@@ -976,6 +976,7 @@ th{background:transparent;color:var(--muted);font-size:12px}
 .role{background:var(--pill-neutral-bg);color:var(--pill-neutral-ink)}
 .t-draft{background:var(--pill-neutral-bg);color:var(--pill-neutral-ink)}
 .t-review{background:var(--warning-pale);color:var(--warning-ink)}
+.guestbar{background:var(--warning-pale);color:var(--warning-ink);border:1px solid var(--warn);border-radius:8px;padding:10px 14px;margin:0 0 14px;font-size:14px;line-height:1.5;font-weight:600}
 .t-reported{background:var(--accent-pale);color:var(--accent-ink)}
 .ht-seg{border-radius:var(--radius-control);overflow:hidden;border-color:var(--control)}
 .ht-seg button.on{background:var(--active);color:var(--text)}
@@ -1274,6 +1275,20 @@ const isAdminish = r => ['admin','dev'].includes(r);
 // 사람·브리핑까지 보는 최고 권한 (관리자 · 공동대표)
 const isTop = r => ['admin','ceo'].includes(r);
 let me=null, view='list', cur=null, editing=false;
+// 2026-11-25 게스트 계정 (홍석진 대표 11/25 — 관계사 개발 담당자가 둘러보기만). 가입 때 app_metadata.guest=true · guest_until.
+// 저장은 DB 트리거와 처리 서버가 막습니다. 화면은 안내 띠를 보이고, 쓰기 메뉴·동의 단계를 뺍니다.
+let GUEST=null;
+function guestUntilText(v){
+  const d=new Date(v||''); if(isNaN(d)) return '';
+  const p={}; new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false})
+    .formatToParts(d).forEach(x=>p[x.type]=x.value);
+  return `${+p.month}월 ${+p.day}일 ${String(p.hour).replace(/^24$/,'00').padStart(2,'0')}:${p.minute}`;
+}
+function guestBar(){
+  if(!GUEST) return '';
+  const u=guestUntilText(GUEST.until);
+  return `<div class="guestbar" role="note">게스트 계정이에요. 둘러보기만 할 수 있고, 저장·수정은 되지 않아요.${u?` ${u}까지 쓸 수 있어요.`:''}</div>`;
+}
 
 // ─────────────────────────── 화면 밝기 (어둡게 / 밝게 / 기기 설정 따름)
 // 고른 값은 ① 서버(hd_member.theme) 에 계정별로 남고
@@ -1591,6 +1606,7 @@ function shell(){
     ['보기',   [['cal','일정'],['list','회의록']]],
     ['찾기',   [['chat','물어보기']]],
   ];
+  if(GUEST){ groups.length=0; groups.push(['보기',[['list','회의록']]]); }   // 게스트: 회의실 일정(실제 예약)·쓰기·물어보기 없음
   const admin = [];
   if(['admin','ceo','dev'].includes(me.role)) admin.push(['brief','브리핑']);
   if(['admin','ceo','exec','dev'].includes(me.role)) admin.push(['usage','사용료']);
@@ -1640,6 +1656,7 @@ function shell(){
          <button class="btn" id="out-m" title="로그아웃">로그아웃</button></div>
      </div>
      <div class="wrap">
+       ${guestBar()}
        <div class="page" id="p-home"></div><div class="page" id="p-cal"></div><div class="page" id="p-list"></div><div class="page" id="p-search"></div>
        <div class="page" id="p-actions"></div><div class="page" id="p-brief"></div>
        <div class="page" id="p-chat"></div><div class="page" id="p-projects"></div>
@@ -2100,6 +2117,8 @@ async function renderHome(){
     <div id="h-rec" class="hrec"><div class="sub">내 회의를 불러오는 중…</div></div>`;
   // 회의실 예약만 쓰는 법인은 물어보기·확정 카드를 숨깁니다
   if(isBookOnly()){ const a=el.querySelector('.hask'); if(a) a.remove(); const c=$('#h-cf'); if(c) c.remove(); drawHomeTL(); drawHomeMy(); return; }
+  // 게스트는 물어보기·확정 카드·회의실 일정(실제 예약)을 숨기고 볼 수 있는 회의만 보입니다
+  if(GUEST){ ['.hask','#h-cf','#h-tl'].forEach(k=>{ const x=el.querySelector(k); if(x) x.remove(); }); drawHomeMy(); return; }
   drawHomeConfirm();
   const hask=()=>{ const q=($('#hq').value||'').trim(); if(!q) return $('#hq').focus(); CHATQ=q; go('chat'); };
   $('#hqgo').onclick=hask; $('#hq').onkeydown=e=>{ if(e.key==='Enter' && !e.isComposing) hask(); };
@@ -2290,6 +2309,7 @@ async function bookSend(meta, label, waitMs){
 // 진입점(일정 「+ 회의실 예약」 · 홈 「+ 예약」 · 홈 시간표 빈칸)은 그대로 bookOpen(미리 채울 값)을 부릅니다.
 let BK={};                      // 미리 채울 값 + 어느 화면에서 왔는지
 function bookOpen(keep){
+  if(GUEST){ alert('게스트 계정이에요. 둘러보기만 할 수 있고, 저장·수정은 되지 않아요.'); return; }
   BK=Object.assign({}, keep||{}, {from: view && view!=='book' ? view : 'cal'});
   go('book');
 }
@@ -2688,7 +2708,7 @@ async function drawHomeMy(){
         <div class="hm-when">${esc(m.held_on||'')}${timeText(m)?' '+esc(timeText(m)):''}</div>
         <div class="hm-tt">${esc(tp.name)}<small>${esc(tp.tag||'')}${m.dept?' · '+esc(m.dept):''}</small></div>
         ${(m.status==='confirmed'||m.status==='reported')?'<span class="tag t-reported">✓ 확정</span>':'<span class="tag t-draft">초안</span>'}
-        ${m.visibility==='private'?'<span style="color:var(--warn);font-size:12px">나만 보기</span>':''}</div>`;
+        ${m.visibility==='private'&&!GUEST?'<span style="color:var(--warn);font-size:12px">나만 보기</span>':''}</div>`;
     }).join('') : '<div class="empty">아직 참석한 회의가 없습니다.</div>';
   }
   box.innerHTML=head()+rows
@@ -2848,6 +2868,7 @@ function seriesKey(m){
 
 // 앞으로 잡힌 회의 — 아직 녹음하지 않은 예약만 보여줍니다
 async function upcomingHtml(){
+  if(GUEST) return '';                   // 게스트에게는 실제 회의실 예약을 보이지 않습니다 (2026-11-25)
   const now = new Date();
   const to  = new Date(now.getTime() + 14*24*3600*1000);
   const [cal, mtg] = await Promise.all([
@@ -2895,7 +2916,7 @@ async function renderList(){
   }
   else if(F.pid) q = q.eq('project_id',F.pid);
   else if(F.co){
-    q = q.neq('visibility','private');
+    if(!GUEST) q = q.neq('visibility','private');
     q = F.co===PJ_NOCO ? q.or('company.is.null,company.eq.') : q.eq('company',F.co);
     if(F.dept) q = F.dept===PJ_NODEPT ? q.or('dept.is.null,dept.eq.') : q.eq('dept',F.dept);
   }
@@ -2950,7 +2971,7 @@ async function renderList(){
           ${timeText(m)?`<span>${esc(timeText(m))}</span>`:''}
           <span>${esc(attLine((ATT[m.id]||[]).map(a=>a.name)))}</span>
           ${m.dept?`<span>${esc(m.dept)}</span>`:''}
-          ${m.visibility==='private'?'<span style="color:var(--warn)">나만 보기</span>':''}</div>
+          ${m.visibility==='private'&&!GUEST?'<span style="color:var(--warn)">나만 보기</span>':''}</div>
         ${m.summary_md
           ? `<div class="csum">${esc(oneLine(m.summary_md))}</div>`
           : '<div class="csum none">요약 없음</div>'}</div>`; };
@@ -3129,7 +3150,7 @@ function drawMeeting(){
     ${(!okd && m.confirm_rule && m.visibility!=='private' && m.status==='review')?`<span class="tag t-draft" title="담당자가 회의록을 확인해 [회의 확정]을 누르기 전입니다">초안 · ${m.confirm_owner_name?'담당자 '+esc(m.confirm_owner_name)+' 확정 전':'확정 전 (담당자 미정)'}</span>`:''}
     ${m.source?`<span class="tag" style="background:var(--warnbg);color:var(--warn)">${esc(m.source)} 사용 회의</span>`:''}
     ${m.status==='archived'?'<span class="tag t-draft">보관</span>':''}
-    ${m.visibility==='private'?'<span class="tag" style="background:var(--errbg);color:var(--warn)">나만 보기</span>':''}</div>
+    ${m.visibility==='private'&&!GUEST?'<span class="tag" style="background:var(--errbg);color:var(--warn)">나만 보기</span>':''}</div>
   ${(document.title=(tp.name||'회의록')+' · 헤임달')?'':''}
   <h1 class="mttl"><span class="mtag">${esc(tp.tag)}</span> <span id="mtitle">${esc(tp.name)}</span></h1>
   ${sub?`<div class="msub">${esc(sub)}</div>`:''}
@@ -4822,9 +4843,10 @@ async function loadSideTree(force){
 function drawSideTree(){
   const el=$('#stree'); if(!el||!SDATA) return;
   const {projects}=SDATA;
-  const meetings=SDATA.all.filter(m=>m.visibility!=='private');
-  const myNotes =SDATA.all.filter(m=>m.visibility==='private' && m.owner_id===me.id);
-  const shNotes =SDATA.all.filter(m=>m.visibility==='private' && m.owner_id!==me.id);
+  // 게스트의 시연 회의는 비공개로 저장돼 있지만 노트가 아니라 회의로 보입니다 (2026-11-25)
+  const meetings=SDATA.all.filter(m=>GUEST||m.visibility!=='private');
+  const myNotes =GUEST?[]:SDATA.all.filter(m=>m.visibility==='private' && m.owner_id===me.id);
+  const shNotes =GUEST?[]:SDATA.all.filter(m=>m.visibility==='private' && m.owner_id!==me.id);
   const nkind=m=>m.source==='아이디어 노트'?'idea':m.source==='지시사항'?'order':m.source==='개인 면담'?'talk':'etc';
   const NOTES='내 노트';
   const pcos=p=>(p.companies&&p.companies.length)?p.companies:(p.company?[p.company]:[PJ_NOCO]);
@@ -4917,9 +4939,10 @@ async function renderProjects(){
   const projects=pj.data||[];
   const all=ms.data||[];
   // 개인 노트는 회사 폴더가 아니라 「내 노트」 폴더로 갑니다
-  const meetings=all.filter(m=>m.visibility!=='private');
-  const myNotes =all.filter(m=>m.visibility==='private' && m.owner_id===me.id);
-  const shNotes =all.filter(m=>m.visibility==='private' && m.owner_id!==me.id);
+  // 게스트의 시연 회의는 비공개로 저장돼 있지만 노트가 아니라 회의로 보입니다 (2026-11-25)
+  const meetings=all.filter(m=>GUEST||m.visibility!=='private');
+  const myNotes =GUEST?[]:all.filter(m=>m.visibility==='private' && m.owner_id===me.id);
+  const shNotes =GUEST?[]:all.filter(m=>m.visibility==='private' && m.owner_id!==me.id);
   const nkind=m=>m.source==='아이디어 노트'?'idea':m.source==='지시사항'?'order':m.source==='개인 면담'?'talk':'etc';
   const NOTES='내 노트';
   const canMake=['admin','ceo','manager','dev'].includes(me.role);
@@ -6760,6 +6783,7 @@ async function boot(){
   //   주소만 치면 회의록이 그대로 열립니다. 그래서 여기서 막습니다.
   if(isRoomAccount(data)) return roomAcctPage(data);
   me=data;
+  { const am=(session.user&&session.user.app_metadata)||{}; GUEST = am.guest===true ? {until: am.guest_until||''} : null; }
   // 계정에 저장된 밝기가 있으면 그것이 이깁니다 (다른 컴퓨터에서도 같게 보입니다)
   if(data.theme) applyTheme(data.theme);
   // 로그인 직후 주소에 남는 토큰(#access_token=…)은 바로 지웁니다 — 주소를 복사해 보내면 그 계정으로 들어올 수 있습니다
@@ -6768,6 +6792,7 @@ async function boot(){
   const enter=()=>{ shell(); checkPending(); route(); };
   // 2026-11-16 처음 로그인하거나 안내문이 바뀌면 회의 녹음 안내와 동의를 먼저 받습니다 (시험용 화면에서만)
   // 2026-11-16 미리보기 — 주소 끝 ?onboard=1 이면 첫 사용 단계를 처음부터 보여 주되 아무것도 기록하지 않습니다
+  if(GUEST) return enter();                        // 게스트는 녹음 동의·목소리 등록 단계가 없습니다 (저장이 막혀 있어 멈춥니다)
   if(isBookOnly()) return enter();                 // 회의실 예약만 쓰는 법인은 녹음 동의·목소리 등록 단계가 없습니다
   if(CONSENT_ON && OB_PREVIEW){ await consentVerLoad(); CONSENT_PREV=''; return consentPage(enter); }
   if(CONSENT_ON && await consentNeeded()) return consentPage(enter);
